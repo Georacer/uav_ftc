@@ -1,10 +1,11 @@
-#%%
+# %%
 import numpy as np
 from numpy import sin, cos, tan
 from dataclasses import dataclass
 from typing import Any
 
-#%%
+# %%
+
 
 @dataclass
 class Vector3:
@@ -17,14 +18,15 @@ class Vector3:
 
     def from_array(self, arr):
         # Convert a numpy array to Vector3
-        if len(arr)==1: # arr is a 1-dimensional array
+        if len(arr) == 1:  # arr is a 1-dimensional array
             self.x = arr[0]
             self.y = arr[1]
-            self.z = arr[2] 
-        else: # Arr is a 2-dimensional vertical vector array
-            self.x = arr[0,0]
-            self.y = arr[1,0]
-            self.z = arr[2,0]
+            self.z = arr[2]
+        else:  # Arr is a 2-dimensional vertical vector array
+            self.x = arr[0, 0]
+            self.y = arr[1, 0]
+            self.z = arr[2, 0]
+
 
 @dataclass
 class Inputs:
@@ -33,9 +35,29 @@ class Inputs:
     delta_t: float = 0
     delta_r: float = 0
 
+    def to_array(self):
+        return np.transpose(np.array([[self.delta_a,
+                                       self.delta_e,
+                                       self.delta_t,
+                                       self.delta_r]]))
+
+    def from_array(self, arr):
+        # Convert a numpy array to Vector3
+        if len(arr) == 1:  # arr is a 1-dimensional array
+            self.delta_a = arr[0]
+            self.delta_e = arr[1]
+            self.delta_t = arr[2]
+            self.delta_r = arr[3]
+        else:  # Arr is a 2-dimensional vertical vector array
+            self.delta_a = arr[0, 0]
+            self.delta_e = arr[1, 0]
+            self.delta_t = arr[2, 0]
+            self.delta_r = arr[3, 0]
+
+
 @dataclass
-class aircraft_state: 
-    pos: Vector3 = Vector3() # NED position
+class aircraft_state:
+    pos: Vector3 = Vector3()  # NED position
     att: Vector3 = Vector3()  # Euler angles attitude
     airdata: Vector3 = Vector3()  # Airdata triplet
     ang_vel: Vector3 = Vector3()  # Body-frame angular velocity
@@ -46,8 +68,27 @@ class aircraft_state:
              f'Attitude={repr(self.att)}\n'
              f'Airdata={repr(self.airdata)}\n'
              f'Angular Velocity={repr(self.ang_vel)}'
-            )
+             )
         return s
+
+    def to_array(self):
+        # Convert data object to a 12 x 1 numpy array
+        output = np.zeros([12, 1])
+        output[0, 0] = self.pos.x
+        output[1, 0] = self.pos.y
+        output[2, 0] = self.pos.z
+        output[3, 0] = self.att.x
+        output[4, 0] = self.att.y
+        output[5, 0] = self.att.z
+        output[6, 0] = self.airdata.x
+        output[7, 0] = self.airdata.y
+        output[8, 0] = self.airdata.z
+        output[9, 0] = self.ang_vel.x
+        output[10, 0] = self.ang_vel.y
+        output[11, 0] = self.ang_vel.z
+
+        return output
+
 
 def eul_to_rot_mat(att: Vector3):
     # Convert Euler angle (roll, pitch, yaw) vector to rotation matrix from
@@ -70,6 +111,7 @@ def eul_to_rot_mat(att: Vector3):
     ])
     return R
 
+
 def eul_to_e(att: Vector3):
     # Create E matrix from Euler angle (roll, pitch, yaw) vector.
     # E matrix premultiplies angular rates to produce Euler angle derivatives
@@ -90,6 +132,7 @@ def eul_to_e(att: Vector3):
     ])
     return E
 
+
 def airdata_to_s(alpha, beta):
     # Create rotation matrix S, which transforms from body frame to wind frame
     sa = sin(alpha)
@@ -104,6 +147,7 @@ def airdata_to_s(alpha, beta):
     ])
     return S
 
+
 def airdata_to_u(airdata: Vector3) -> Vector3:
     # Convert airdata triplet to Body frame velocities
     Va = airdata.x
@@ -116,10 +160,12 @@ def airdata_to_u(airdata: Vector3) -> Vector3:
 
     return Vector3(u, v, w)
 
+
 def get_qbar(V_a: float) -> float:
     # Return dynamic pressure
     rho = 1.225
     return 0.5*rho*V_a
+
 
 def get_wrench_gravity(state: aircraft_state):
     # Returns a wrench tuple (F, M)
@@ -133,8 +179,9 @@ def get_wrench_gravity(state: aircraft_state):
     F = Vector3()
     M = Vector3()
     F.from_array(R_i_b @ g_i)
-    M.from_array(np.zeros([3,1]))
+    M.from_array(np.zeros([3, 1]))
     return (F, M)
+
 
 def get_wrench_prop(state: aircraft_state, input: Inputs):
     # Returns a wrench tuple (F, M)
@@ -147,11 +194,12 @@ def get_wrench_prop(state: aircraft_state, input: Inputs):
 
     v_a = aircraft_state.airdata.x
     deltat = input.delta_t
-    thrust = 0.5*1.225*s_prop*((k_m*deltat)**2 - v_a**2) 
+    thrust = 0.5*1.225*s_prop*((k_m*deltat)**2 - v_a**2)
     F = Vector3(0, 0, thrust)
     M = Vector3()
 
     return (F, M)
+
 
 def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     # Returns a wrench tuple (F, M)
@@ -180,7 +228,7 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     c_y_p = 0
     c_y_r = 0
     c_y_deltaa = 0
-    c_y_deltar = -0.2 #opposite sign than c_n_deltar
+    c_y_deltar = -0.2  # opposite sign than c_n_deltar
 
     c_l_0 = 0
     c_l_p = -1.0
@@ -197,7 +245,7 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     c_n_p = 0.022
     c_n_r = -1
     c_n_deltaa = 0.00
-    c_n_deltar = 0.1 #opposite sign than c_y_deltar
+    c_n_deltar = 0.1  # opposite sign than c_y_deltar
 
     deltaa_max = 0.3491
     deltae_max = 0.3491
@@ -207,7 +255,7 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     airdata = state.airdata
     Va = airdata.x
     alpha = airdata.y
-    if (alpha>alpha_stall):
+    if (alpha > alpha_stall):
         alpha = alpha_stall
     beta = airdata.z
 
@@ -221,16 +269,18 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     deltar = deltar_max*input.delta_r
 
     qbar = get_qbar(Va)
-    F_lift = qbar*s*(c_lift_0 + c_lift_a*alpha + c_lift_q*c/(2*Va)*q + c_lift_deltae*deltae)
-    F_drag = qbar*s*(c_drag_0 + c_drag_a*alpha + c_drag_q*c/(2*Va)*q + c_drag_deltae*deltae)
-    F_Y = qbar*s*(c_y_0 + c_y_b*beta + b/(2*Va)*(c_y_p*p + c_y_r*r) \
-        + c_y_deltaa*deltaa + c_y_deltar*deltar)
+    F_lift = qbar*s*(c_lift_0 + c_lift_a*alpha + c_lift_q *
+                     c/(2*Va)*q + c_lift_deltae*deltae)
+    F_drag = qbar*s*(c_drag_0 + c_drag_a*alpha + c_drag_q *
+                     c/(2*Va)*q + c_drag_deltae*deltae)
+    F_Y = qbar*s*(c_y_0 + c_y_b*beta + b/(2*Va)*(c_y_p*p + c_y_r*r)
+                  + c_y_deltaa*deltaa + c_y_deltar*deltar)
 
-    l = qbar*s*b*(c_l_0 + c_l_b*beta + b/(2*Va)*(c_l_p*p + c_l_r*r) \
-        + c_l_deltaa*deltaa + c_l_deltar*deltar)
+    l = qbar*s*b*(c_l_0 + c_l_b*beta + b/(2*Va)*(c_l_p*p + c_l_r*r)
+                  + c_l_deltaa*deltaa + c_l_deltar*deltar)
     m = qbar*s*c*(c_m_0 + c_m_a*alpha + c_m_q*c/(2*Va)*q + c_m_deltae)
-    n = qbar*s*b*(c_n_0 + c_n_b*beta + b/(2*Va)*(c_n_p*p + c_n_r*r) \
-        + c_n_deltaa*deltaa + c_n_deltar*deltar)
+    n = qbar*s*b*(c_n_0 + c_n_b*beta + b/(2*Va)*(c_n_p*p + c_n_r*r)
+                  + c_n_deltaa*deltaa + c_n_deltar*deltar)
 
     F = Vector3(-F_drag, F_Y, F_lift)
     M = Vector3(l, m, n)
@@ -243,7 +293,7 @@ def get_force_dervivatives(state: aircraft_state, input: Inputs) -> Vector3:
     Va = state.airdata.x
     alpha = state.airdata.y
     beta = state.airdata.z
-    
+
     # Construct the forces in the wind frame
     F_aero, _ = get_wrench_aerodynamics(state, input)
     S = airdata_to_s(alpha, beta)
@@ -258,17 +308,18 @@ def get_force_dervivatives(state: aircraft_state, input: Inputs) -> Vector3:
 
     # Convert angular rates in wind frame
     vel_ang_w = S @ state.ang_vel.to_array()
-    q_w = vel_ang_w[1,0]
-    r_w = vel_ang_w[2,0]
+    q_w = vel_ang_w[1, 0]
+    r_w = vel_ang_w[2, 0]
 
     dot_va = 1/par_i['m']*(F_prop.x + F_aero.x + F_grav.x)
-    dot_beta = 1/(par_i['m']*Va)*(F_prop.y + F_aero.y - par_i['m']*Va*r_w \
-        + F_grav.y)
-    dot_alpha = 1/(par_i['m']*Va*cos(beta))*(F_prop.z + F_aero.z + par_i['m']*Va*q_w \
-        + F_grav.z)
+    dot_beta = 1/(par_i['m']*Va)*(F_prop.y + F_aero.y - par_i['m']*Va*r_w
+                                  + F_grav.y)
+    dot_alpha = 1/(par_i['m']*Va*cos(beta))*(F_prop.z + F_aero.z + par_i['m']*Va*q_w
+                                             + F_grav.z)
 
     airdata_der = Vector3(dot_va, dot_alpha, dot_beta)
     return airdata_der
+
 
 def get_moment_derivatives(state: aircraft_state, input: Inputs) -> Vector3:
     # Returns derivatives of p, q, r
@@ -306,9 +357,10 @@ def get_moment_derivatives(state: aircraft_state, input: Inputs) -> Vector3:
     dot_q = c_5*p*r + c_6*(p**2 - r**2) + c_7*(M_aero.y + M_prop.y + M_grav.y)
     dot_r = (c_8*p - c_2*r)*q + c_4*(M_aero.x + M_prop.x + M_grav.x) \
         + c_9*(M_aero.z + M_prop.z + M_grav.z)
-    
+
     moment_der = Vector3(dot_p, dot_q, dot_r)
     return moment_der
+
 
 def get_attitude_derivatives(state: aircraft_state) -> Vector3:
     # Returns derivatives of Euler angles
@@ -316,6 +368,7 @@ def get_attitude_derivatives(state: aircraft_state) -> Vector3:
     der_vec = Vector3()
     der_vec.from_array(der_arr)
     return der_vec
+
 
 def get_navigation_derivatives(state: aircraft_state) -> Vector3:
     B = eul_to_rot_mat(state.att)
@@ -325,6 +378,7 @@ def get_navigation_derivatives(state: aircraft_state) -> Vector3:
     der_vec.from_array(der_arr)
     return der_vec
 
+
 def get_derivatives(state: aircraft_state, input: Inputs) -> aircraft_state:
     der_vec = aircraft_state()
     der_vec.airdata = get_force_dervivatives(state, input)
@@ -332,6 +386,7 @@ def get_derivatives(state: aircraft_state, input: Inputs) -> aircraft_state:
     der_vec.att = get_attitude_derivatives(state)
     der_vec.pos = get_navigation_derivatives(state)
     return der_vec
+
 
 def inertial_parameters():
     p = dict()
@@ -342,6 +397,7 @@ def inertial_parameters():
     p['j_xz'] = 0.120
 
     return p
+
 
 if __name__ == "__main__":
 
@@ -360,4 +416,4 @@ if __name__ == "__main__":
     print('Successfully ran')
 
 
-#%%
+# %%

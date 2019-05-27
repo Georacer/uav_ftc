@@ -1,2 +1,4 @@
 
 \.vscode/
+
+include/uav_ftc/__pycache__/
