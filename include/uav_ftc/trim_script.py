@@ -8,6 +8,10 @@ import timeit
 import uav_model as mdl  # Import UAV model library
 
 
+# Raise an error when invalid floating-point operations occur
+np.seterr(invalid='raise')
+
+
 class Trimmer:
 
     x0 = None
@@ -20,12 +24,17 @@ class Trimmer:
 
     bound_phi = (np.deg2rad(-90), np.deg2rad(90))  # Allow only upright flight
     bound_theta = (np.deg2rad(-90), np.deg2rad(90))
-    bound_Va = (0, 50)
+    bound_Va = (5, 50)
     bound_alpha = (np.deg2rad(-20), np.deg2rad(90))
-    bound_beta = (np.deg2rad(-90), np.deg2rad(-90))
+    bound_beta = (np.deg2rad(-90), np.deg2rad(90))
     bound_p = (-5, 5)
     bound_q = (-5, 5)
     bound_r = (-1, 1)
+    bound_deltaa = (-1, 1)
+    bound_deltae = (-1, 1)
+    bound_deltat = (0, 1)
+    bound_deltar = (-1, 1)
+    optim_bounds = None
 
     def __init__(self,
                  model=mdl.get_derivatives,
@@ -115,11 +124,19 @@ class Trimmer:
         ix_argument = [3, 4, 6, 7, 8, 9, 10, 11]
         init_vector = np.concatenate((self.x0.to_array()[ix_argument],
                                       self.u0.to_array()), axis=0)
+        self.optim_bounds = (self.bound_phi, self.bound_theta,
+                             self.bound_Va, self.bound_alpha, self.bound_beta,
+                             self.bound_p, self.bound_q, self.bound_r,
+                             self.bound_deltaa, self.bound_deltae,
+                             self.bound_deltat, self.bound_deltar
+                             )
         res = minimize(self.cost_function_state_input_wrapper,
                        init_vector,
+                       method='SLSQP',
+                       bounds = self.optim_bounds
                        )
 
-        print(res.message)
+        print(f'Optimization result:\n {res.message}')
         if res.success:
             return res.x
         else:
@@ -182,4 +199,4 @@ if __name__ == "__main__":
 
     trimmer = Trimmer()
     trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
-    trimmer.find_trim_state()
+    trim_state = trimmer.find_trim_state()
