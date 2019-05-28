@@ -1,7 +1,7 @@
 # %%
 import numpy as np
 from numpy import sin, cos, tan
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 # %%
@@ -69,7 +69,8 @@ class aircraft_state:
     pos: Vector3 = field(default_factory=Vector3)  # NED position
     att: Vector3 = field(default_factory=Vector3)  # Euler angles attitude
     airdata: Vector3 = field(default_factory=Vector3)  # Airdata triplet
-    ang_vel: Vector3 = field(default_factory=Vector3)  # Body-frame angular velocity
+    # Body-frame angular velocity
+    ang_vel: Vector3 = field(default_factory=Vector3)
 
     def __repr__(self):
         s = (f'{self.__class__.__name__}:\n'
@@ -173,7 +174,7 @@ def airdata_to_u(airdata: Vector3) -> Vector3:
 def get_qbar(V_a: float) -> float:
     # Return dynamic pressure
     rho = 1.225
-    return 0.5*rho*V_a
+    return 0.5*rho*V_a**2
 
 
 def get_wrench_gravity(state: aircraft_state):
@@ -181,13 +182,16 @@ def get_wrench_gravity(state: aircraft_state):
     # F is a Vector3 with forces in Body frame
     # M is a Vector3 with moments in Body frame
 
+    par_i = inertial_parameters()
+    m = par_i['m']
+
     euler_angles = state.att
     R_i_b = eul_to_rot_mat(euler_angles)
     g = 9.81
-    g_i = np.array([[0, 0, g]]).T
+    Fg_i = np.array([[0, 0, m*g]]).T
     F = Vector3()
     M = Vector3()
-    F.from_array(R_i_b @ g_i)
+    F.from_array(R_i_b @ Fg_i)
     M.from_array(np.zeros([3, 1]))
     return (F, M)
 
@@ -278,10 +282,10 @@ def get_wrench_aerodynamics(state: aircraft_state, inputs: Inputs):
     deltar = deltar_max*inputs.delta_r
 
     qbar = get_qbar(Va)
-    F_lift = qbar*s*(c_lift_0 + c_lift_a*alpha + c_lift_q *
-                     c/(2*Va)*q + c_lift_deltae*deltae)
-    F_drag = qbar*s*(c_drag_0 + c_drag_a*alpha + c_drag_q *
-                     c/(2*Va)*q + c_drag_deltae*deltae)
+    F_lift = qbar*s*(c_lift_0 + c_lift_a*alpha + c_lift_q*c/(2*Va)*q
+                     + c_lift_deltae*deltae)
+    F_drag = qbar*s*(c_drag_0 + c_drag_a*alpha + c_drag_q*c/(2*Va)*q
+                     + c_drag_deltae*deltae)
     F_Y = qbar*s*(c_y_0 + c_y_b*beta + b/(2*Va)*(c_y_p*p + c_y_r*r)
                   + c_y_deltaa*deltaa + c_y_deltar*deltar)
 
@@ -291,7 +295,7 @@ def get_wrench_aerodynamics(state: aircraft_state, inputs: Inputs):
     n = qbar*s*b*(c_n_0 + c_n_b*beta + b/(2*Va)*(c_n_p*p + c_n_r*r)
                   + c_n_deltaa*deltaa + c_n_deltar*deltar)
 
-    F = Vector3(-F_drag, F_Y, F_lift)
+    F = Vector3(-F_drag, F_Y, -F_lift)
     M = Vector3(l, m, n)
     return (F, M)
 
