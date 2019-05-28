@@ -15,6 +15,7 @@ np.seterr(invalid='raise')
 class Trimmer:
 
     x0 = None
+    dx0 = None
     u0 = None
     x_des = None
     x_dot_des = None
@@ -62,26 +63,32 @@ class Trimmer:
         if dx0 is not None:
             self.dx0 = dx0
 
-    def setup_trim_trajectory(self,
-                              Va=15,
-                              gamma=0,
-                              R=np.inf
-                              ):
+    def setup_trim_trajectory(self, Va, gamma, R):
+        # Setup initial seed
         self.x0 = mdl.aircraft_state()
         self.x0.att.y = gamma
-        self.x0.airdata.Va = Va
+        self.x0.airdata.x = Va
+
+        # self.x0.airdata.y = -0.02
+        # self.x0.att.x = 0.8
+        # self.x0.ang_vel.y = 0.1
+        # self.x0.ang_vel.z = 0.1
+        # self.u0 = mdl.Inputs(0, 0.3, 0.44, 0.5)
+
         self.u0 = mdl.Inputs(0, 0, 0.5, 0)
 
         self.x_des = mdl.aircraft_state()
-        self.x_des.airdata.Va = Va
-        self.x_des.airdata.beta = 0
+        self.x_des.airdata.x = Va
+        self.x_des.airdata.z = 0
+        self.ix = [6, 8]  # Indices of trim states which should be satisfied
+
         self.x_dot_des = mdl.aircraft_state()
         self.x_dot_des.pos.z = -Va*sin(gamma)
         self.x_dot_des.att.z = Va/R*cos(gamma)
+        # Indices of trim derivatives which should be satisfied
+        self.idx = slice(2, 12)
 
-        self.ix = [6, 8]  # Indices of trim states
-        self.idx = slice(2, 12)  # Indices of trim derivatives
-        self.iu = [3]
+        self.iu = [2]  # Indices of input for cost reduction
 
     def setup_trim_states(self, phi, theta, Va, alpha, beta, r):
         self.x_des = mdl.aircraft_state()
@@ -118,10 +125,12 @@ class Trimmer:
 
     def find_trim_state(self):
         # Find a trim state which satisfies the trim trajectory requirement
+        # Returns a tuple with the trim states and trim inputs
         if self.x_dot_des is None or self.x_des is None:
             raise ValueError('Target model derivatives or states not set')
 
         ix_argument = [3, 4, 6, 7, 8, 9, 10, 11]
+        # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
         init_vector = np.concatenate((self.x0.to_array()[ix_argument],
                                       self.u0.to_array()), axis=0)
         self.optim_bounds = (self.bound_phi, self.bound_theta,
@@ -132,15 +141,33 @@ class Trimmer:
                              )
         res = minimize(self.cost_function_state_input_wrapper,
                        init_vector,
-                       method='SLSQP',
-                       bounds = self.optim_bounds
+                       method='SLSQP', options={'disp': True},
+                       #    method='L-BFGS-B',
+                       bounds=self.optim_bounds,
+                       callback=self.optim_callback
                        )
-
-        print(f'Optimization result:\n {res.message}')
         if res.success:
-            return res.x
+            optim_result_s = 'SUCCESS'
         else:
-            return None
+            optim_result_s = 'FAILURE'
+        print(f'Optimization result: {optim_result_s}\n {res.message}')
+        print(f' Optimization ended in {res.nit} iterations\n'
+              f' Optimization error: {res.fun}')
+        if res.success:
+            trim_state = mdl.aircraft_state()
+            trim_state.att.x = res.x[0]
+            trim_state.att.y = res.x[1]
+            trim_state.airdata.x = res.x[2]
+            trim_state.airdata.y = res.x[3]
+            trim_state.airdata.z = res.x[4]
+            trim_state.ang_vel.x = res.x[5]
+            trim_state.ang_vel.y = res.x[6]
+            trim_state.ang_vel.z = res.x[7]
+
+            trim_inputs = mdl.Inputs(*res.x[8:12])
+            return (trim_state, trim_inputs)
+        else:
+            return (None, None)
 
     def find_trim_input(self):
         # Find a trim input wich satisfies the trim state
@@ -171,7 +198,7 @@ class Trimmer:
         return self.cost_function(state, inputs)
 
     def cost_function(self, state: mdl.aircraft_state, inputs: mdl.Inputs):
-        # Penalize derivatives as well as input
+        # Penalize derivatives and states errors as well as input
 
         x_dot = self.model(state, inputs).to_array()
         x_dot_err = self.x_dot_des.to_array()[self.idx] - x_dot[self.idx]
@@ -190,13 +217,31 @@ class Trimmer:
 
         return cost
 
+    def optim_callback(self, arguments):
+        # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
+        phi, theta = arguments[0:2]
+        Va, alpha, beta = arguments[2:5]
+        p, q, r = arguments[5:8]
+        da, de, dt, dr = arguments[8:12]
+
+        # Fill out cost function arguments
+        state = mdl.aircraft_state()
+        state.att = mdl.Vector3(phi, theta, 0)  # Yaw isn't optimized
+        state.airdata = mdl.Vector3(Va, alpha, beta)
+        state.ang_vel = mdl.Vector3(p, q, r)
+        inputs = mdl.Inputs(da, de, dt, dr)
+
+        print(f'Current optimization step:'
+              f'{state}',
+              f'{inputs}')
+
 
 if __name__ == "__main__":
 
     Va_des = 15
-    gamma_des = 0
-    R_des = np.inf
+    gamma_des = np.deg2rad(0)
+    R_des = 100
 
     trimmer = Trimmer()
     trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
-    trim_state = trimmer.find_trim_state()
+    (trim_state, trim_inputs) = trimmer.find_trim_state()
