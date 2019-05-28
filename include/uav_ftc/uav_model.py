@@ -367,7 +367,7 @@ def get_moment_derivatives(state: aircraft_state, inputs: Inputs) -> Vector3:
 
     dot_p = (c_1*r + c_2*p)*q + c_3*(M_aero.x + M_prop.x + M_grav.x) + \
         + c_4*(M_aero.z + M_prop.z + M_grav.z)
-    dot_q = c_5*p*r + c_6*(p**2 - r**2) + c_7*(M_aero.y + M_prop.y + M_grav.y)
+    dot_q = c_5*p*r - c_6*(p**2 - r**2) + c_7*(M_aero.y + M_prop.y + M_grav.y)
     dot_r = (c_8*p - c_2*r)*q + c_4*(M_aero.x + M_prop.x + M_grav.x) \
         + c_9*(M_aero.z + M_prop.z + M_grav.z)
 
