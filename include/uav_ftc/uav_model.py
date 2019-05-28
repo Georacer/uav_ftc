@@ -35,6 +35,15 @@ class Inputs:
     delta_t: float = 0
     delta_r: float = 0
 
+    def __repr__(self):
+        s = (f'{self.__class__.__name__}:\n'
+             f'delta_a={self.delta_a}\n'
+             f'delta_e={self.delta_e}\n'
+             f'delta_t={self.delta_t}\n'
+             f'delta_r={self.delta_r}\n'
+             )
+        return s
+
     def to_array(self):
         return np.transpose(np.array([[self.delta_a,
                                        self.delta_e,
