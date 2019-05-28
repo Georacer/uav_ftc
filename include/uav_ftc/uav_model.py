@@ -40,7 +40,7 @@ class Inputs:
              f'delta_a={self.delta_a}\n'
              f'delta_e={self.delta_e}\n'
              f'delta_t={self.delta_t}\n'
-             f'delta_r={self.delta_r}\n'
+             f'delta_r={self.delta_r}'
              )
         return s
 
@@ -66,17 +66,17 @@ class Inputs:
 
 @dataclass
 class aircraft_state:
-    pos: Vector3 = Vector3()  # NED position
-    att: Vector3 = Vector3()  # Euler angles attitude
-    airdata: Vector3 = Vector3()  # Airdata triplet
-    ang_vel: Vector3 = Vector3()  # Body-frame angular velocity
+    pos: Vector3 = field(default_factory=Vector3)  # NED position
+    att: Vector3 = field(default_factory=Vector3)  # Euler angles attitude
+    airdata: Vector3 = field(default_factory=Vector3)  # Airdata triplet
+    ang_vel: Vector3 = field(default_factory=Vector3)  # Body-frame angular velocity
 
     def __repr__(self):
         s = (f'{self.__class__.__name__}:\n'
-             f'Position={repr(self.pos)}\n'
-             f'Attitude={repr(self.att)}\n'
-             f'Airdata={repr(self.airdata)}\n'
-             f'Angular Velocity={repr(self.ang_vel)}'
+             f'pos={repr(self.pos)}\n'
+             f'att={repr(self.att)}\n'
+             f'airdata={repr(self.airdata)}\n'
+             f'ang_vel={repr(self.ang_vel)}'
              )
         return s
 
@@ -181,7 +181,7 @@ def get_wrench_gravity(state: aircraft_state):
     # F is a Vector3 with forces in Body frame
     # M is a Vector3 with moments in Body frame
 
-    euler_angles = aircraft_state.att
+    euler_angles = state.att
     R_i_b = eul_to_rot_mat(euler_angles)
     g = 9.81
     g_i = np.array([[0, 0, g]]).T
@@ -192,7 +192,7 @@ def get_wrench_gravity(state: aircraft_state):
     return (F, M)
 
 
-def get_wrench_prop(state: aircraft_state, input: Inputs):
+def get_wrench_prop(state: aircraft_state, inputs: Inputs):
     # Returns a wrench tuple (F, M)
     # F is a Vector3 with forces in the Body frame
     # M is a Vector3 with moments in Body frame
@@ -201,16 +201,16 @@ def get_wrench_prop(state: aircraft_state, input: Inputs):
     c_prop = 1.0
     k_m = 40.0
 
-    v_a = aircraft_state.airdata.x
-    deltat = input.delta_t
+    v_a = state.airdata.x
+    deltat = inputs.delta_t
     thrust = 0.5*1.225*s_prop*((k_m*deltat)**2 - v_a**2)
-    F = Vector3(0, 0, thrust)
+    F = Vector3(thrust, 0, 0)
     M = Vector3()
 
     return (F, M)
 
 
-def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
+def get_wrench_aerodynamics(state: aircraft_state, inputs: Inputs):
     # Returns a wrench tuple (F, M)
     # F is a Vector3 with forces in the Wind frame
     # M is a Vector3 with moments in Body frame
@@ -273,9 +273,9 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     q = omega.y
     r = omega.z
 
-    deltaa = deltaa_max*input.delta_a
-    deltae = deltae_max*input.delta_e
-    deltar = deltar_max*input.delta_r
+    deltaa = deltaa_max*inputs.delta_a
+    deltae = deltae_max*inputs.delta_e
+    deltar = deltar_max*inputs.delta_r
 
     qbar = get_qbar(Va)
     F_lift = qbar*s*(c_lift_0 + c_lift_a*alpha + c_lift_q *
@@ -287,7 +287,7 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
 
     l = qbar*s*b*(c_l_0 + c_l_b*beta + b/(2*Va)*(c_l_p*p + c_l_r*r)
                   + c_l_deltaa*deltaa + c_l_deltar*deltar)
-    m = qbar*s*c*(c_m_0 + c_m_a*alpha + c_m_q*c/(2*Va)*q + c_m_deltae)
+    m = qbar*s*c*(c_m_0 + c_m_a*alpha + c_m_q*c/(2*Va)*q + c_m_deltae*deltae)
     n = qbar*s*b*(c_n_0 + c_n_b*beta + b/(2*Va)*(c_n_p*p + c_n_r*r)
                   + c_n_deltaa*deltaa + c_n_deltar*deltar)
 
@@ -296,7 +296,7 @@ def get_wrench_aerodynamics(state: aircraft_state, input: Inputs):
     return (F, M)
 
 
-def get_force_dervivatives(state: aircraft_state, input: Inputs) -> Vector3:
+def get_force_dervivatives(state: aircraft_state, inputs: Inputs) -> Vector3:
     # Returns tuple with derivatives of Va, alpha, beta
     par_i = inertial_parameters()
     Va = state.airdata.x
@@ -304,9 +304,9 @@ def get_force_dervivatives(state: aircraft_state, input: Inputs) -> Vector3:
     beta = state.airdata.z
 
     # Construct the forces in the wind frame
-    F_aero, _ = get_wrench_aerodynamics(state, input)
+    F_aero, _ = get_wrench_aerodynamics(state, inputs)
     S = airdata_to_s(alpha, beta)
-    F_prop_b, _ = get_wrench_prop(state, input)
+    F_prop_b, _ = get_wrench_prop(state, inputs)
     F_prop_arr = S @ F_prop_b.to_array()
     F_prop = Vector3()
     F_prop.from_array(F_prop_arr)
@@ -330,7 +330,7 @@ def get_force_dervivatives(state: aircraft_state, input: Inputs) -> Vector3:
     return airdata_der
 
 
-def get_moment_derivatives(state: aircraft_state, input: Inputs) -> Vector3:
+def get_moment_derivatives(state: aircraft_state, inputs: Inputs) -> Vector3:
     # Returns derivatives of p, q, r
     par_i = inertial_parameters()
 
@@ -340,8 +340,8 @@ def get_moment_derivatives(state: aircraft_state, input: Inputs) -> Vector3:
     r = omega.z
 
     # Construct the moments in the body frame
-    _, M_aero = get_wrench_aerodynamics(state, input)
-    _, M_prop = get_wrench_prop(state, input)
+    _, M_aero = get_wrench_aerodynamics(state, inputs)
+    _, M_prop = get_wrench_prop(state, inputs)
     _, M_grav = get_wrench_gravity(state)
 
     # Construct composite inertial coefficients
@@ -388,10 +388,10 @@ def get_navigation_derivatives(state: aircraft_state) -> Vector3:
     return der_vec
 
 
-def get_derivatives(state: aircraft_state, input: Inputs) -> aircraft_state:
+def get_derivatives(state: aircraft_state, inputs: Inputs) -> aircraft_state:
     der_vec = aircraft_state()
-    der_vec.airdata = get_force_dervivatives(state, input)
-    der_vec.ang_vel = get_moment_derivatives(state, input)
+    der_vec.airdata = get_force_dervivatives(state, inputs)
+    der_vec.ang_vel = get_moment_derivatives(state, inputs)
     der_vec.att = get_attitude_derivatives(state)
     der_vec.pos = get_navigation_derivatives(state)
     return der_vec
@@ -414,13 +414,13 @@ if __name__ == "__main__":
     current_state.airdata.x = 15
     current_state.att.x = np.deg2rad(30)
 
-    input = Inputs()
-    input.delta_a = 0.5
-    input.delta_e = 0.1
-    input.delta_t = 0.5
-    input.delta_r = 0.5
+    inputs = Inputs()
+    inputs.delta_a = 0.5
+    inputs.delta_e = 0.1
+    inputs.delta_t = 0.5
+    inputs.delta_r = 0.5
 
-    derivatives = get_derivatives(current_state, input)
+    derivatives = get_derivatives(current_state, inputs)
     print(derivatives)
     print('Successfully ran')
 
