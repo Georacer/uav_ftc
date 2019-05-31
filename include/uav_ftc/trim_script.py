@@ -94,7 +94,7 @@ class Trimmer:
 
         self.iu = [2]  # Indices of input for cost reduction
 
-    def setup_trim_states(self, phi, theta, Va, alpha, beta, r):
+    def setup_trim_states(self, phi, theta, Va, alpha, beta, r, verbose=False):
 
         self.x_des = mdl.aircraft_state()
 
@@ -126,12 +126,13 @@ class Trimmer:
         self.idx = slice(2, 12)  # Indices of trim derivatives
         self.iu = []
 
-        print(f'Requested trajectory:\n'
-              f'Airspeed: {Va} m/s\n'
-              f'Flight Path Angle: {np.rad2deg(gamma)} degrees\n'
-              f'Turn Radius: {R} m')
+        if verbose:
+            print(f'Requested trajectory:\n'
+                  f'Airspeed: {Va} m/s\n'
+                  f'Flight Path Angle: {np.rad2deg(gamma)} degrees\n'
+                  f'Turn Radius: {R} m')
 
-    def find_trim_state(self):
+    def find_trim_state(self, verbose=False):
         # Find a trim state which satisfies the trim trajectory requirement
         # Returns a tuple with the trim states and trim inputs
         if self.x_dot_des is None or self.x_des is None:
@@ -158,9 +159,12 @@ class Trimmer:
             optim_result_s = 'SUCCESS'
         else:
             optim_result_s = 'FAILURE'
-        print(f'Optimization result: {optim_result_s}\n {res.message}')
-        print(f' Optimization ended in {res.nit} iterations\n'
-              f' Optimization error: {res.fun}')
+
+        if verbose:
+            print(f'Optimization result: {optim_result_s}\n {res.message}')
+            print(f' Optimization ended in {res.nit} iterations\n'
+                f' Optimization error: {res.fun}')
+
         if res.success:
             trim_state = mdl.aircraft_state()
             trim_state.att.x = res.x[0]
@@ -177,7 +181,7 @@ class Trimmer:
         else:
             return (None, None)
 
-    def find_trim_input(self):
+    def find_trim_input(self, verbose=False):
         # Find a trim input wich satisfies the trim state
         if self.x_des is None:
             raise ValueError('Target state not set')
@@ -197,9 +201,12 @@ class Trimmer:
             optim_result_s = 'SUCCESS'
         else:
             optim_result_s = 'FAILURE'
-        print(f'Optimization result: {optim_result_s}\n {res.message}')
-        print(f' Optimization ended in {res.nit} iterations\n'
-              f' Optimization error: {res.fun}')
+
+        if verbose:
+            print(f'Optimization result: {optim_result_s}\n {res.message}')
+            print(f' Optimization ended in {res.nit} iterations\n'
+                f' Optimization error: {res.fun}')
+
         if res.success:
             trim_inputs = mdl.Inputs(*res.x)
             return trim_inputs
@@ -284,11 +291,10 @@ def build_envelope(trimmer: Trimmer):
     # build state polyhedron
     dimension_resolution = 2
     # We shall assume coordinated turn. p, q are constructed from the other 6 arguments
-    axes_names = trimmer.states - set(['p', 'q'])  
+    axes_names = trimmer.states - set(['p', 'q'])
     axes_list = np.array([np.linspace(trimmer.bounds_dict[axis][0], trimmer.bounds_dict[axis][1], dimension_resolution)
-                 for axis in axes_names])
+                          for axis in axes_names])
     fl_env_dimension = tuple([len(axis) for axis in axes_list])
-    print(fl_env_dimension)
     fl_env = np.fromfunction(  # Function must support vector inputs
         np.vectorize(build_fe_element, excluded=('axes_list', 'trimmer')), fl_env_dimension, axes_list=axes_list, trimmer=trimmer)
     # iterate over all points
