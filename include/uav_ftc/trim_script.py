@@ -35,6 +35,10 @@ class Trimmer:
     bound_deltae = (-1, 1)
     bound_deltat = (0, 1)
     bound_deltar = (-1, 1)
+    states = set(['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r'])
+    bounds_tuple = (bound_phi, bound_theta, bound_Va,
+                    bound_alpha, bound_beta, bound_p, bound_q, bound_r)
+    bounds_dict = dict(zip(states, bounds_tuple))
     optim_bounds = None
 
     def __init__(self,
@@ -91,6 +95,7 @@ class Trimmer:
         self.iu = [2]  # Indices of input for cost reduction
 
     def setup_trim_states(self, phi, theta, Va, alpha, beta, r):
+
         self.x_des = mdl.aircraft_state()
 
         # Calculate dependent state elements
@@ -98,30 +103,33 @@ class Trimmer:
         p = -k*sin(theta)
         q = k*sin(phi)*cos(theta)
 
-        # Setup directly selected quantities
+        # Fix state requirements
         self.x_des.att.x = phi
         self.x_des.att.y = theta
-        self.x_des.airdata.Va = Va
-        self.x_des.airdata.alpha = alpha
-        self.x_des.airdata.beta = beta
+        self.x_des.airdata.x = Va
+        self.x_des.airdata.y = alpha
+        self.x_des.airdata.z = beta
         self.x_des.ang_vel.x = p
         self.x_des.ang_vel.y = q
         self.x_des.ang_vel.z = r
 
-        # Setup derived quantities
+        # Calculate derived quantities
         gamma = theta - alpha
         R = Va/r*cos(gamma)*cos(phi)*cos(theta)
-        self.x_des.ang_vel.x = -Va/R*cos(gamma)*sin(theta)
-        self.x_des.ang_vel.y = Va/R*cos(gamma)*sin(phi)*cos(theta)
 
         self.x_dot_des = mdl.aircraft_state()
         self.x_dot_des.pos.z = -Va*sin(gamma)
-        self.x_dot_des.att.z = Va/R*cos(gamma)
+        self.x_dot_des.att.z = k  # k=Va/R*cos(gamma)
 
         # Set error indices
         self.ix = []  # Indices of trim states
         self.idx = slice(2, 12)  # Indices of trim derivatives
-        self.iu = [3]
+        self.iu = []
+
+        print(f'Requested trajectory:\n'
+              f'Airspeed: {Va} m/s\n'
+              f'Flight Path Angle: {np.rad2deg(gamma)} degrees\n'
+              f'Turn Radius: {R} m')
 
     def find_trim_state(self):
         # Find a trim state which satisfies the trim trajectory requirement
@@ -174,10 +182,33 @@ class Trimmer:
         if self.x_des is None:
             raise ValueError('Target state not set')
 
+        # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
+        init_vector = self.u0.to_array()
+        self.optim_bounds = (self.bound_deltaa, self.bound_deltae,
+                             self.bound_deltat, self.bound_deltar)
+        res = minimize(self.cost_function_input_wrapper,
+                       init_vector,
+                       #   method='SLSQP', options={'disp': True},
+                       method='L-BFGS-B',
+                       #    method='TNC'
+                       #   bounds=self.optim_bounds,
+                       )
+        if res.success:
+            optim_result_s = 'SUCCESS'
+        else:
+            optim_result_s = 'FAILURE'
+        print(f'Optimization result: {optim_result_s}\n {res.message}')
+        print(f' Optimization ended in {res.nit} iterations\n'
+              f' Optimization error: {res.fun}')
+        if res.success:
+            trim_inputs = mdl.Inputs(*res.x)
+            return trim_inputs
+        else:
+            return None
+
     def cost_function_input_wrapper(self, arguments):
         # arguments: da, de, dt, dr
-        inputs = mdl.Inputs()
-        inputs.from_array(arguments)
+        inputs = mdl.Inputs(*arguments)
 
         return self.cost_function(self.x_des, inputs)
 
@@ -218,6 +249,7 @@ class Trimmer:
         return cost
 
     def optim_callback(self, arguments):
+        # Optimization callback for state+inputs trim set search
         # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
         phi, theta = arguments[0:2]
         Va, alpha, beta = arguments[2:5]
@@ -236,12 +268,61 @@ class Trimmer:
               f'{inputs}')
 
 
+def build_fe_element(*indices, axes_list=None, trimmer=Trimmer()):
+    # For some reason indces are passed as floats
+    indices_int = [int(idx) for idx in indices]
+    arguments = axes_list[np.arange(len(axes_list)), indices_int]
+    # arguments = tuple([axes_list[int(index)] for index in indices])
+    # arguments = axes_list[range(len(axes_list))][[int(idx) for idx in indices]]
+    phi, theta, Va, alpha, beta, r = arguments
+    trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
+    trim_inputs = trimmer.find_trim_input()
+    return trim_inputs
+
+
+def build_envelope(trimmer: Trimmer):
+    # build state polyhedron
+    dimension_resolution = 2
+    # We shall assume coordinated turn. p, q are constructed from the other 6 arguments
+    axes_names = trimmer.states - set(['p', 'q'])  
+    axes_list = np.array([np.linspace(trimmer.bounds_dict[axis][0], trimmer.bounds_dict[axis][1], dimension_resolution)
+                 for axis in axes_names])
+    fl_env_dimension = tuple([len(axis) for axis in axes_list])
+    print(fl_env_dimension)
+    fl_env = np.fromfunction(  # Function must support vector inputs
+        np.vectorize(build_fe_element, excluded=('axes_list', 'trimmer')), fl_env_dimension, axes_list=axes_list, trimmer=trimmer)
+    # iterate over all points
+    # calculate trim inputs for each point
+    return fl_env
+
+
 if __name__ == "__main__":
 
-    Va_des = 15
-    gamma_des = np.deg2rad(0)
-    R_des = 100
-
     trimmer = Trimmer()
-    trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
-    (trim_state, trim_inputs) = trimmer.find_trim_state()
+
+    # Trajectory Trimming
+    # Va_des = 15
+    # gamma_des = np.deg2rad(0)
+    # R_des = 100
+    # trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
+    # (trim_state, trim_inputs) = trimmer.find_trim_state()
+
+    # State trimming
+    # Va_des = 15
+    # alpha_des = np.deg2rad(2)
+    # beta_des = np.deg2rad(0)
+    # phi_des = np.deg2rad(30)
+    # theta_des = np.deg2rad(15)
+    # r_des = np.deg2rad(5)
+    # Va_des = 15
+    # alpha_des = np.deg2rad(1.5)
+    # beta_des = np.deg2rad(0)
+    # phi_des = np.deg2rad(0)
+    # theta_des = np.deg2rad(1.5)
+    # r_des = np.deg2rad(0)
+    # trimmer.setup_trim_states(
+    #     phi_des, theta_des, Va_des, alpha_des, beta_des, r_des)
+    # trim_inputs = trimmer.find_trim_input()
+
+    # Static Flight envelope construction
+    build_envelope(trimmer)
