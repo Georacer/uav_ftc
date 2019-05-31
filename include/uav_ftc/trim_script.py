@@ -129,7 +129,10 @@ class Trimmer:
 
         # Calculate derived quantities
         gamma = theta - alpha
-        R = Va/r*cos(gamma)*cos(phi)*cos(theta)
+        try: 
+            R = Va/r*cos(gamma)*cos(phi)*cos(theta)
+        except ZeroDivisionError:
+            R = np.inf
 
         self.x_dot_des = mdl.aircraft_state()
         self.x_dot_des.pos.z = -Va*sin(gamma)
@@ -296,50 +299,74 @@ class Trimmer:
               f'{inputs}')
 
 
-def build_fe_element(*indices, axes_list=None, trimmer=Trimmer()):
-    # For some reason indces are passed as floats
+class FlightEnvelope:
+
+    axes_dict = None
+    axes_names = None
+    trimmer = None
+    static_trim = None
+
+    def __init__(self, axes_dict: dict, trimmer: Trimmer):
+        self.axes_dict = axes_dict
+        self.axes_names = sorted(axes_dict.keys())
+        self.trimmer = trimmer
+
+        # Verify axes_dict has the correct axes names
+        if not set(self.axes_dict.keys()) != set(['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r']):
+            raise KeyError('Not all state parameters provided')
+
+    def find_static_trim(self):
+        # Get data values dimension
+        axes_values = [self.axes_dict[axis_name]
+                       for axis_name in self.axes_names]
+        axes_dimensions = map(len, axes_values)
+
+        fl_env_ndarray = build_envelope_ndarray(
+            self.trimmer, axes_dimensions, self.axes_dict)
+
+        self.static_trim = xr.Dataset(
+            {'trim': (self.axes_names, fl_env_ndarray[0]),
+             'cost': (self.axes_names, fl_env_ndarray[1]),
+             'success': (self.axes_names, fl_env_ndarray[2])},
+            coords=dict(zip(self.axes_names, axes_values)))
+
+
+def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
+    # build state polyhedron
+    fl_env = np.fromfunction(  # Function must support vector inputs
+        np.vectorize(build_fe_element, excluded=('axes_dict', 'trimmer')), fl_env_dimension, axes_dict=axes_dict, trimmer=trimmer)
+    # # iterate over all points
+    # # calculate trim inputs for each point
+
+    return fl_env
+
+
+def build_fe_element(*indices, axes_dict=None, trimmer=Trimmer()):
+    # Warning: Axes are sorted and so are their indices
+    # For some reason indices are passed as floats
     indices_int = [int(idx) for idx in indices]
-    arguments = axes_list[np.arange(len(axes_list)), indices_int]
+    axes_names = sorted(axes_dict.keys())
+    arguments = {axis_name: axes_dict[axis_name][indices_int[idx]] for (axis_name, idx) in zip(axes_names, range(len(axes_names)))}
+    phi = arguments['phi']
+    theta = arguments['theta']
+    Va = arguments['Va']
+    alpha = arguments['alpha']
+    beta = arguments['beta']
+    r = arguments['r']
+
+    # arguments = [axes_list[axis_idx][tick_idx]
+                #  for (axis_idx, tick_idx) in zip(range(len(indices_int)), indices_int)]
+    # arguments = axes_list[np.arange(len(axes_list)), indices_int]
     # arguments = tuple([axes_list[int(index)] for index in indices])
     # arguments = axes_list[range(len(axes_list))][[int(idx) for idx in indices]]
-    phi, theta, Va, alpha, beta, r = arguments
+    # phi, theta, Va, alpha, beta, r = arguments
+
     trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
     trim_inputs, cost, success = trimmer.find_trim_input()
     # trim_costs = trimmer.find_trim_input_cost()
     return (trim_inputs, cost, success)
     # return trim_costs
 
-def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_list):
-    # build state polyhedron
-    fl_env = np.fromfunction(  # Function must support vector inputs
-        np.vectorize(build_fe_element, excluded=('axes_list', 'trimmer')), fl_env_dimension, axes_list=axes_list, trimmer=trimmer)
-    # # iterate over all points
-    # # calculate trim inputs for each point
-
-    return fl_env
-
-def build_envelope(trimmer: Trimmer):
-    # Build state polyhedron as xarray.DataSet
-    dimension_resolution = 2
-    # We shall assume coordinated turn. p, q are constructed from the other 6 arguments
-    axes_names = trimmer.states
-    p_index = axes_names.index('p')
-    del axes_names[p_index]
-    q_index = axes_names.index('q')
-    del axes_names[q_index]
-
-    axes_list = np.array([np.linspace(trimmer.bounds_dict[axis][0], trimmer.bounds_dict[axis][1], dimension_resolution)
-                          for axis in axes_names])
-    fl_env_dimension = tuple([len(axis) for axis in axes_list])
-    fl_env_ndarray = build_envelope_ndarray(trimmer, fl_env_dimension, axes_list)
-
-    axes_dict = {axis_name: axis_value for axis_name, axis_value in zip(axes_names, axes_list)}
-
-    ds = xr.Dataset({'inputs': (axes_names, fl_env_ndarray[0]),
-                     'cost': (axes_names, fl_env_ndarray[1]),
-                     'success': (axes_names, fl_env_ndarray[2])},
-                    coords = axes_dict)
-    return ds
 
 if __name__ == "__main__":
 
@@ -370,4 +397,12 @@ if __name__ == "__main__":
     # trim_inputs = trimmer.find_trim_input()
 
     # Static Flight envelope construction
-    fl_env = build_envelope(trimmer)
+    domain = {'Va': np.linspace(5, 15, 10),
+              'alpha': np.linspace(np.deg2rad(0), np.deg2rad(10), 10),
+              'beta': [0],
+              'phi': [0],
+              'theta': [0],
+              'r': [0]}
+
+    flight_envelope = FlightEnvelope(domain, trimmer)
+    flight_envelope.find_static_trim()
