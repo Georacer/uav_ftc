@@ -3,6 +3,7 @@
 import numpy as np
 from numpy import cos, sin
 from scipy.optimize import minimize
+import xarray as xr
 import timeit
 
 import uav_model as mdl  # Import UAV model library
@@ -23,19 +24,32 @@ class Trimmer:
     idx = None  # Indices of trim derivatives
     iu = None
 
-    bound_phi = (np.deg2rad(-90), np.deg2rad(90))  # Allow only upright flight
-    bound_theta = (np.deg2rad(-90), np.deg2rad(90))
-    bound_Va = (5, 50)
-    bound_alpha = (np.deg2rad(-20), np.deg2rad(90))
-    bound_beta = (np.deg2rad(-90), np.deg2rad(90))
-    bound_p = (-5, 5)
-    bound_q = (-5, 5)
-    bound_r = (-1, 1)
+    # bound_phi = (np.deg2rad(-90), np.deg2rad(90))  # Allow only upright flight
+    # bound_theta = (np.deg2rad(-90), np.deg2rad(90))
+    # bound_Va = (5, 50)
+    # bound_alpha = (np.deg2rad(-20), np.deg2rad(90))
+    # bound_beta = (np.deg2rad(-90), np.deg2rad(90))
+    # bound_p = (-5, 5)
+    # bound_q = (-5, 5)
+    # bound_r = (-1, 1)
+    # bound_deltaa = (-1, 1)
+    # bound_deltae = (-1, 1)
+    # bound_deltat = (0, 1)
+    # bound_deltar = (-1, 1)
+    bound_phi = (np.deg2rad(-5), np.deg2rad(5))  # Allow only upright flight
+    bound_theta = (np.deg2rad(-5), np.deg2rad(5))
+    bound_Va = (13, 15)
+    bound_alpha = (np.deg2rad(0), np.deg2rad(2))
+    bound_beta = (np.deg2rad(0), np.deg2rad(0))
+    bound_p = (0, 0)
+    bound_q = (0, 0)
+    bound_r = (0, 0)
     bound_deltaa = (-1, 1)
     bound_deltae = (-1, 1)
     bound_deltat = (0, 1)
     bound_deltar = (-1, 1)
-    states = set(['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r'])
+
+    states = ['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r']
     bounds_tuple = (bound_phi, bound_theta, bound_Va,
                     bound_alpha, bound_beta, bound_p, bound_q, bound_r)
     bounds_dict = dict(zip(states, bounds_tuple))
@@ -163,7 +177,7 @@ class Trimmer:
         if verbose:
             print(f'Optimization result: {optim_result_s}\n {res.message}')
             print(f' Optimization ended in {res.nit} iterations\n'
-                f' Optimization error: {res.fun}')
+                  f' Optimization error: {res.fun}')
 
         if res.success:
             trim_state = mdl.aircraft_state()
@@ -183,6 +197,9 @@ class Trimmer:
 
     def find_trim_input(self, verbose=False):
         # Find a trim input wich satisfies the trim state
+        # Returns: The optimal trim input
+        # The final optimization cost
+        # The success flag
         if self.x_des is None:
             raise ValueError('Target state not set')
 
@@ -205,13 +222,17 @@ class Trimmer:
         if verbose:
             print(f'Optimization result: {optim_result_s}\n {res.message}')
             print(f' Optimization ended in {res.nit} iterations\n'
-                f' Optimization error: {res.fun}')
+                  f' Optimization error: {res.fun}')
 
         if res.success:
             trim_inputs = mdl.Inputs(*res.x)
-            return trim_inputs
+            return (trim_inputs, res.fun, res.success)
         else:
-            return None
+            return (None, res.fun, res.success)
+
+    def find_trim_input_cost(self, verbose=False):
+        _, cost, success = self.find_trim_input(verbose)
+        return cost
 
     def cost_function_input_wrapper(self, arguments):
         # arguments: da, de, dt, dr
@@ -283,24 +304,42 @@ def build_fe_element(*indices, axes_list=None, trimmer=Trimmer()):
     # arguments = axes_list[range(len(axes_list))][[int(idx) for idx in indices]]
     phi, theta, Va, alpha, beta, r = arguments
     trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
-    trim_inputs = trimmer.find_trim_input()
-    return trim_inputs
+    trim_inputs, cost, success = trimmer.find_trim_input()
+    # trim_costs = trimmer.find_trim_input_cost()
+    return (trim_inputs, cost, success)
+    # return trim_costs
 
+def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_list):
+    # build state polyhedron
+    fl_env = np.fromfunction(  # Function must support vector inputs
+        np.vectorize(build_fe_element, excluded=('axes_list', 'trimmer')), fl_env_dimension, axes_list=axes_list, trimmer=trimmer)
+    # # iterate over all points
+    # # calculate trim inputs for each point
+
+    return fl_env
 
 def build_envelope(trimmer: Trimmer):
-    # build state polyhedron
+    # Build state polyhedron as xarray.DataSet
     dimension_resolution = 2
     # We shall assume coordinated turn. p, q are constructed from the other 6 arguments
-    axes_names = trimmer.states - set(['p', 'q'])
+    axes_names = trimmer.states
+    p_index = axes_names.index('p')
+    del axes_names[p_index]
+    q_index = axes_names.index('q')
+    del axes_names[q_index]
+
     axes_list = np.array([np.linspace(trimmer.bounds_dict[axis][0], trimmer.bounds_dict[axis][1], dimension_resolution)
                           for axis in axes_names])
     fl_env_dimension = tuple([len(axis) for axis in axes_list])
-    fl_env = np.fromfunction(  # Function must support vector inputs
-        np.vectorize(build_fe_element, excluded=('axes_list', 'trimmer')), fl_env_dimension, axes_list=axes_list, trimmer=trimmer)
-    # iterate over all points
-    # calculate trim inputs for each point
-    return fl_env
+    fl_env_ndarray = build_envelope_ndarray(trimmer, fl_env_dimension, axes_list)
 
+    axes_dict = {axis_name: axis_value for axis_name, axis_value in zip(axes_names, axes_list)}
+
+    ds = xr.Dataset({'inputs': (axes_names, fl_env_ndarray[0]),
+                     'cost': (axes_names, fl_env_ndarray[1]),
+                     'success': (axes_names, fl_env_ndarray[2])},
+                    coords = axes_dict)
+    return ds
 
 if __name__ == "__main__":
 
@@ -331,4 +370,4 @@ if __name__ == "__main__":
     # trim_inputs = trimmer.find_trim_input()
 
     # Static Flight envelope construction
-    build_envelope(trimmer)
+    fl_env = build_envelope(trimmer)
