@@ -218,7 +218,6 @@ class Trimmer:
                        #    method='TNC'
                        #   bounds=self.optim_bounds,
                        )
-        # fitness_cost = 
         if res.success:
             optim_result_s = 'SUCCESS'
         else:
@@ -231,9 +230,10 @@ class Trimmer:
 
         if res.success:
             trim_inputs = mdl.Inputs(*res.x)
-            return (trim_inputs, res.fun, res.success)
         else:
-            return (None, res.fun, res.success)
+            trim_inputs = mdl.Inputs(None, None, None, None)
+
+        return (trim_inputs, res.fun, res.success)
 
     def find_trim_input_cost(self, verbose=False):
         _, cost, success = self.find_trim_input(verbose)
@@ -279,7 +279,7 @@ class Trimmer:
 
         cost = x_dot_term + x_term + input_term
 
-        return cost[0][0]
+        return cost.item()
 
     def optim_callback(self, arguments):
         # Optimization callback for state+inputs trim set search
@@ -321,10 +321,10 @@ class FlightEnvelope:
         # Get data values dimension
         # domain_tuples = self.axes_dict.items()
         runner = xyz.Runner(build_fe_element,
-                            var_names=['trim_inputs', 'cost', 'success'],
+                            var_names=['delta_a', 'delta_e', 'delta_t', 'delta_r', 'cost', 'success'],
                             # var_dims={#'trim_inputs': self.axes_names,
-                                      #'cost': self.axes_names,
-                                    #   'success': self.axes_names},
+                            # 'cost': self.axes_names,
+                            #   'success': self.axes_names},
                             resources={'trimmer': self.trimmer},
                             # fn_args=['phi', 'theta', 'Va', 'alpha', 'beta', 'r', 'trimmer']
                             # fn_args=['trimmer']
@@ -358,7 +358,7 @@ def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
 def build_fe_element(phi, theta, Va, alpha, beta, r, trimmer=Trimmer()):
     trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
     trim_inputs, cost, success = trimmer.find_trim_input()
-    return trim_inputs, cost, success
+    return trim_inputs.delta_a, trim_inputs.delta_e, trim_inputs.delta_t, trim_inputs.delta_r, cost, success
 
 
 if __name__ == "__main__":
