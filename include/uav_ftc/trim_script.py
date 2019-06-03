@@ -375,7 +375,7 @@ if __name__ == "__main__":
     da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (ds_f.delta_a.data <= trimmer.bound_deltaa[1])
     de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (ds_f.delta_e.data <= trimmer.bound_deltae[1])
     dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (ds_f.delta_r.data <= trimmer.bound_deltar[1])
-    overall_mask = optim_mask * cost_mask * da_mask * de_mask * dr_mask
+    overall_mask = optim_mask * cost_mask * da_mask * de_mask * dt_mask * dr_mask
 
     ds_f['delta_t'] = ds_f.delta_t.where(overall_mask)
     ds_f['delta_e'] = ds_f.delta_e.where(overall_mask)
