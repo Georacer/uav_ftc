@@ -4,6 +4,7 @@ import numpy as np
 from numpy import cos, sin
 from scipy.optimize import minimize
 import xarray as xr
+import xyzpy as xyz
 import timeit
 
 import uav_model as mdl  # Import UAV model library
@@ -129,7 +130,7 @@ class Trimmer:
 
         # Calculate derived quantities
         gamma = theta - alpha
-        try: 
+        try:
             R = Va/r*cos(gamma)*cos(phi)*cos(theta)
         except ZeroDivisionError:
             R = np.inf
@@ -217,6 +218,7 @@ class Trimmer:
                        #    method='TNC'
                        #   bounds=self.optim_bounds,
                        )
+        # fitness_cost = 
         if res.success:
             optim_result_s = 'SUCCESS'
         else:
@@ -277,7 +279,7 @@ class Trimmer:
 
         cost = x_dot_term + x_term + input_term
 
-        return cost
+        return cost[0][0]
 
     def optim_callback(self, arguments):
         # Optimization callback for state+inputs trim set search
@@ -308,27 +310,38 @@ class FlightEnvelope:
 
     def __init__(self, axes_dict: dict, trimmer: Trimmer):
         self.axes_dict = axes_dict
-        self.axes_names = sorted(axes_dict.keys())
+        self.axes_names = ['Va', 'alpha', 'beta', 'phi', 'theta', 'r']
         self.trimmer = trimmer
 
         # Verify axes_dict has the correct axes names
-        if not set(self.axes_dict.keys()) != set(['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r']):
+        if not set(self.axes_dict.keys()) == set(self.axes_names):
             raise KeyError('Not all state parameters provided')
 
     def find_static_trim(self):
         # Get data values dimension
-        axes_values = [self.axes_dict[axis_name]
-                       for axis_name in self.axes_names]
-        axes_dimensions = map(len, axes_values)
+        # domain_tuples = self.axes_dict.items()
+        runner = xyz.Runner(build_fe_element,
+                            var_names=['trim_inputs', 'cost', 'success'],
+                            # var_dims={#'trim_inputs': self.axes_names,
+                                      #'cost': self.axes_names,
+                                    #   'success': self.axes_names},
+                            resources={'trimmer': self.trimmer},
+                            # fn_args=['phi', 'theta', 'Va', 'alpha', 'beta', 'r', 'trimmer']
+                            # fn_args=['trimmer']
+                            )
+        self.static_trim = runner.run_combos(self.axes_dict)
+        # axes_values = [self.axes_dict[axis_name]
+        #                for axis_name in self.axes_names]
+        # axes_dimensions = map(len, axes_values)
 
-        fl_env_ndarray = build_envelope_ndarray(
-            self.trimmer, axes_dimensions, self.axes_dict)
+        # fl_env_ndarray = build_envelope_ndarray(
+        #     self.trimmer, axes_dimensions, self.axes_dict)
 
-        self.static_trim = xr.Dataset(
-            {'trim': (self.axes_names, fl_env_ndarray[0]),
-             'cost': (self.axes_names, fl_env_ndarray[1]),
-             'success': (self.axes_names, fl_env_ndarray[2])},
-            coords=dict(zip(self.axes_names, axes_values)))
+        # self.static_trim = xr.Dataset(
+        #     {'trim': (self.axes_names, fl_env_ndarray[0]),
+        #      'cost': (self.axes_names, fl_env_ndarray[1]),
+        #      'success': (self.axes_names, fl_env_ndarray[2])},
+        #     coords=dict(zip(self.axes_names, axes_values)))
 
 
 def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
@@ -341,31 +354,11 @@ def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
     return fl_env
 
 
-def build_fe_element(*indices, axes_dict=None, trimmer=Trimmer()):
-    # Warning: Axes are sorted and so are their indices
-    # For some reason indices are passed as floats
-    indices_int = [int(idx) for idx in indices]
-    axes_names = sorted(axes_dict.keys())
-    arguments = {axis_name: axes_dict[axis_name][indices_int[idx]] for (axis_name, idx) in zip(axes_names, range(len(axes_names)))}
-    phi = arguments['phi']
-    theta = arguments['theta']
-    Va = arguments['Va']
-    alpha = arguments['alpha']
-    beta = arguments['beta']
-    r = arguments['r']
-
-    # arguments = [axes_list[axis_idx][tick_idx]
-                #  for (axis_idx, tick_idx) in zip(range(len(indices_int)), indices_int)]
-    # arguments = axes_list[np.arange(len(axes_list)), indices_int]
-    # arguments = tuple([axes_list[int(index)] for index in indices])
-    # arguments = axes_list[range(len(axes_list))][[int(idx) for idx in indices]]
-    # phi, theta, Va, alpha, beta, r = arguments
-
+# def build_fe_element(*indices, axes_dict=None, trimmer=Trimmer()):
+def build_fe_element(phi, theta, Va, alpha, beta, r, trimmer=Trimmer()):
     trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
     trim_inputs, cost, success = trimmer.find_trim_input()
-    # trim_costs = trimmer.find_trim_input_cost()
-    return (trim_inputs, cost, success)
-    # return trim_costs
+    return trim_inputs, cost, success
 
 
 if __name__ == "__main__":
