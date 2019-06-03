@@ -25,18 +25,6 @@ class Trimmer:
     idx = None  # Indices of trim derivatives
     iu = None
 
-    # bound_phi = (np.deg2rad(-90), np.deg2rad(90))  # Allow only upright flight
-    # bound_theta = (np.deg2rad(-90), np.deg2rad(90))
-    # bound_Va = (5, 50)
-    # bound_alpha = (np.deg2rad(-20), np.deg2rad(90))
-    # bound_beta = (np.deg2rad(-90), np.deg2rad(90))
-    # bound_p = (-5, 5)
-    # bound_q = (-5, 5)
-    # bound_r = (-1, 1)
-    # bound_deltaa = (-1, 1)
-    # bound_deltae = (-1, 1)
-    # bound_deltat = (0, 1)
-    # bound_deltar = (-1, 1)
     bound_phi = (np.deg2rad(-5), np.deg2rad(5))  # Allow only upright flight
     bound_theta = (np.deg2rad(-5), np.deg2rad(5))
     bound_Va = (13, 15)
@@ -50,10 +38,6 @@ class Trimmer:
     bound_deltat = (0, 1)
     bound_deltar = (-1, 1)
 
-    states = ['phi', 'theta', 'Va', 'alpha', 'beta', 'p', 'q', 'r']
-    bounds_tuple = (bound_phi, bound_theta, bound_Va,
-                    bound_alpha, bound_beta, bound_p, bound_q, bound_r)
-    bounds_dict = dict(zip(states, bounds_tuple))
     optim_bounds = None
 
     def __init__(self,
@@ -87,12 +71,6 @@ class Trimmer:
         self.x0 = mdl.aircraft_state()
         self.x0.att.y = gamma
         self.x0.airdata.x = Va
-
-        # self.x0.airdata.y = -0.02
-        # self.x0.att.x = 0.8
-        # self.x0.ang_vel.y = 0.1
-        # self.x0.ang_vel.z = 0.1
-        # self.u0 = mdl.Inputs(0, 0.3, 0.44, 0.5)
 
         self.u0 = mdl.Inputs(0, 0, 0.5, 0)
 
@@ -322,26 +300,13 @@ class FlightEnvelope:
         # domain_tuples = self.axes_dict.items()
         runner = xyz.Runner(build_fe_element,
                             var_names=['delta_a', 'delta_e', 'delta_t', 'delta_r', 'cost', 'success'],
-                            # var_dims={#'trim_inputs': self.axes_names,
+                            # var_dims={'cost': [self.axes_names]},  # This duplicates the arguments for some reason
                             # 'cost': self.axes_names,
                             #   'success': self.axes_names},
                             resources={'trimmer': self.trimmer},
-                            # fn_args=['phi', 'theta', 'Va', 'alpha', 'beta', 'r', 'trimmer']
-                            # fn_args=['trimmer']
+                            fn_args=['phi', 'theta', 'Va', 'alpha', 'beta', 'r', 'trimmer']
                             )
         self.static_trim = runner.run_combos(self.axes_dict)
-        # axes_values = [self.axes_dict[axis_name]
-        #                for axis_name in self.axes_names]
-        # axes_dimensions = map(len, axes_values)
-
-        # fl_env_ndarray = build_envelope_ndarray(
-        #     self.trimmer, axes_dimensions, self.axes_dict)
-
-        # self.static_trim = xr.Dataset(
-        #     {'trim': (self.axes_names, fl_env_ndarray[0]),
-        #      'cost': (self.axes_names, fl_env_ndarray[1]),
-        #      'success': (self.axes_names, fl_env_ndarray[2])},
-        #     coords=dict(zip(self.axes_names, axes_values)))
 
 
 def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
@@ -399,3 +364,4 @@ if __name__ == "__main__":
 
     flight_envelope = FlightEnvelope(domain, trimmer)
     flight_envelope.find_static_trim()
+    # plt_figure = flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
