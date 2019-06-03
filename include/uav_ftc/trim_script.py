@@ -206,10 +206,10 @@ class Trimmer:
             print(f' Optimization ended in {res.nit} iterations\n'
                   f' Optimization error: {res.fun}')
 
-        if res.success:
-            trim_inputs = mdl.Inputs(*res.x)
-        else:
-            trim_inputs = mdl.Inputs(None, None, None, None)
+        # if res.success:
+        trim_inputs = mdl.Inputs(*res.x)
+        # else:
+            # trim_inputs = mdl.Inputs(None, None, None, None)
 
         return (trim_inputs, res.fun, res.success)
 
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     # trim_inputs = trimmer.find_trim_input()
 
     # Static Flight envelope construction
-    domain = {'Va': np.linspace(5, 15, 10),
+    domain = {'Va': np.linspace(5, 40, 10),
               'alpha': np.linspace(np.deg2rad(0), np.deg2rad(10), 10),
               'beta': [0],
               'phi': [0],
@@ -365,3 +365,21 @@ if __name__ == "__main__":
     flight_envelope = FlightEnvelope(domain, trimmer)
     flight_envelope.find_static_trim()
     # plt_figure = flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
+    # flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
+
+    # Mask infeasible optimizations
+    ds_f = flight_envelope.static_trim.copy(deep=True)
+    optim_mask = ds_f.success==1
+    cost_mask = ds_f.cost < 50000
+    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (ds_f.delta_t.data <= trimmer.bound_deltat[1])
+    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (ds_f.delta_a.data <= trimmer.bound_deltaa[1])
+    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (ds_f.delta_e.data <= trimmer.bound_deltae[1])
+    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (ds_f.delta_r.data <= trimmer.bound_deltar[1])
+    overall_mask = optim_mask * cost_mask * da_mask * de_mask * dr_mask
+
+    ds_f['delta_t'] = ds_f.delta_t.where(overall_mask)
+    ds_f['delta_e'] = ds_f.delta_e.where(overall_mask)
+    ds_f['delta_a'] = ds_f.delta_a.where(overall_mask)
+    ds_f['delta_r'] = ds_f.delta_r.where(overall_mask)
+    ds_f['cost'] = ds_f.cost.where(overall_mask)
+    ds_f['success'] = ds_f.success.where(overall_mask)
