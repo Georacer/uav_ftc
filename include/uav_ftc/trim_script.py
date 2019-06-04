@@ -9,6 +9,7 @@ import xyzpy as xyz
 import timeit
 
 import uav_model as mdl  # Import UAV model library
+import plot_utils as plu  # Import plotting utilities
 
 
 # Raise an error when invalid floating-point operations occur
@@ -355,7 +356,7 @@ def build_convex_hull(ds):
     # fe: a xarray.DataSet
 
     # Create a list of points
-    ds_f_s = ds_f.stack(t=list(ds_f.dims.keys()))  # Create a new stacked dimension
+    ds_f_s = ds_f.stack(t=list(ds_f.coords.keys()))  # Create a new stacked dimension
     coords = ds_f_s.t.values  # Get the N x 1 np.array of coordinates
     point_vals = ds_f.delta_t.values.reshape(coords.shape[0],)
     point_vec = np.array([coord for (value, coord) in zip(point_vals, coords) if not np.isnan(value)])
