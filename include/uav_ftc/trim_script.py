@@ -3,6 +3,7 @@
 import numpy as np
 from numpy import cos, sin
 from scipy.optimize import minimize
+from scipy.spatial import ConvexHull
 import xarray as xr
 import xyzpy as xyz
 import timeit
@@ -325,6 +326,43 @@ def build_fe_element(phi, theta, Va, alpha, beta, r, trimmer=Trimmer()):
     trim_inputs, cost, success = trimmer.find_trim_input()
     return trim_inputs.delta_a, trim_inputs.delta_e, trim_inputs.delta_t, trim_inputs.delta_r, cost, success
 
+def build_feasible_fe(fe):
+    # Mask infeasible optimizations
+    # fe: a FlightEnvelope object
+    # ds_f: a xarray.DataSet
+    ds_f = fe.copy(deep=True)
+    optim_mask = ds_f.success==1
+    cost_mask = ds_f.cost < 50000
+    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (ds_f.delta_t.data <= trimmer.bound_deltat[1])
+    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (ds_f.delta_a.data <= trimmer.bound_deltaa[1])
+    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (ds_f.delta_e.data <= trimmer.bound_deltae[1])
+    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (ds_f.delta_r.data <= trimmer.bound_deltar[1])
+    overall_mask = optim_mask * cost_mask * da_mask * de_mask * dt_mask * dr_mask
+
+    ds_f['delta_t'] = ds_f.delta_t.where(overall_mask)
+    ds_f['delta_e'] = ds_f.delta_e.where(overall_mask)
+    ds_f['delta_a'] = ds_f.delta_a.where(overall_mask)
+    ds_f['delta_r'] = ds_f.delta_r.where(overall_mask)
+    ds_f['cost'] = ds_f.cost.where(overall_mask)
+    ds_f['success'] = ds_f.success.where(overall_mask)
+
+    ds_f = ds_f.where(overall_mask, drop=True)
+
+    return ds_f
+
+def build_convex_hull(ds):
+    # Build the convex hull of the flight envelope datapoints
+    # fe: a xarray.DataSet
+
+    # Create a list of points
+    ds_f_s = ds_f.stack(t=list(ds_f.dims.keys()))  # Create a new stacked dimension
+    coords = ds_f_s.t.values  # Get the N x 1 np.array of coordinates
+    point_vals = ds_f.delta_t.values.reshape(coords.shape[0],)
+    point_vec = np.array([coord for (value, coord) in zip(point_vals, coords) if not np.isnan(value)])
+
+    return ConvexHull(point_vec, qhull_options='QJ')  # Juggle the input because most of the points are coplanar
+    # resulting in numerical issues
+
 
 if __name__ == "__main__":
 
@@ -355,11 +393,11 @@ if __name__ == "__main__":
     # trim_inputs = trimmer.find_trim_input()
 
     # Static Flight envelope construction
-    domain = {'Va': np.linspace(5, 40, 10),
-              'alpha': np.linspace(np.deg2rad(0), np.deg2rad(10), 10),
+    domain = {'Va': np.linspace(5, 30, 8),
+              'alpha': np.linspace(np.deg2rad(0), np.deg2rad(10), 8),
               'beta': [0],
               'phi': [0],
-              'theta': [0],
+              'theta': np.linspace(np.deg2rad(-10), np.deg2rad(10), 8),
               'r': [0]}
 
     flight_envelope = FlightEnvelope(domain, trimmer)
@@ -367,19 +405,8 @@ if __name__ == "__main__":
     # plt_figure = flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
     # flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
 
-    # Mask infeasible optimizations
-    ds_f = flight_envelope.static_trim.copy(deep=True)
-    optim_mask = ds_f.success==1
-    cost_mask = ds_f.cost < 50000
-    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (ds_f.delta_t.data <= trimmer.bound_deltat[1])
-    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (ds_f.delta_a.data <= trimmer.bound_deltaa[1])
-    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (ds_f.delta_e.data <= trimmer.bound_deltae[1])
-    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (ds_f.delta_r.data <= trimmer.bound_deltar[1])
-    overall_mask = optim_mask * cost_mask * da_mask * de_mask * dt_mask * dr_mask
+    #Create a new flight_envelope with only feasible trim points
+    ds_f = build_feasible_fe(flight_envelope.static_trim)
 
-    ds_f['delta_t'] = ds_f.delta_t.where(overall_mask)
-    ds_f['delta_e'] = ds_f.delta_e.where(overall_mask)
-    ds_f['delta_a'] = ds_f.delta_a.where(overall_mask)
-    ds_f['delta_r'] = ds_f.delta_r.where(overall_mask)
-    ds_f['cost'] = ds_f.cost.where(overall_mask)
-    ds_f['success'] = ds_f.success.where(overall_mask)
+    # Create the convex hull of the flight envelope
+    convex_hull = build_convex_hull(ds_f)
