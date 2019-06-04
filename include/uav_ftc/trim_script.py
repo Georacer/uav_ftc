@@ -327,6 +327,28 @@ def build_fe_element(phi, theta, Va, alpha, beta, r, trimmer=Trimmer()):
     trim_inputs, cost, success = trimmer.find_trim_input()
     return trim_inputs.delta_a, trim_inputs.delta_e, trim_inputs.delta_t, trim_inputs.delta_r, cost, success
 
+    
+def find_nav_trim(points_vector):
+    # Use self.static_trim to calculate navigation Va, R, gamma triplet
+    # f = np.vectorize(state_to_nav_vec, otypes=[float, float, float])
+    # return f(points_vector)
+    return np.apply_along_axis(state_to_nav_vec, 1, points_vector)
+
+def state_to_nav(Va, alpha, beta, phi, theta, r):
+    # Convert from aircraft trim state to navigation triplet Va, R, gamma
+    R_max = 1000
+
+    gamma = theta - alpha  # Disregards wind
+    R = Va/r*cos(gamma)*cos(phi)*cos(theta)  # Disregards wind
+    if np.isinf(R):
+        R = R_max
+    
+    return Va, gamma, R
+
+def state_to_nav_vec(states):
+    return state_to_nav(*tuple(states))
+
+
 def build_feasible_fe(fe):
     # Mask infeasible optimizations
     # fe: a FlightEnvelope object
@@ -395,10 +417,10 @@ if __name__ == "__main__":
 
     # Static Flight envelope construction
     domain = {'Va': np.linspace(5, 30, 8),
-              'alpha': np.linspace(np.deg2rad(0), np.deg2rad(10), 8),
+              'alpha': np.linspace(np.deg2rad(-10), np.deg2rad(45), 8),
               'beta': [0],
               'phi': [0],
-              'theta': np.linspace(np.deg2rad(-10), np.deg2rad(10), 8),
+              'theta': np.linspace(np.deg2rad(-45), np.deg2rad(45), 8),
               'r': [0]}
 
     flight_envelope = FlightEnvelope(domain, trimmer)
@@ -411,3 +433,10 @@ if __name__ == "__main__":
 
     # Create the convex hull of the flight envelope
     convex_hull = build_convex_hull(ds_f)
+    # Plot a 3D slice
+    plu.plot3_points(convex_hull.points[:,[0, 1, 4]], ['Va', 'alpha', 'theta'])
+
+    # Build the Va, R, gamma variables for each trim point
+    flight_envelope.nav_trim = find_nav_trim(convex_hull.points)
+    # Plot the navigation envelope
+    plu.plot3_points(flight_envelope.nav_trim, ['Va', 'gamma', 'R'])

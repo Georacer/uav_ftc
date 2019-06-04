@@ -9,6 +9,7 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 
     fig = plt.figure()
     ax = fig.add_subplot('111', projection='3d')
+    ax.set_proj_type('ortho')
     ax.scatter(x, y, z, c='b', marker='o')
 
     ax.set_xlabel(axes_names[0])
