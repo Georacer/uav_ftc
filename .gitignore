@@ -2,3 +2,4 @@
 \.vscode/
 
 include/uav_ftc/__pycache__/
+mpc_models/CMakeFiles
