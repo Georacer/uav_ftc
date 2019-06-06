@@ -1,5 +1,4 @@
 #include "acado_toolkit.hpp"
-#include "acado_optimal_control.hpp"
 #include "acado_code_generation.hpp"
 #include "acado_gnuplot.hpp"
 
@@ -235,7 +234,7 @@ int main()
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                    // paralellization
     mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);     // set on runtime
-    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, YES); // time-varying costs
+    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);             // Single precision
 
     // Do not generate tests, makes or matlab-related interfaces.
