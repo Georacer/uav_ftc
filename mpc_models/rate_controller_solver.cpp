@@ -1,3 +1,4 @@
+#include "acado_toolkit.hpp"
 #include "acado_optimal_control.hpp"
 #include "acado_code_generation.hpp"
 #include "acado_gnuplot.hpp"
@@ -22,14 +23,15 @@ int main()
   // System variables
   DifferentialState p, q, r;
   Control da, de, dr;
-  DifferentialEquation f;
-  Function h, hN;
-  OnlineData Va, alpha, beta;
+  // OnlineData Va, alpha, beta;
+  const double Va = 15;
+  const double alpha = 0.03;
+  const double beta = 0;
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
-  const double t_end = 2.0;        // Time horizon [s]
-  const double dt = 0.01;          // Discretization time [s]
+  const double t_end = 1.0;        // Time horizon [s]
+  const double dt = 0.05;          // Discretization time [s]
   const int N = round(t_end / dt); // Number of computation nodes
   const double g0 = 9.81;          // Gravity acceleration [m/s^2]
   const double rho = 1.225;        // Air density [kg/m^3]
@@ -81,10 +83,11 @@ int main()
   ///////////////
   // System Model
   ///////////////
+  DifferentialEquation f;
   // Torque calculations
-  IntermediateState l = 0.5 * rho * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr);
-  IntermediateState m = 0.5 * rho * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
-  IntermediateState n = 0.5 * rho * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
+  IntermediateState l = 0.5 * rho * Va * Va * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr);
+  IntermediateState m = 0.5 * rho * Va * Va * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
+  IntermediateState n = 0.5 * rho * Va * Va * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
 
   // System dynamics
   f << dot(p) == G1 * p * q - G2 * q * r + G3 * l + G4 * n;
@@ -99,6 +102,7 @@ int main()
   ////////
   // Costs
   ////////
+  Function h, hN;
   // Running cost vector
   h << p << q << r
     << da << de << dr;
@@ -109,12 +113,12 @@ int main()
   // Running cost weight matrix
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
-  Q(0, 0) = 100; // p
-  Q(1, 1) = 100; // q
-  Q(2, 2) = 100; // r
-  Q(3, 3) = 100; // da
-  Q(4, 4) = 100; // de
-  Q(5, 5) = 100; // dr
+  Q(0, 0) = 1000; // p
+  Q(1, 1) = 1000; // q
+  Q(2, 2) = 1000; // r
+  Q(3, 3) = 1; // da
+  Q(4, 4) = 1; // de
+  Q(5, 5) = 1; // dr
 
   // End cost weight matrix
   DMatrix QN(hN.getDim(), hN.getDim());
@@ -123,12 +127,14 @@ int main()
   QN(1, 1) = Q(1, 1);
   QN(2, 2) = Q(2, 2);
 
+  /////////////////////////////////////////////////////////
   // Set a reference for the analysis, if CODE_GEN == false
+  //////////////////////////////////////////////////////////
   DVector ref(h.getDim());
   ref.setZero();
   ref(0) = 0;
   ref(1) = 0;
-  ref(2) = 0.2; // Yaw rate required at 0.2rad/s
+  ref(2) = 0; // Yaw rate required at 0rad/s
 
   DVector refN(hN.getDim());
   refN.setZero();
@@ -164,31 +170,75 @@ int main()
   ocp.subjectTo(-deltae_max <= de <= deltae_max);
   ocp.subjectTo(-deltar_max <= dr <= deltar_max);
   // Set Number of Online Data
-  ocp.setNOD(3);
+  // ocp.setNOD(3);
 
   if (!CODE_GEN)
   {
-    // Set initial state
-    ocp.subjectTo(AT_START, p == 0);
-    ocp.subjectTo(AT_START, q == 0);
-    ocp.subjectTo(AT_START, r == 0);
-    // Setup visualizations
-    GnuplotWindow window1(PLOT_AT_EACH_ITERATION);
-    window1.addSubplot(p, "roll rate (rad/s)");
-    window1.addSubplot(q, "pitch rate (rad/s)");
-    window1.addSubplot(r, "yaw rate (rad/s)");
-    GnuplotWindow window2(PLOT_AT_EACH_ITERATION);
-    window1.addSubplot(da, "aileron input (rad)");
-    window1.addSubplot(de, "elevator input (rad)");
-    window1.addSubplot(dr, "rudder input (rad)");
+    // Setup the simulated process
+    OutputFcn identity;
+    DynamicSystem dynamicSystem(f, identity);
+    Process process(dynamicSystem, INT_RK45);
 
-    // Define an algorithm to solve the problem
-    OptimizationAlgorithm algorithm(ocp);
-    algorithm.set(INTEGRATOR_TOLERANCE, 1e-6);
-    algorithm.set(KKT_TOLERANCE, 1e-3);
-    algorithm << window1;
-    algorithm << window2;
-    algorithm.solve();
+    // Setup the MPC
+    RealTimeAlgorithm alg(ocp, dt);
+    alg.set(MAX_NUM_ITERATIONS, 2);
+    StaticReferenceTrajectory zeroReference;
+    Controller controller(alg, zeroReference);
+
+    // Setup simulation environment
+    SimulationEnvironment sim(t_start, t_end, process, controller);
+    // Set initial conditions
+    DVector x0(3);
+    x0(0) = 0.3;
+    x0(1) = 0.2;
+    x0(2) = 0.1;
+
+    if (sim.init(x0) != SUCCESSFUL_RETURN)
+    {
+      exit(EXIT_FAILURE);
+    }
+    if (sim.run() != SUCCESSFUL_RETURN)
+    {
+      exit(EXIT_FAILURE);
+    }
+
+    // Plot the results
+    VariablesGrid sampledProcessOutput;
+    sim.getSampledProcessOutput(sampledProcessOutput);
+
+    VariablesGrid feedbackControl;
+    sim.getFeedbackControl(feedbackControl);
+
+    GnuplotWindow window;
+    window.addSubplot(sampledProcessOutput(0), "p");
+    window.addSubplot(sampledProcessOutput(1), "q");
+    window.addSubplot(sampledProcessOutput(2), "r");
+    window.addSubplot(feedbackControl(0), "da");
+    window.addSubplot(feedbackControl(1), "de");
+    window.addSubplot(feedbackControl(2), "dr");
+    window.plot();
+    // // Set initial state
+    // ocp.subjectTo(AT_START, p == 0);
+    // ocp.subjectTo(AT_START, q == 0);
+    // ocp.subjectTo(AT_START, r == 0);
+
+    // // Setup visualizations
+    // GnuplotWindow window1(PLOT_AT_EACH_ITERATION);
+    // window1.addSubplot(p, "roll rate (rad/s)");
+    // window1.addSubplot(q, "pitch rate (rad/s)");
+    // window1.addSubplot(r, "yaw rate (rad/s)");
+    // GnuplotWindow window2(PLOT_AT_EACH_ITERATION);
+    // window1.addSubplot(da, "aileron input (rad)");
+    // window1.addSubplot(de, "elevator input (rad)");
+    // window1.addSubplot(dr, "rudder input (rad)");
+
+    // // Define an algorithm to solve the problem
+    // OptimizationAlgorithm algorithm(ocp);
+    // algorithm.set(INTEGRATOR_TOLERANCE, 1e-6);
+    // algorithm.set(KKT_TOLERANCE, 1e-3);
+    // algorithm << window1;
+    // algorithm << window2;
+    // algorithm.solve();
   }
   else
   {
