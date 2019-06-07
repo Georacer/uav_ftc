@@ -1,8 +1,8 @@
 #include <Eigen/Eigen>
 #include <ros/ros.h>
 
-#include "rate_controller_mpc_solver/acado_auxiliary_functions.h"
-#include "rate_controller_mpc_solver/acado_common.h"
+#include "acado_auxiliary_functions.h"
+#include "acado_common.h"
 
 static constexpr int kSamples = ACADO_N;              // number of samples
 static constexpr int kStateSize = ACADO_NX;           // number of states
@@ -36,15 +36,16 @@ public:
     //   bool setLimits(T min_thrust, T max_thrust,
     //     T max_rollpitchrate, T max_yawrate);  // Currently we haven't set variable limits
 
-    bool MpcWrapper<T>::setOnlineData(
-        const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
+    bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool setReferencePose(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
 
-    bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
+    bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
+               const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
+                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data,
                 bool do_preparation = true);
     bool prepare();
 
@@ -104,6 +105,6 @@ private:
 
     bool acado_is_prepared_{false};
     const T dt_{dt};
-    const Eigen::Matrix<real_t, kInputSize, 1> kTrimInput = // Not meaningful in our case
+    const Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
         (Eigen::Matrix<real_t, kInputSize, 1>() << 0.0, 0.0, 0.0).finished();
 };

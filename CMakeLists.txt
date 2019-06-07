@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(uav_ftc)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+# activate c++ 11, taken from https://github.com/uzh-rpg/rpg_mpc/blob/master/CMakeLists.txt
+IF(CMAKE_COMPILER_IS_GNUCC)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+ELSE()
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+ENDIF()
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -12,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
 )
+
+find_package(Eigen3 REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -103,10 +109,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ INCLUDE_DIRS include
 #  LIBRARIES uav_ftc
 #  CATKIN_DEPENDS roscpp rospy std_msgs
-#  DEPENDS system_lib
+ DEPENDS EIGEN3
 )
 
 ###########
@@ -116,21 +122,60 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/uav_ftc.cpp
-# )
+# The rate controller solver library
+add_library(rate_controller_solver
+  externals/qpoases/SRC/Bounds.cpp
+  externals/qpoases/SRC/Constraints.cpp
+  externals/qpoases/SRC/CyclingManager.cpp
+  externals/qpoases/SRC/Indexlist.cpp
+  externals/qpoases/SRC/MessageHandling.cpp
+  externals/qpoases/SRC/QProblem.cpp
+  externals/qpoases/SRC/QProblemB.cpp
+  externals/qpoases/SRC/SubjectTo.cpp
+  externals/qpoases/SRC/Utils.cpp
+  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
+  mpc_models/rate_controller_mpc_solver/acado_qpoases_interface.cpp
+  mpc_models/rate_controller_mpc_solver/acado_integrator.c
+  mpc_models/rate_controller_mpc_solver/acado_solver.c
+  mpc_models/rate_controller_mpc_solver/acado_auxiliary_functions.c
+)
+target_include_directories(rate_controller_solver PUBLIC
+  mpc_models/rate_controller_mpc_solver/
+  externals/qpoases
+  externals/qpoases/INCLUDE
+  externals/qpoases/SRC
+)
 
+# The rate controller wrapper
+add_library(rate_controller_wrapper
+  src/rate_controller_wrapper.cpp
+)
+target_link_libraries(rate_controller_wrapper
+  rate_controller_solver
+)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
+
+# The rate controller
+add_executable(rate_controller
+  src/rate_controller.cpp
+)
+# add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(rate_controller
+  ${catkin_LIBRARIES}
+  rate_controller_wrapper
+)
+
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/uav_ftc_node.cpp)

@@ -3,3 +3,5 @@
 
 include/uav_ftc/__pycache__/
 mpc_models/CMakeFiles
+mpc_models/uav_ftc_codegen/qpoases
+mpc_models/rate_controller_mpc_solver/qpoases
