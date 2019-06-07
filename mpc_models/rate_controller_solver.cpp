@@ -238,13 +238,13 @@ int main()
     mpc.set(USE_SINGLE_PRECISION, YES);             // Single precision
 
     // Do not generate tests, makes or matlab-related interfaces.
-    mpc.set(GENERATE_TEST_FILE, YES);
+    mpc.set(GENERATE_TEST_FILE, NO);
     mpc.set(GENERATE_MAKE_FILE, YES);
     mpc.set(GENERATE_MATLAB_INTERFACE, NO);
     mpc.set(GENERATE_SIMULINK_INTERFACE, NO);
 
     // Finally, export everything.
-    if (mpc.exportCode("uav_ftc_codegen") != SUCCESSFUL_RETURN)
+    if (mpc.exportCode("rate_controller_mpc_solver") != SUCCESSFUL_RETURN)
       exit(EXIT_FAILURE);
     mpc.printDimensionsQP();
   }
