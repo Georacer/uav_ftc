@@ -8,6 +8,13 @@ RateController::RateController(ros::NodeHandle n) : mpcController()
     tprev = ros::Time::now();
     states_.header.stamp = tprev;
 
+    // Initialize airdata container
+    airdata_ << 15, 0.03, 0; // Values allow a normal-ish response, avoiding divide-by-zero errors
+    // Initialize system state
+    angularStates_ << 0, 0, 0;
+    // Initialize reference 
+    refRates_ << 0, 0, 0;
+
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
     subRef = n.subscribe("refRates", 1, &RateController::getReference, this);
@@ -39,7 +46,7 @@ void RateController::step()
     mpcController.setReferencePose(refRates_);
 
     // Solve problem with given measurements
-    mpcController.solve(angular_states_, airdata_);
+    mpcController.solve(angularStates_, airdata_);
 
     // Write the resulting controller output
     readControls();
@@ -58,9 +65,9 @@ void RateController::getStates(last_letter_msgs::SimStates inpStates)
     states_ = inpStates;
 
     // Isolate angular velocity system measurements
-    angular_states_(0) = inpStates.velocity.angular.x;
-    angular_states_(1) = inpStates.velocity.angular.y;
-    angular_states_(2) = inpStates.velocity.angular.z;
+    angularStates_(0) = inpStates.velocity.angular.x;
+    angularStates_(1) = inpStates.velocity.angular.y;
+    angularStates_(2) = inpStates.velocity.angular.z;
 }
 
 void RateController::readControls()

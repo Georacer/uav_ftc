@@ -57,13 +57,12 @@ find_package(Eigen3 REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  # Messages removed because their type could be supported by existing types
+# add_message_files(
+  # FILES
   # refRates.msg
   # refAirdata.msg
   # refManeuver.msg
-)
+# )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -80,10 +79,10 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   std_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -176,10 +175,19 @@ target_link_libraries(rate_controller_wrapper
 add_executable(rate_controller
   src/rate_controller.cpp
 )
-# add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
+add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(rate_controller
   ${catkin_LIBRARIES}
   rate_controller_wrapper
+)
+
+# Node reading from joystick and generating reference commands
+add_executable(reference_generator
+  src/reference_generator.cpp
+)
+add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(reference_generator
+  ${catkin_LIBRARIES}
 )
 
 ## With catkin_make all packages are built within a single CMake context
