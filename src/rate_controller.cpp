@@ -9,18 +9,20 @@ RateController::RateController(ros::NodeHandle n) : mpcController()
     states_.header.stamp = tprev;
 
     // Initialize airdata container
-    airdata_ << 15, 0.03, 0; // Values allow a normal-ish response, avoiding divide-by-zero errors
+    airdata_ << 15.0f, 0.03f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
+    mpcController.setOnlineData(airdata_);
     // Initialize system state
-    angularStates_ << 0, 0, 0;
+    angularStates_ << 0.0f, 0.0f, 0.0f;
+    mpcController.setInitialState(angularStates_);
     // Initialize reference 
-    refRates_ << 0, 0, 0;
+    refRates_ << 0.0f, 0.0f, 0.0f;
+    mpcController.setReferencePose(refRates_);
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
     subRef = n.subscribe("refRates", 1, &RateController::getReference, this);
     pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 100);
 
-    // RateMpcController already initialized in declaration
 }
 
 ///////////////////
@@ -35,10 +37,12 @@ RateController::~RateController()
 void RateController::step()
 {
     // Convert airdata triplet
-    geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
-    airdata_(0) = airdataVec.x;
-    airdata_(1) = airdataVec.y;
-    airdata_(2) = airdataVec.z;
+    // Enable this once airdata will be normal.
+    // TODO: Don't forget to make a cutoff for low airspeed
+    // geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
+    // airdata_(0) = airdataVec.x;
+    // airdata_(1) = airdataVec.y;
+    // airdata_(2) = airdataVec.z;
 
     // refRates are already saved in the controller
 
@@ -79,10 +83,10 @@ void RateController::readControls()
 // Controller outputs to us PPM values and publish them
 void RateController::writeOutput()
 {
-    last_letter_msgs::SimPWM channels;
-    channels.value[0] = FullRangeToPwm(predicted_controls_(0)); // Pass aileron input
-    channels.value[1] = FullRangeToPwm(predicted_controls_(1)); // Pass elevator input
-    channels.value[3] = FullRangeToPwm(predicted_controls_(2)); // Pass rudder input
+    geometry_msgs::Vector3Stamped channels;
+    channels.vector.x = FullRangeToPwm(predicted_controls_(0)); // Pass aileron input
+    channels.vector.y = FullRangeToPwm(predicted_controls_(1)); // Pass elevator input
+    channels.vector.z = FullRangeToPwm(predicted_controls_(2)); // Pass rudder input
     channels.header.stamp = ros::Time::now();
     pubCtrl.publish(channels);
 }
@@ -109,7 +113,7 @@ int main(int argc, char **argv)
 
     ros::WallDuration(3).sleep(); //wait for other nodes to get raised
     double ctrlRate;
-    ros::param::get("ctrlRate", ctrlRate); //frame rate in Hz
+    ros::param::get("/ctrlRate", ctrlRate); //frame rate in Hz
     ros::Rate spinner(ctrlRate);
 
     RateController rate_ctrl(n);

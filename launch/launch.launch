@@ -1,0 +1,47 @@
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+<launch>
+	<!-- Available arguments -->
+	<arg name="log" default="false"/>
+	<!-- <arg name="groundCam" default="false"/> -->
+
+	<!-- External optional arguments -->
+	<arg name="home" default="nan"/>
+	<arg name="simRate" default="nan"/>
+	<arg name="deltaT" default="nan"/>
+
+	<!-- Enable simulation clock -->
+	<param name="use_sim_time" type="bool" value="false" />
+
+	<!-- Initialization of parameters -->
+	<group>
+		<!-- Load general parameters -->
+		<rosparam command="load" file="$(find uav_ftc)data/parameters/params.yaml" />
+	</group>
+
+    <!-- Raising core controller nodes -->
+    <group>
+        <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen"/>
+        <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller" output="screen" launch-prefix="gdb -ex run -args"/> -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" output="screen">
+            <remap from="refRates" to="refCmds"/>
+        </node>
+    </group>
+
+    <!-- Input nodes -->
+    <group>
+        <rosparam command="load" file="$(find last_letter)data/parameters/HID.yaml" />
+        <node pkg="joy" type="joy_node" name="joystick" output="screen" >
+            <param name="dev" value="/dev/input/js0" />
+            <param name="deadzone" value="0.01" />
+        </node>
+        <node pkg="last_letter" name="joy2chan" type="joy2chan" output="screen" />
+    </group>
+
+    <!-- Raising auxiliary nodes -->
+    <group>
+        <node if="$(arg log)" pkg="rosbag" name="recorder" type="record" args="-O UAV_recording.bag -a"/> <!-- topic activity recorder node -->
+    </group>
+
+</launch>

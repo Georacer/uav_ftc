@@ -37,6 +37,7 @@ public:
     //     T max_rollpitchrate, T max_yawrate);  // Currently we haven't set variable limits
 
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
+    bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setReferencePose(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
@@ -90,18 +91,6 @@ private:
 
     Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
         acado_upper_bounds_{acadoVariables.ubValues};
-
-    // Not sure what this is, perhaps a local W matrix initialization?
-    Eigen::Matrix<T, kRefSize, kRefSize> W_ = (Eigen::Matrix<T, kRefSize, 1>() << 10 * Eigen::Matrix<T, 3, 1>::Ones(),
-                                               100 * Eigen::Matrix<T, 4, 1>::Ones(),
-                                               10 * Eigen::Matrix<T, 3, 1>::Ones(),
-                                               Eigen::Matrix<T, 2, 1>::Zero(),
-                                               1, 10, 10, 1)
-                                                  .finished()
-                                                  .asDiagonal();
-
-    Eigen::Matrix<T, kEndRefSize, kEndRefSize> WN_ =
-        W_.block(0, 0, kEndRefSize, kEndRefSize);
 
     bool acado_is_prepared_{false};
     const T dt_{dt};

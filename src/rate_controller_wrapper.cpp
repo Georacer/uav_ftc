@@ -160,6 +160,14 @@ bool RateMpcWrapper<T>::setOnlineData(
     return true;
 }
 
+// Set initial state
+template <typename T>
+bool RateMpcWrapper<T>::setInitialState(
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
+{
+    acado_initial_state_ = state.template cast<float>();
+}
+
 // Set a reference pose.
 template <typename T>
 bool RateMpcWrapper<T>::setReferencePose(
@@ -207,7 +215,7 @@ bool RateMpcWrapper<T>::solve(
 {
     acado_states_ = state.replicate(1, kSamples + 1).template cast<float>();
 
-    acado_inputs_ = kTrimInput_.replicate(1, kSamples);
+    acado_inputs_ = kTrimInput_.replicate(1, kSamples).template cast<float>();
 
     return update(state, online_data);
 }
@@ -221,7 +229,7 @@ bool RateMpcWrapper<T>::update(
 {
     if (!acado_is_prepared_)
     {
-        ROS_WARN("MPC: Solver was triggered without preparation, abort!");
+        ROS_ERROR("MPC: Solver was triggered without preparation, abort!");
         return false;
     }
 
@@ -229,11 +237,18 @@ bool RateMpcWrapper<T>::update(
     setOnlineData(online_data);
 
     // Pass measurement
-    acado_initial_state_ = state.template cast<float>();
+    setInitialState(state);
+
+    std::cout << "Ready to perform solver step" << std::endl;
+    std::cout << "Initial State: " << acado_initial_state_ << std::endl;
+    std::cout << "Online data: " << acado_online_data_ << std::endl;
+    std::cout << "Reference: " << acado_reference_states_ << std::endl;
 
     // Perform feedback step and reset preparation check.
     acado_feedbackStep();
     acado_is_prepared_ = false;
+
+    std::cout << "Resulting input: " << acado_inputs_ << std::endl;
 
     // Prepare if the solver if wanted
     if (do_preparation)

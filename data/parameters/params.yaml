@@ -1,0 +1,2 @@
+/refScale: [1.0, 1.0, 1.0]
+/ctrlRate: 50 # Frequency of the rate controller

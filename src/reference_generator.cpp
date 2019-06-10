@@ -43,6 +43,7 @@ ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
         ROS_ASSERT(listInt[i].getType() == XmlRpc::XmlRpcValue::TypeInt);
         buttonIndex_[i] = listInt[i];
     }
+    // Read the reference commands parameters from the server:w
     ROS_INFO("Reading reference scale configuration");
     if (!ros::param::getCached("/refScale", listDouble))
     {
