@@ -15,6 +15,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+	message_generation
+  mathutils
+  uav_utils
+  last_letter_msgs
 )
 
 find_package(Eigen3 REQUIRED)
@@ -53,11 +57,13 @@ find_package(Eigen3 REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  # Messages removed because their type could be supported by existing types
+  # refRates.msg
+  # refAirdata.msg
+  # refManeuver.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -74,10 +80,10 @@ find_package(Eigen3 REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -111,7 +117,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES uav_ftc
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+ CATKIN_DEPENDS roscpp std_msgs # message_runtime
  DEPENDS EIGEN3
 )
 

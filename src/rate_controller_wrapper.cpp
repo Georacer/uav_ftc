@@ -228,6 +228,9 @@ bool RateMpcWrapper<T>::update(
     // Pass airdata information
     setOnlineData(online_data);
 
+    // Pass measurement
+    acado_initial_state_ = state.template cast<float>();
+
     // Perform feedback step and reset preparation check.
     acado_feedbackStep();
     acado_is_prepared_ = false;

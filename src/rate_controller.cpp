@@ -2,16 +2,16 @@
 
 ///////////////////
 //Class Constructor
-RateController::RateController(ros::NodeHandle n)
+RateController::RateController(ros::NodeHandle n) : mpcController()
 {
     //Initialize states
     tprev = ros::Time::now();
-    states.header.stamp = tprev;
+    states_.header.stamp = tprev;
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
     subRef = n.subscribe("refRates", 1, &RateController::getReference, this);
-    pubCtrl = n.advertise<geometry_msgs::Vector3>("ctrlSurfaceCmds", 100);
+    pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 100);
 
     // RateMpcController already initialized in declaration
 }
@@ -20,28 +20,32 @@ RateController::RateController(ros::NodeHandle n)
 //Class Destructor
 RateController::~RateController()
 {
-    delete mpcController;
+    delete &mpcController;
 }
 
 ////////////
 // Main Step
 void RateController::step()
 {
-    // Copy over p, q, r
-    geometry_msgs::Vector3 currentState = states.velocity.angular;
-
     // Convert airdata triplet
-    airdata = getAirData(states.velocity.linear);
+    geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
+    airdata_(0) = airdataVec.x;
+    airdata_(1) = airdataVec.y;
+    airdata_(2) = airdataVec.z;
 
-    // refRates are already saved
+    // refRates are already saved in the controller
 
-    // Set mpc OnlineData with airdata
-    // Set mpc x0 with states
-    // Set mpc reference with refRates
+    // Set the MPC reference state
+    mpcController.setReferencePose(refRates_);
 
-    float output[4];
+    // Solve problem with given measurements
+    mpcController.solve(angular_states_, airdata_);
+
+    // Write the resulting controller output
+    readControls();
+
     // Fill control commands and publish them
-    writePWM(output);
+    writeOutput();
 }
 
 ///////////
@@ -50,7 +54,18 @@ void RateController::step()
 
 void RateController::getStates(last_letter_msgs::SimStates inpStates)
 {
-    states = inpStates;
+    // Copy over all aircraft state
+    states_ = inpStates;
+
+    // Isolate angular velocity system measurements
+    angular_states_(0) = inpStates.velocity.angular.x;
+    angular_states_(1) = inpStates.velocity.angular.y;
+    angular_states_(2) = inpStates.velocity.angular.z;
+}
+
+void RateController::readControls()
+{
+    mpcController.getInput(0, predicted_controls_);
 }
 
 ///////////////////////////////////////////////////////
@@ -58,23 +73,23 @@ void RateController::getStates(last_letter_msgs::SimStates inpStates)
 void RateController::writeOutput()
 {
     last_letter_msgs::SimPWM channels;
-    channels.value[0] = FullRangeToPwm(output[0]);
-    channels.value[1] = FullRangeToPwm(output[1]);
-    channels.value[2] = HalfRangeToPwm(output[2]);
-    channels.value[3] = FullRangeToPwm(output[3]);
-    channels.value[9] = HalfRangeToPwm(output[9]);
+    channels.value[0] = FullRangeToPwm(predicted_controls_(0)); // Pass aileron input
+    channels.value[1] = FullRangeToPwm(predicted_controls_(1)); // Pass elevator input
+    channels.value[3] = FullRangeToPwm(predicted_controls_(2)); // Pass rudder input
     channels.header.stamp = ros::Time::now();
     pubCtrl.publish(channels);
 }
 
 /////////////////////////////////////////////////
 // Store reference commands
-void RateController::getReference(uav_ftc::refRates pRefRates)
+void RateController::getReference(geometry_msgs::Vector3Stamped pRefRates)
 {
-    refRates = pRefRates;
+    refRates_(0) = pRefRates.vector.x;
+    refRates_(1) = pRefRates.vector.y;
+    refRates_(2) = pRefRates.vector.z;
 }
 
-RateMpcWrapper<float> rate_ctrl();
+// RateMpcWrapper<float> rate_ctrl(); // I think this is a mis-paste
 
 ///////////////
 //Main function
