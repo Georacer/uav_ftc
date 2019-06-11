@@ -1,2 +1,10 @@
-/refScale: [1.0, 1.0, 1.0]
-/ctrlRate: 50 # Frequency of the rate controller
+#Global Miscellaneous Parameters
+
+
+# Controller parameters
+ctrlMode: 1
+# 0: Direct passthrough from joystick (controllers still active)
+# 1: Angular rate control
+# 2: Trajectory control
+refScale: [1.0, 1.0, 1.0] # Scaling factor of reference commands
+ctrlRate: 50 # Frequency of the rate controller

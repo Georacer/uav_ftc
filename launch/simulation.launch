@@ -1,0 +1,77 @@
+<!-- Launch file for the simulator core /-->
+
+<launch>
+
+	<arg name="manualMode"/>
+	<!-- Connect model input with joystick -->
+	<arg name="autoMode"/>
+	<!-- Connect model input with a controller node -->
+	<arg name="uav_name"/>
+	<!-- uav_name parameter which selects aircraft data file -->
+
+	<!-- External optional arguments -->
+	<arg name="home"/>
+	<arg name="simRate"/>
+	<arg name="deltaT"/>
+
+	<!-- Initialization of parameters -->
+	<group>
+		<!-- Load environmental parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/environment.yaml" />
+		<!-- Load global parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/world.yaml" />
+	</group>
+
+	<!-- Initialization of services -->
+	<group>
+	</group>
+
+	<!-- First UAV Group -->
+	<group ns="$(arg uav_name)">
+
+		<!-- Initialization of the parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/aircraft/$(arg uav_name)/init.yaml" />
+		<!-- load state initialization parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/aircraft/$(arg uav_name)/rigidBody.yaml" />
+		<!-- load rigid body parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/aircraft/$(arg uav_name)/aerodynamics.yaml" />
+		<!-- load aerodynamic parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/aircraft/$(arg uav_name)/propulsion.yaml" />
+		<!-- load propulsion parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/aircraft/$(arg uav_name)/contactPts.yaml" />
+		<!-- load contact points parameters -->
+		<rosparam command="load" file="$(find last_letter)data/parameters/Sensors_parameters.yaml" />
+
+		<!-- Raising core nodes -->
+		<group>
+			<node pkg="last_letter" name="argumentHandler" type="argumentHandler" output="screen">				<!-- Node which handles last-minute changes in the parameter server. Always last after any parameter loads -->
+				<rosparam param="home" subst_value="true">$(arg home)</rosparam>
+				<param name="simRate" value="$(arg simRate)"/>
+				<param name="deltaT" value="$(arg deltaT)"/>
+			</node>
+			<node pkg="last_letter" name="clock" type="simClock" output="screen"/>
+			<node pkg="last_letter" name="plane_model" type="model" output="screen" required="true"/>
+			<node pkg="last_letter" name="environment_model" type="environment" output="screen"/>
+			<node pkg="last_letter" name="euler_translator" type="quat2euler" output="screen"/>
+		</group>
+
+		<!-- Transformations broadcasters -->
+		<group>
+			<!-- transform body NED to body NWU -->
+			<node pkg="tf" type="static_transform_publisher" name="body2Cockpit" args="0.0 0.0 0.0 0.0 0.0 3.14 base_link plane_camera 10" />
+			<!-- publish body NWU frame for rviz-->
+			<node pkg="last_letter" type="uav_publisher" name="broadcaster" />
+		</group>
+
+		<!-- Raising sensor nodes -->
+		<group>
+			<!--			<node pkg="last_letter" name="Accelerometer" type="accelerometer.py" output="screen"/>-->
+			<!--			<node pkg="last_letter" name="Altimeter" type="altimeter.py" output="screen"/>-->
+			<!--			<node pkg="last_letter" name="Barometer" type="barometer.py" output="screen"/>-->
+			<!--			<node pkg="last_letter" name="Gyroscope" type="gyroscope.py" output="screen"/>-->
+			<!--			<node pkg="last_letter" name="GPS" type="GPS.py" output="screen"/>-->
+			<!--			<node pkg="last_letter" name="Magnetometer" type="magnetometer.py" output="screen"/>-->
+		</group>
+	</group>
+
+</launch>

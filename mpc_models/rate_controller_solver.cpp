@@ -31,8 +31,8 @@ int main()
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
-  const double t_end = 1.0;        // Time horizon [s]
-  const double dt = 0.05;          // Discretization time [s]
+  const double t_end = 0.4;        // Time horizon [s]
+  const double dt = 0.02;          // Discretization time [s]
   const int N = round(t_end / dt); // Number of computation nodes
   const double g0 = 9.81;          // Gravity acceleration [m/s^2]
   const double rho = 1.225;        // Air density [kg/m^3]
@@ -152,9 +152,9 @@ int main()
     DVector ref(h.getDim());
     ref.setZero();
     // Set all angular rates to 0
-    ref(0) = 0;
-    ref(1) = 0;
-    ref(2) = 0;
+    ref(0) = 1;
+    ref(1) = 1;
+    ref(2) = 1;
 
     DVector refN(hN.getDim());
     refN.setZero();
@@ -186,8 +186,8 @@ int main()
     // Setup the MPC
     RealTimeAlgorithm alg(ocp, dt);
     alg.set(MAX_NUM_ITERATIONS, 2);
-    StaticReferenceTrajectory zeroReference;
-    Controller controller(alg, zeroReference);
+    StaticReferenceTrajectory reference;
+    Controller controller(alg, reference);
 
     // Setup simulation environment
     SimulationEnvironment sim(t_start, t_end, process, controller);
@@ -230,12 +230,13 @@ int main()
     mpc.set(SPARSE_QP_SOLUTION, FULL_CONDENSING_N2); // due to qpOASES
     mpc.set(INTEGRATOR_TYPE, INT_IRK_GL4);           // accurate
     mpc.set(NUM_INTEGRATOR_STEPS, N);
+    mpc.set(MAX_NUM_ITERATIONS, 5);
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
-    mpc.set(CG_USE_OPENMP, YES);                    // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);     // set on runtime
+    mpc.set(CG_USE_OPENMP, YES);                   // paralellization
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // set on runtime
     mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // time-varying costs
-    mpc.set(USE_SINGLE_PRECISION, YES);             // Single precision
+    mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
     // Do not generate tests, makes or matlab-related interfaces.
     mpc.set(GENERATE_TEST_FILE, NO);

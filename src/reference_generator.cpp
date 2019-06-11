@@ -45,7 +45,7 @@ ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
     }
     // Read the reference commands parameters from the server:w
     ROS_INFO("Reading reference scale configuration");
-    if (!ros::param::getCached("/refScale", listDouble))
+    if (!ros::param::getCached("refScale", listDouble))
     {
         ROS_FATAL("Invalid parameters for -/refScale- in param server!");
         ros::shutdown();

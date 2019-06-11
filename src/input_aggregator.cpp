@@ -21,16 +21,19 @@ void InputAggregator::rawCtrlsCallback(last_letter_msgs::SimPWM msg)
     }
 }
 
-void InputAggregator::surfaceCtrlsCallback(last_letter_msgs::SimPWM msg)
+void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
-    surfaceCtrls_ = msg;
+    surfaceCtrls_.vector.x = msg.vector.x;
+    surfaceCtrls_.vector.y = msg.vector.y;
+    surfaceCtrls_.vector.z = msg.vector.z;
+
     if (ctrlMode_ == 1) // Publish as fast as you have control surface inputs
     {
         publishCtrls();
     }
 }
 
-void InputAggregator::throttleCtrlsCallback(last_letter_msgs::SimPWM msg)
+void InputAggregator::throttleCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
     throttleCtrls_ = msg;
 }
@@ -46,9 +49,11 @@ void InputAggregator::mixer()
     case 1: // Use the control surface signals from the controller
         mixedCtrls_ = rawCtrls_; // Copy over all of the raw signals
         mixedCtrls_.header.stamp = ros::Time::now(); // Stamp the message
-        mixedCtrls_.value[0] = surfaceCtrls_.value[0]; // Copy over aileron
-        mixedCtrls_.value[1] = surfaceCtrls_.value[1]; // Copy over elevator
-        mixedCtrls_.value[3] = surfaceCtrls_.value[2]; // Copy over rudder
+        // Pick selected channels and convert them to PWM values
+        mixedCtrls_.value[0] = FullRangeToPwm(surfaceCtrls_.vector.x); // Copy over aileron
+        mixedCtrls_.value[1] = FullRangeToPwm(surfaceCtrls_.vector.y); // Copy over elevator
+        mixedCtrls_.value[3] = FullRangeToPwm(surfaceCtrls_.vector.z); // Copy over rudder
+        break;
     
     default:
         ROS_ERROR("Please specify a value for ctrlMode parameter");

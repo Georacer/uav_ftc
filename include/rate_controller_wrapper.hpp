@@ -38,6 +38,8 @@ public:
                 const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data,
                 bool do_preparation = true);
     bool prepare();
+    bool checkInput();
+    bool resetController();
 
     void getState(const int node_index,
                   Eigen::Ref<Eigen::Matrix<T, kStateSize, 1>> return_state);
@@ -68,13 +70,6 @@ private:
     Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>>
         acado_online_data_{acadoVariables.od};
 
-    // We do not have variable weight matrices
-    //   Eigen::Map<Eigen::Matrix<float, kRefSize, kRefSize * kSamples>>
-    //     acado_W_{acadoVariables.W};
-
-    //   Eigen::Map<Eigen::Matrix<float, kEndRefSize, kEndRefSize>>
-    //     acado_W_end_{acadoVariables.WN};
-
     Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
         acado_lower_bounds_{acadoVariables.lbValues};
 
@@ -82,6 +77,7 @@ private:
         acado_upper_bounds_{acadoVariables.ubValues};
 
     bool acado_is_prepared_{false};
+    bool controller_is_reset_{false};
     const T dt_{dt};
     const Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
         (Eigen::Matrix<real_t, kInputSize, 1>() << 0.0, 0.0, 0.0).finished();
