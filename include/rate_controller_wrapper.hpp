@@ -24,17 +24,6 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     RateMpcWrapper(); // No-argument constructor
-                      //   RateMpcWrapper(  // Constructor with custom Q and R costs
-                      //     const Eigen::Ref<const Eigen::Matrix<T, kCostSize, kCostSize>> Q,
-                      //     const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R);
-
-    //   bool setCosts(  // We do not plan to add varying costs any time now...
-    //     const Eigen::Ref<const Eigen::Matrix<T, kCostSize, kCostSize>> Q,
-    //     const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
-    //     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
-
-    //   bool setLimits(T min_thrust, T max_thrust,
-    //     T max_rollpitchrate, T max_yawrate);  // Currently we haven't set variable limits
 
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);

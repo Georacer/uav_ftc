@@ -190,6 +190,15 @@ target_link_libraries(reference_generator
   ${catkin_LIBRARIES}
 )
 
+# Node reading from inputs sources and combinging control signals
+add_executable(input_aggregator
+  src/input_aggregator.cpp
+)
+add_dependencies(input_aggregator ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(input_aggregator
+  ${catkin_LIBRARIES}
+)
+
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/uav_ftc_node.cpp)
