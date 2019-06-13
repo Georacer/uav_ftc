@@ -58,7 +58,7 @@ void RateController::step()
     mpcController.setReferencePose(refRates_);
 
     // Solve problem with given measurements
-    mpcController.solve(angularStates_, airdata_);
+    mpcController.update(angularStates_, airdata_);
 
     // Write the resulting controller output
     readControls();
