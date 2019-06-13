@@ -25,13 +25,13 @@ public:
 
     RateMpcWrapper(); // No-argument constructor
 
+
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setReferencePose(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
-
     bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
@@ -40,7 +40,6 @@ public:
     bool prepare();
     bool checkInput();
     bool resetController();
-
     void getState(const int node_index,
                   Eigen::Ref<Eigen::Matrix<T, kStateSize, 1>> return_state);
     void getStates(
@@ -78,7 +77,7 @@ private:
 
     bool acado_is_prepared_{false};
     bool controller_is_reset_{false};
-    const T dt_{dt};
+    const T dt_{dt}; // Currently unused
     const Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
         (Eigen::Matrix<real_t, kInputSize, 1>() << 0.0, 0.0, 0.0).finished();
 };

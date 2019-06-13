@@ -1,7 +1,19 @@
+/**
+ * @file rate_controller.cpp
+ * @author George Zogopoulos-Papaliakos (gzogop@mail.ntua.gr)
+ * @brief Defines the RateController class which controls the angular rates of the UAV. Also raises the corresponding ROS node.
+ * @date 2019-06-13
+ * 
+ * @copyright Copyright (c) 2019
+ * 
+ */
 #include "rate_controller.hpp"
 
-///////////////////
-//Class Constructor
+/**
+ * @brief Construct a new Rate Controller:: Rate Controller object
+ * 
+ * @param n The ROS NodeHandle of the calling ROS node
+ */
 RateController::RateController(ros::NodeHandle n) : mpcController()
 {
     //Initialize states
@@ -30,15 +42,19 @@ RateController::RateController(ros::NodeHandle n) : mpcController()
     pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 100);
 }
 
-///////////////////
-//Class Destructor
+/**
+ * @brief Destroy the Rate Controller:: Rate Controller object
+ * 
+ */
 RateController::~RateController()
 {
     delete &mpcController;
 }
 
-////////////
-// Main Step
+/**
+ * @brief Perform one step of the MPC
+ * 
+ */
 void RateController::step()
 {
     // Convert airdata triplet
@@ -76,6 +92,12 @@ void RateController::step()
 //Utilities
 ///////////
 
+/**
+ * @brief Callback function to store the UAV states
+ * Used to capture the angular rate measurements
+ * 
+ * @param inpStates The whole UAV state
+ */
 void RateController::getStates(last_letter_msgs::SimStates inpStates)
 {
     // Copy over all aircraft state
@@ -87,13 +109,20 @@ void RateController::getStates(last_letter_msgs::SimStates inpStates)
     angularStates_(2) = inpStates.velocity.angular.z;
 }
 
+/**
+ * @brief Get the optimal input calculated by the MPC
+ * The result is stored in the predicted_controls_ variable.
+ * 
+ */
 void RateController::readControls()
 {
     mpcController.getInput(0, predicted_controls_);
 }
 
-///////////////////////////////////////////////////////
-// Controller outputs to us PPM values and publish them
+/**
+ * @brief Convert the optimal input to PPM values and publish them
+ * 
+ */
 void RateController::writeOutput()
 {
     geometry_msgs::Vector3Stamped channels;
@@ -110,8 +139,11 @@ void RateController::writeOutput()
     pubCtrl.publish(channels);
 }
 
-/////////////////////////////////////////////////
-// Store reference commands
+/**
+ * @brief Callback to store the angular rate reference commands
+ * 
+ * @param pRefRates The reference angular rates p, q, r.
+ */
 void RateController::getReference(geometry_msgs::Vector3Stamped pRefRates)
 {
     refRates_(0) = pRefRates.vector.x;

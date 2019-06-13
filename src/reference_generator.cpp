@@ -1,6 +1,20 @@
-// Read the joystick commands and convert them to a Vector3Stamped reference command
+/**
+ * @file reference_generator.cpp
+ * @author George Zogopoulos-Papaliakos (gzogop@mail.ntua.gr)
+ * @brief Read the joystick commands and convert them to a reference command
+ * @date 2019-06-13
+ * 
+ * @copyright Copyright (c) 2019
+ * 
+ */
 #include <reference_generator.hpp>
 
+/**
+ * @brief Construct a new Reference Generator:: Reference Generator object
+ * Is tasked with generating reference commands from user inputs
+ * 
+ * @param n The ROS NodeHandle of the ROS node instantiating this class
+ */
 ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
 {
     n_ = n;
@@ -57,6 +71,11 @@ ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
     }
 }
 
+/**
+ * @brief Callback to the joystick message, representing user input
+ * 
+ * @param joyMsg The joystick message
+ */
 void ReferenceGenerator::joyCallback(sensor_msgs::Joy joyMsg)
 {
     for (int i = 0; i < 11; i++)
@@ -79,6 +98,12 @@ void ReferenceGenerator::joyCallback(sensor_msgs::Joy joyMsg)
     publishCmds(reference_);
 }
 
+/**
+ * @brief Convert the user inputs to reference commands.
+ * 
+ * @param inputs A double array, containing the user input channels, in the -1,1 range
+ * @return Eigen::Vector3d The angular rates (p, q, r) reference values
+ */
 Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
 {
     Eigen::Vector3d reference;
@@ -88,6 +113,11 @@ Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
     return reference;
 }
 
+/**
+ * @brief Publish the reference values
+ * 
+ * @param reference The reference values
+ */
 void ReferenceGenerator::publishCmds(Eigen::Vector3d reference)
 {
     geometry_msgs::Vector3Stamped msg;

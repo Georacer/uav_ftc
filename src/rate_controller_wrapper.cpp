@@ -1,6 +1,19 @@
+/**
+ * @file rate_controller_wrapper.cpp
+ * @author George Zogopoulos-Papaliakos (gzogop@mail.ntua.gr)
+ * @brief Wrapper library for the rate controller MPC library
+ * @date 2019-06-13
+ * 
+ * @copyright Copyright (c) 2019
+ * 
+ */
 #include "rate_controller_wrapper.hpp"
 
-// Default Constructor.
+/**
+ * @brief Construct a new Rate Mpc Wrapper< T>:: Rate Mpc Wrapper object
+ * 
+ * @tparam T 
+ */
 template <typename T>
 RateMpcWrapper<T>::RateMpcWrapper()
 {
@@ -28,7 +41,14 @@ RateMpcWrapper<T>::RateMpcWrapper()
     acado_is_prepared_ = true;
 }
 
-// Set online data
+/**
+ * @brief Set the online data used by the model
+ * 
+ * @tparam T float or double
+ * @param online_data airspeed, AoA, AoS
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::setOnlineData(
     const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data)
@@ -39,7 +59,14 @@ bool RateMpcWrapper<T>::setOnlineData(
     return true;
 }
 
-// Set initial state
+/**
+ * @brief Set the initial state of the system under optimization, essentially the measurement
+ * 
+ * @tparam T float or double
+ * @param state The initial system state
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::setInitialState(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
@@ -49,7 +76,14 @@ bool RateMpcWrapper<T>::setInitialState(
     return true;
 }
 
-// Set a reference pose.
+/**
+ * @brief Set the target pose the sysetm should achieve at the end of the horizon
+ * 
+ * @tparam T float or double
+ * @param state The target values each state should achieve
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::setReferencePose(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
@@ -68,7 +102,15 @@ bool RateMpcWrapper<T>::setReferencePose(
     return true;
 }
 
-// Set a reference trajectory.
+/**
+ * @brief The target trajectory the system should follow within the prediction horizon
+ * 
+ * @tparam T float or double
+ * @param states One state vector for each time instance in the horizon plus the final state
+ * @param inputs One input vector for each time instance in the horizon plus the final state
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::setTrajectory(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
@@ -89,7 +131,16 @@ bool RateMpcWrapper<T>::setTrajectory(
     return true;
 }
 
-// Reset states and inputs and calculate new solution.
+/**
+ * @brief Perform one step of the MPC
+ * Initialize the first-pass estimate of the solution before searching for a solution
+ * 
+ * @tparam T float or double 
+ * @param state The first-pass guess for the optimal state before optimizing the system
+ * @param online_data The currently measured vector of airspeed, AoA, AoS
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::solve(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
@@ -106,7 +157,16 @@ bool RateMpcWrapper<T>::solve(
     return update(state, online_data);
 }
 
-// Calculate new solution from last known solution.
+/**
+ * @brief Perform one step of the MPC 
+ * 
+ * @tparam T float or double
+ * @param state The first-pass guess for the optimal state before optimizing the system
+ * @param online_data The currently measured vector of airspeed, AoA, AoS
+ * @param do_preparation Peform the ACADO preparation step after the optimization step
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::update(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
@@ -158,8 +218,14 @@ bool RateMpcWrapper<T>::update(
     return true;
 }
 
-// Prepare the solver.
-// Must be triggered between iterations if not done in the update funciton.
+/**
+ * @brief Call the ACADO preparation step
+ * Must be triggered between iterations if not done in the update function
+ * 
+ * @tparam T float or double
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::prepare()
 {
@@ -169,7 +235,13 @@ bool RateMpcWrapper<T>::prepare()
     return true;
 }
 
-// Check if resulting input is valid
+/**
+ * @brief Check if the resulting optimal input has NaN elements
+ * 
+ * @tparam T 
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::checkInput()
 {
@@ -184,6 +256,14 @@ bool RateMpcWrapper<T>::checkInput()
 }
 
 // Reset the solver if it crashes (output==Nan)
+/**
+ * @brief Reset the solver
+ * Also perform one feedback step and check if the new optimal input has NaN elements
+ * 
+ * @tparam T 
+ * @return true 
+ * @return false 
+ */
 template <typename T>
 bool RateMpcWrapper<T>::resetController()
 {
@@ -215,11 +295,11 @@ bool RateMpcWrapper<T>::resetController()
         setInitialState(trim_state);
         std::cout << "Running optimzation anew:" << std::endl;
         acado_feedbackStep();
-        std::cout << "Got airdata: " << acado_online_data_ << std::endl;
-        std::cout << "Got reference: " << acado_reference_states_ << std::endl;
-        std::cout << "Got measurements: " << acado_initial_state_ << std::endl;
-        std::cout << "Expected states: " << acado_states_ << std::endl;
-        std::cout << "Made input: " << acado_inputs_ << std::endl;
+        // std::cout << "Got airdata: " << acado_online_data_ << std::endl;
+        // std::cout << "Got reference: " << acado_reference_states_ << std::endl;
+        // std::cout << "Got measurements: " << acado_initial_state_ << std::endl;
+        // std::cout << "Expected states: " << acado_states_ << std::endl;
+        // std::cout << "Made input: " << acado_inputs_ << std::endl;
 
         return true;
     }
@@ -230,7 +310,13 @@ bool RateMpcWrapper<T>::resetController()
     }
 }
 
-// Get a specific state.
+/**
+ * @brief Get the predicted state at a time instance
+ * 
+ * @tparam T float or double 
+ * @param node_index The index of the desired time instance
+ * @param return_state The vector onto which to write the state
+ */
 template <typename T>
 void RateMpcWrapper<T>::getState(const int node_index,
                                  Eigen::Ref<Eigen::Matrix<T, kStateSize, 1>> return_state)
@@ -238,7 +324,12 @@ void RateMpcWrapper<T>::getState(const int node_index,
     return_state = acado_states_.col(node_index).cast<T>();
 }
 
-// Get all states.
+/**
+ * @brief Get all the predicted states trajectory
+ * 
+ * @tparam T 
+ * @param return_states The matrix onto which to return the trajectories
+ */
 template <typename T>
 void RateMpcWrapper<T>::getStates(
     Eigen::Ref<Eigen::Matrix<T, kStateSize, kSamples + 1>> return_states)
@@ -246,7 +337,13 @@ void RateMpcWrapper<T>::getStates(
     return_states = acado_states_.cast<T>();
 }
 
-// Get a specific input.
+/**
+ * @brief Get the optimal input at a time instance
+ * 
+ * @tparam T float or double
+ * @param node_index The index of the desired time instance
+ * @param return_input The vector onto which to return the input
+ */
 template <typename T>
 void RateMpcWrapper<T>::getInput(const int node_index,
                                  Eigen::Ref<Eigen::Matrix<T, kInputSize, 1>> return_input)
@@ -254,7 +351,12 @@ void RateMpcWrapper<T>::getInput(const int node_index,
     return_input = acado_inputs_.col(node_index).cast<T>();
 }
 
-// Get all inputs.
+/**
+ * @brief Get the whole optimal input trajectory
+ * 
+ * @tparam T float or double
+ * @param return_inputs The matrix onto which to return the trajectories
+ */
 template <typename T>
 void RateMpcWrapper<T>::getInputs(
     Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_inputs)

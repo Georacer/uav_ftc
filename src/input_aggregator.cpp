@@ -1,6 +1,19 @@
-// Merge input commands for control surfaces and throttle and output them to the UAV control topic
+/**
+ * @file input_aggregator.cpp
+ * @author George Zogopoulos-Papaliakos (gzogop@mail.ntua.gr)
+ * @brief Provides mixing utilities to combine direct user control inputs and controller-generated inputs
+ * @date 2019-06-13
+ * 
+ * @copyright Copyright (c) 2019
+ * 
+ */
 #include <input_aggregator.hpp>
 
+/**
+ * @brief Construct a new Input Aggregator:: Input Aggregator object
+ * 
+ * @param n The ROS NodeHandle of the ROS node instantiating this class
+ */
 InputAggregator::InputAggregator(ros::NodeHandle n)
 {
     rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
@@ -12,6 +25,11 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
     ros::param::get("ctrlMode", ctrlMode_);
 };
 
+/**
+ * @brief Callback which stores the user control inputs 
+ * 
+ * @param msg The user control input message
+ */
 void InputAggregator::rawCtrlsCallback(last_letter_msgs::SimPWM msg)
 {
     rawCtrls_ = msg;
@@ -21,6 +39,11 @@ void InputAggregator::rawCtrlsCallback(last_letter_msgs::SimPWM msg)
     }
 }
 
+/**
+ * @brief Callback which stores the controller-issued control surface commands
+ * 
+ * @param msg The controller-issued commands
+ */
 void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
     surfaceCtrls_.vector.x = msg.vector.x;
@@ -33,11 +56,20 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     }
 }
 
+/**
+ * @brief Callback which stores the controller issued throttle commands
+ * 
+ * @param msg The throttle commands
+ */
 void InputAggregator::throttleCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
     throttleCtrls_ = msg;
 }
 
+/**
+ * @brief Performs the input mixing. Relies on the ctrlMode parameter to pick a strategy.
+ * 
+ */
 void InputAggregator::mixer()
 {
     switch (ctrlMode_)
@@ -61,6 +93,10 @@ void InputAggregator::mixer()
     }
 }
 
+/**
+ * @brief Publish an input message, based on the currently stored inputs
+ * 
+ */
 void InputAggregator::publishCtrls()
 {
     mixer(); // Mix control signals according to ctrlMode_ setting

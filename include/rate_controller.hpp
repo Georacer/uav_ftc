@@ -14,9 +14,9 @@
 
 class RateController
 {
-public:
-    ///////////
-    //Variables
+private:
+    ////////////
+    // Variables
     last_letter_msgs::SimStates states_; // Complete aircraft state
     Eigen::Vector3f angularStates_;     // p, q, r measurements
     Eigen::Vector3f airdata_;
@@ -26,27 +26,22 @@ public:
     ros::Subscriber subState, subRef;
     ros::Publisher pubCtrl;
 
-    /////////
-    //Members
-    RateMpcWrapper<float> mpcController;
+    //////////
+    // Members
+    RateMpcWrapper<float> mpcController_;
 
-    ///////////
-    //Functions
+public:
+
+    ////////////
+    // Functions
     void step();                                                // Caller of rate_controller_wrapper
     void getStates(last_letter_msgs::SimStates measuredStates); // Callback to store measured states
     void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command  //TODO: Declare and compile the msg
     void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
     void writeOutput();                                         // Send control signals to the control inputs aggregator
 
-    //Constructor
+    // Constructor
     RateController(ros::NodeHandle n);
-    //Destructor
+    // Destructor
     ~RateController();
-
-private:
-    ///////////
-    //Variables
-
-    ///////////
-    //Functions
 };
