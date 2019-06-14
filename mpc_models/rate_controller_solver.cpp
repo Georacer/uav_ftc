@@ -55,7 +55,7 @@ int main()
   double G4 = j_xz / G;
   double G5 = (j_z - j_x) / j_y;
   double G6 = j_xz / j_y;
-  double G7 = ((j_y - j_y) * j_x + j_xz * j_xz) / G;
+  double G7 = ((j_x - j_y) * j_x + j_xz * j_xz) / G;
   double G8 = j_x / G;
   // roll moment parameters
   double c_l_0 = 0;
@@ -91,15 +91,10 @@ int main()
   IntermediateState m = qbar * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
   IntermediateState n = qbar * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
 
-  // System dynamics
+  // System dynamics, Beard notation
   f << dot(p) == G1 * p * q - G2 * q * r + G3 * l + G4 * n;
   f << dot(q) == G5 * p * r - G6 * (p * p - r * r) + m / j_y;
   f << dot(r) == G7 * p * q - G1 * q * r + G4 * l + G8 * n;
-
-  //  // Explicit model without using IntermediateStates
-  // f << dot(p) == G1 * p * q - G2 * q * r + G3 * (0.5 * rho * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr)) + G4 * (0.5 * rho * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr));
-  // f << dot(q) == G5 * p * r - G6 * (p * p - r * r) + (0.5 * rho * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de)) / j_y;
-  // f << dot(r) == G7 * p * q - G1 * q * r + G4 * (0.5 * rho * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr)) + G8 * (0.5 * rho * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr));
 
   ////////
   // Costs
@@ -143,7 +138,7 @@ int main()
   ocp.setNOD(3);
   if (!CODE_GEN)
   {
-    // Set the values of online data
+    // Setting the values of online data does not seem to work
     // ocp.subjectTo(Va == 15);
     // ocp.subjectTo(alpha == 0.035);
     // ocp.subjectTo(beta == 0);
@@ -185,7 +180,7 @@ int main()
 
     // Setup the MPC
     RealTimeAlgorithm alg(ocp, dt);
-    alg.set(MAX_NUM_ITERATIONS, 2);
+    alg.set(MAX_NUM_ITERATIONS, 5);
     StaticReferenceTrajectory reference;
     Controller controller(alg, reference);
 
@@ -230,15 +225,15 @@ int main()
     mpc.set(SPARSE_QP_SOLUTION, FULL_CONDENSING_N2); // due to qpOASES
     mpc.set(INTEGRATOR_TYPE, INT_IRK_GL4);           // accurate
     mpc.set(NUM_INTEGRATOR_STEPS, N);
-    mpc.set(MAX_NUM_ITERATIONS, 5);
+    mpc.set(MAX_NUM_ITERATIONS, 2);
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                   // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // set on runtime
-    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // time-varying costs
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // Currently we do no plan to alter the constraints
+    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // only used for time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
-    // Do not generate tests, makes or matlab-related interfaces.
+    // Do not generate tests or matlab-related interfaces.
     mpc.set(GENERATE_TEST_FILE, NO);
     mpc.set(GENERATE_MAKE_FILE, YES);
     mpc.set(GENERATE_MATLAB_INTERFACE, NO);
