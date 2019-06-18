@@ -14,7 +14,7 @@
  * 
  * @param n The ROS NodeHandle of the calling ROS node
  */
-RateController::RateController(ros::NodeHandle n) : mpcController()
+RateController::RateController(ros::NodeHandle n) : mpcController_()
 {
     //Initialize states
     states_.velocity.angular.x = 0;
@@ -28,13 +28,13 @@ RateController::RateController(ros::NodeHandle n) : mpcController()
 
     // Initialize airdata container
     airdata_ << 15.0f, 0.03f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
-    mpcController.setOnlineData(airdata_);
+    mpcController_.setOnlineData(airdata_);
     // Initialize system state
     angularStates_ << 0.0f, 0.0f, 0.0f;
-    mpcController.setInitialState(angularStates_);
+    mpcController_.setInitialState(angularStates_);
     // Initialize reference
     refRates_ << 0.0f, 0.0f, 0.0f;
-    mpcController.setReferencePose(refRates_);
+    mpcController_.setReferencePose(refRates_);
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
@@ -48,7 +48,7 @@ RateController::RateController(ros::NodeHandle n) : mpcController()
  */
 RateController::~RateController()
 {
-    delete &mpcController;
+    delete &mpcController_;
 }
 
 /**
@@ -71,13 +71,17 @@ void RateController::step()
     // refRates are already saved in the controller
 
     // Set the MPC reference state
-    mpcController.setReferencePose(refRates_);
+    mpcController_.setReferencePose(refRates_);
 
     // Solve problem with given measurements
-    mpcController.update(angularStates_, airdata_);
+    mpcController_.update(angularStates_, airdata_);
 
     // Write the resulting controller output
     readControls();
+
+    // Shift the solver state by one and re-initialize
+    mpcController_.shift();
+    mpcController_.prepare();
 
     // std::cout << "Got airdata: " << airdata_ << std::endl;
     // std::cout << "Got reference: " << refRates_ << std::endl;
@@ -116,7 +120,7 @@ void RateController::getStates(last_letter_msgs::SimStates inpStates)
  */
 void RateController::readControls()
 {
-    mpcController.getInput(0, predicted_controls_);
+    mpcController_.getInput(0, predicted_controls_);
 }
 
 /**

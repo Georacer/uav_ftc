@@ -35,8 +35,8 @@ public:
     bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
-                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data,
-                bool do_preparation = true);
+                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
+    bool shift();
     bool prepare();
     bool checkInput();
     bool resetController();

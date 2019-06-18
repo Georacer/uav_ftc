@@ -170,8 +170,7 @@ bool RateMpcWrapper<T>::solve(
 template <typename T>
 bool RateMpcWrapper<T>::update(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
-    const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data,
-    bool do_preparation)
+    const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data)
 {
     if (!acado_is_prepared_)
     {
@@ -189,15 +188,11 @@ bool RateMpcWrapper<T>::update(
     acado_feedbackStep();
     acado_is_prepared_ = false;
 
-    std::cout << "Got airdata: " << acado_online_data_ << std::endl;
-    std::cout << "Got reference: " << acado_reference_states_ << std::endl;
-    std::cout << "Got measurements: " << acado_initial_state_ << std::endl;
-    std::cout << "Expected states: " << acado_states_ << std::endl;
-    std::cout << "Made input: " << acado_inputs_ << std::endl;
-
-    /* Optional: shift the initialization (look at acado_common.h). */
-    acado_shiftStates(2, 0, 0);
-    acado_shiftControls(0);
+    // std::cout << "Got airdata: " << acado_online_data_ << std::endl;
+    // std::cout << "Got reference: " << acado_reference_states_ << std::endl;
+    // std::cout << "Got measurements: " << acado_initial_state_ << std::endl;
+    // std::cout << "Expected states: " << acado_states_ << std::endl;
+    // std::cout << "Made input: " << acado_inputs_ << std::endl;
 
     // Check if predicted input is valid
     if (!checkInput())
@@ -207,16 +202,24 @@ bool RateMpcWrapper<T>::update(
         ros::shutdown();
     }
 
-    // Prepare if the solver if wanted
-    if (do_preparation)
-    {
-        acado_preparationStep();
-        acado_is_prepared_ = true;
-    }
-
-
     return true;
 }
+
+/**
+ * @brief Shift the solver optimal states and inputs to initialize for the next step
+ * 
+ * @tparam T float or double
+ * @return true 
+ * @return false 
+ */
+template <typename T>
+bool RateMpcWrapper<T>::shift()
+{
+    acado_shiftStates(2, 0, 0);
+    acado_shiftControls(0);
+}
+
+
 
 /**
  * @brief Call the ACADO preparation step
