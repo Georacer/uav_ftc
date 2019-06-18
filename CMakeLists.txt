@@ -116,7 +116,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES uav_ftc
- CATKIN_DEPENDS roscpp std_msgs # message_runtime
+ CATKIN_DEPENDS roscpp std_msgs mathutils # message_runtime
  DEPENDS EIGEN3
 )
 

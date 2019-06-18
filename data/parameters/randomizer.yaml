@@ -1,0 +1,21 @@
+# Randomize the UAV parameters
+
+paramRandomizer/std_dev : 0.0
+paramRandomizer/param_names : [
+  "airfoil1/c_l_0",
+  "airfoil1/c_l_p",
+  "airfoil1/c_l_b",
+  "airfoil1/c_l_r",
+  "airfoil1/c_l_deltaa",
+  "airfoil1/c_l_deltar",
+  "airfoil1/c_m_0",
+  "airfoil1/c_m_a",
+  "airfoil1/c_m_q",
+  "airfoil1/c_m_deltae",
+  "airfoil1/c_n_0",
+  "airfoil1/c_n_b",
+  "airfoil1/c_n_p",
+  "airfoil1/c_n_r",
+  "airfoil1/c_n_deltaa",
+  "airfoil1/c_n_deltar"
+]

@@ -132,13 +132,12 @@ void RateController::writeOutput()
     geometry_msgs::Vector3Stamped channels;
     // MPC controls are in radians, must convert them to -1,1 range
     double deltaa_max, deltae_max, deltar_max;
-    ros::param::getCached("airfoil1/deltaa_max", deltaa_max);
-    ros::param::getCached("airfoil1/deltae_max", deltae_max);
-    ros::param::getCached("airfoil1/deltar_max", deltar_max);
-    channels.vector.x = predicted_controls_(0) / deltaa_max; // Pass aileron input
-    channels.vector.y = predicted_controls_(1) / deltae_max; // Pass elevator input
-    channels.vector.z = predicted_controls_(2) / deltar_max;   // Pass rudder input
-    std::cout << "Writing controls: " << channels.vector << std::endl;
+    ros::param::getCached("airfoil1/deltaa_max_nominal", deltaa_max);
+    ros::param::getCached("airfoil1/deltae_max_nominal", deltae_max);
+    ros::param::getCached("airfoil1/deltar_max_nominal", deltar_max);
+    channels.vector.x = constrain(predicted_controls_(0) / deltaa_max, -1.0, 1.0); // Pass aileron input
+    channels.vector.y = constrain(predicted_controls_(1) / deltae_max, -1.0, 1.0); // Pass elevator input
+    channels.vector.z = constrain(predicted_controls_(2) / deltar_max, -1.0, 1.0);   // Pass rudder input
     channels.header.stamp = ros::Time::now();
     pubCtrl.publish(channels);
 }

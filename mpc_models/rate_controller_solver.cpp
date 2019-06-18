@@ -225,11 +225,11 @@ int main()
     mpc.set(SPARSE_QP_SOLUTION, FULL_CONDENSING_N2); // due to qpOASES
     mpc.set(INTEGRATOR_TYPE, INT_IRK_GL4);           // accurate
     mpc.set(NUM_INTEGRATOR_STEPS, N);
-    mpc.set(MAX_NUM_ITERATIONS, 2);
+    // mpc.set(MAX_NUM_ITERATIONS, 2); // Not a valid option
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                   // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // Currently we do no plan to alter the constraints
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);   // Currently we do no plan to alter the constraints
     mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // only used for time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
