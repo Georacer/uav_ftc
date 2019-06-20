@@ -17,7 +17,7 @@ int main()
   and solved on execution. The reference and constraints must be set in here.
 */
 
-  const bool CODE_GEN = false;
+  const bool CODE_GEN = true;
 
   ///////////////////
   // System variables
@@ -25,7 +25,7 @@ int main()
   DifferentialState Va, alpha, beta, phi, theta;
   IntermediateState psi_dot, gamma;
   // AlgebraicState psi_dot, gamma; // Simulation cannot handle DAEs
-  Control p, q, r, delta_t;
+  Control p, q, r, deltat;
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
@@ -72,7 +72,7 @@ int main()
   Expression FL = qbar * S * CLa;
   Expression FD = qbar * S * (c_drag_p + CLa * CLa / (M_PI * oswald * b * b / S));
   Expression FY = qbar * S * (c_y_0 + c_y_b * beta);
-  Expression Fprop = 0.5 * rho * k_p * (pow(k_m * delta_t, 2) - Va * Va);
+  Expression Fprop = 0.5 * rho * k_p * (k_m * deltat * k_m * deltat - Va * Va);
   // IntermediateState l = qbar * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr);
   // IntermediateState m = qbar * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
   // IntermediateState n = qbar * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
@@ -89,6 +89,7 @@ int main()
   Expression g3 = g0 * (sa*sth + ca*cph*cth);
   Expression qw = -p * sb * ca + q *cb - r*sa * sb;
   Expression rw = -p * sa + r * ca;
+
   psi_dot = (q*sph + r*cph)/cth;
   gamma = theta - alpha;
 
@@ -112,12 +113,12 @@ int main()
     << psi_dot // Prescribed turn rate
     << alpha << beta // Minimize alpha and beta
     << p << q << r // Prescribed angular rates
-    << delta_t; // Minimize throttle
+    << deltat; // Minimize throttle
 
-  // End cost vector
+  // End cost vector, cannot depend on controls, only on state
   hN << Va // Presribed airspeed 
-     << gamma // Prescribed flight path angle
-     << psi_dot; // Prescribed turn radis
+     << gamma; // Prescribed flight path angle
+    //  << psi_dot; // Prescribed turn radius, cannot describe it without using inputs
 
   // Running cost weight matrix
   DMatrix Q(h.getDim(), h.getDim());
@@ -125,8 +126,8 @@ int main()
   Q(0, 0) = 100; // Va
   Q(1, 1) = 100; // Flight path angle
   Q(2, 2) = 100; // turn rate
-  Q(3, 3) = 10;  // alpha
-  Q(4, 4) = 10;  // beta
+  Q(3, 3) = 1;  // alpha
+  Q(4, 4) = 1;  // beta
   Q(5, 5) = 1;   // p
   Q(6, 6) = 1;   // q
   Q(7, 7) = 1;   // r
@@ -137,7 +138,7 @@ int main()
   QN.setIdentity();
   QN(0, 0) = Q(0, 0);
   QN(1, 1) = Q(1, 1);
-  QN(2, 2) = Q(2, 2);
+  // QN(2, 2) = Q(2, 2);
 
   ////////////////////////////////////
   // Define an optimal control problem
@@ -146,8 +147,10 @@ int main()
   // Add system dynamics
   ocp.subjectTo(f);
   // Add constraints
-  ocp.subjectTo(0.0 <= delta_t <= deltat_max);
+  ocp.subjectTo(0.0 <= deltat <= deltat_max);
   ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
+  ocp.subjectTo(-15.0*M_PI/180.0 <= beta <= 15.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
+  ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
   // Set Number of Online Data
   // ocp.setNOD(3); // No online data for this model
   if (!CODE_GEN)
@@ -171,7 +174,7 @@ int main()
     refN.setZero();
     refN(0) = ref(0);
     refN(1) = ref(1);
-    refN(2) = ref(2);
+    // refN(2) = ref(2);
 
     // Set the references into the problem
     ocp.minimizeLSQ(Q, h, ref);
@@ -237,32 +240,52 @@ int main()
     // Plot the results at the end of the simulation
     VariablesGrid sampledProcessOutput;
     sim.getSampledProcessOutput(sampledProcessOutput);
+    std::cout << "Output states num rows: " << sampledProcessOutput.getNumRows() << std::endl;
+    std::cout << "Output states num cols: " << sampledProcessOutput.getNumCols() << std::endl;
     VariablesGrid feedbackControl;
     sim.getFeedbackControl(feedbackControl);
+    std::cout << "Control inputs num rows: " << feedbackControl.getNumRows() << std::endl;
+    std::cout << "Control inputs num cols: " << feedbackControl.getNumCols() << std::endl;
     VariablesGrid intermediateStates;
     sim.getProcessIntermediateStates(intermediateStates);
+    std::cout << "Intermediate states num rows: " << intermediateStates.getNumRows() << std::endl;
+    std::cout << "Intermediate states num cols: " << intermediateStates.getNumCols() << std::endl;
     // VariablesGrid algebraicStates;
     // sim.getProcessAlgebraicStates(algebraicStates);
+
     GnuplotWindow window;
+    // Plot states
     window.addSubplot(sampledProcessOutput(0), "Va");
     window.addSubplot(sampledProcessOutput(1), "alpha");
     window.addSubplot(sampledProcessOutput(2), "beta");
     window.addSubplot(sampledProcessOutput(3), "phi");
     window.addSubplot(sampledProcessOutput(4), "theta");
-
-    window.addSubplot(intermediateStates(1), "gamma");
-    VariablesGrid gamma_2 = sampledProcessOutput(1)-sampledProcessOutput(1);
-    window.addSubplot(gamma_2, "gamma_2");
-    window.addSubplot(intermediateStates(0), "psi_dot");
-
-    // window.addSubplot(algebraicStates(0), "psi_dot");
-    // window.addSubplot(algebraicStates(1), "gamma");
-
+    // Plot control inputs
     window.addSubplot(feedbackControl(0), "p");
     window.addSubplot(feedbackControl(1), "q");
     window.addSubplot(feedbackControl(2), "r");
-    window.addSubplot(feedbackControl(3), "delta_t");
+    window.addSubplot(feedbackControl(3), "deltat");
     window.plot();
+
+    // Plot intermediate states
+    GnuplotWindow window2;
+    window2.addSubplot(intermediateStates(0), "i-state 0");
+    window2.addSubplot(intermediateStates(1), "i-state 1");
+    window2.addSubplot(intermediateStates(2), "i-state 2");
+    window2.addSubplot(intermediateStates(3), "i-state 3");
+    window2.addSubplot(intermediateStates(4), "i-state 4");
+    window2.addSubplot(intermediateStates(5), "i-state 5");
+    window2.addSubplot(intermediateStates(6), "i-state 6");
+    window2.addSubplot(intermediateStates(7), "i-state 7");
+    window2.addSubplot(intermediateStates(8), "i-state 8");
+    window2.addSubplot(intermediateStates(9), "i-state 9");
+    window2.plot();
+
+    // Print functions contents
+    std::cout << "Rolling cost contents: \n" << std::endl;
+    h.print(std::cout);
+    std::cout << "Final cost contents: \n" << std::endl;
+    hN.print(std::cout);
   }
   else
   {
@@ -278,12 +301,12 @@ int main()
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                   // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);   // Currently we do no plan to alter the constraints
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // Currently we do no plan to alter the constraints
     mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // only used for time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
     // Do not generate tests or matlab-related interfaces.
-    mpc.set(GENERATE_TEST_FILE, YES);
+    mpc.set(GENERATE_TEST_FILE, NO);
     mpc.set(GENERATE_MAKE_FILE, YES);
     mpc.set(GENERATE_MATLAB_INTERFACE, NO);
     mpc.set(GENERATE_SIMULINK_INTERFACE, NO);
