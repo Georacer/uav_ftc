@@ -22,17 +22,18 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     MpcWrapper(T dt); // No-argument constructor
+    bool setupMpc(); // Call right after setting trim vectors
 
     bool setTrimState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrimInput(const Eigen::Ref<const Eigen::Matrix<T, kInputSize, 1>> input);
     bool setTrimOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
-    bool setDefaultReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
+    bool setDefaultRunningReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
     bool setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference);
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference,
                       const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> referenceEnd);
-    bool setTrajectory(
+    bool setReferenceTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
     bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
@@ -52,6 +53,7 @@ public:
     void getInputs(
         Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_input);
     T getTimestep() { return dt_; }
+    void printSolverState();
 
 private:
     Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
@@ -72,23 +74,23 @@ private:
     Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>>
         acado_online_data_{acadoVariables.od};
 
-    Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
+    Eigen::Map<Eigen::Matrix<float, 3, kSamples, Eigen::ColMajor>>
         acado_lower_bounds_{acadoVariables.lbValues};
 
-    Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
+    Eigen::Map<Eigen::Matrix<float, 3, kSamples, Eigen::ColMajor>>
         acado_upper_bounds_{acadoVariables.ubValues};
 
     bool acado_is_prepared_{false};
     bool controller_is_reset_{false};
     T dt_; // Currently unused
-    Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
-        Eigen::Matrix<float, kInputSize, 1>::Zero();
-    Eigen::Matrix<real_t, kStateSize, 1> kTrimState_ =
-        Eigen::Matrix<real_t, kStateSize, 1>::Zero();
-    Eigen::Matrix<real_t, kOdSize, 1> kTrimOnlineData_ =
-        Eigen::Matrix<real_t, kOdSize, 1>::Zero();
-    Eigen::Matrix<real_t, kRefSize, 1> defaultReference_ =
-        Eigen::Matrix<real_t, kRefSize, 1>::Zero();
-    Eigen::Matrix<real_t, kEndRefSize, 1> defaultEndReference_ =
-        Eigen::Matrix<real_t, kEndRefSize, 1>::Zero();
+    Eigen::Matrix<T, kInputSize, 1> kTrimInput_ =
+        Eigen::Matrix<T, kInputSize, 1>::Zero();
+    Eigen::Matrix<T, kStateSize, 1> kTrimState_ =
+        Eigen::Matrix<T, kStateSize, 1>::Zero();
+    Eigen::Matrix<T, kOdSize, 1> kTrimOnlineData_ =
+        Eigen::Matrix<T, kOdSize, 1>::Zero();
+    Eigen::Matrix<T, kRefSize, 1> defaultReference_ =
+        Eigen::Matrix<T, kRefSize, 1>::Zero();
+    Eigen::Matrix<T, kEndRefSize, 1> defaultEndReference_ =
+        Eigen::Matrix<T, kEndRefSize, 1>::Zero();
 };

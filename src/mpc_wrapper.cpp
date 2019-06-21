@@ -19,46 +19,60 @@ MpcWrapper<T>::MpcWrapper(T dt)
 {
     dt_ = dt;
 
-    resetController();
+    // Clear solver memory
+    memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
+    memset(&acadoVariables, 0, sizeof(acadoVariables));
+
+    // Initialize the solver
+    acado_initializeSolver();
 
     ROS_INFO("Raised an MPC with attributes:");
-    ROS_INFO("#States: %d", kStateSize);
-    ROS_INFO("#Inputs: %d", kInputSize);
-    ROS_INFO("#OnlineData: %d", kOdSize);
+    ROS_INFO("# States: %d", kStateSize);
+    ROS_INFO("# Inputs: %d", kInputSize);
+    ROS_INFO("# OnlineData: %d", kOdSize);
+    ROS_INFO("# Running reference states: %d", kRefSize);
+    ROS_INFO("# End reference states: %d", kEndRefSize);
+}
+
+template <typename T>
+bool MpcWrapper<T>::setupMpc()
+{
+    resetController();
+    return true;
 }
 
 template <typename T>
 bool MpcWrapper<T>::setTrimState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
 {
-    kTrimState_ = state.template cast<float>();
+    kTrimState_ = state;
     return true;
 }
 
 template <typename T>
 bool MpcWrapper<T>::setTrimInput(const Eigen::Ref<const Eigen::Matrix<T, kInputSize, 1>> input)
 {
-    kTrimInput_ = input.template cast<float>();
+    kTrimInput_ = input;
     return true;
 }
 
 template <typename T>
 bool MpcWrapper<T>::setTrimOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData)
 {
-    kTrimOnlineData_ = onlineData.template cast<float>();
+    kTrimOnlineData_ = onlineData;
     return true;
 }
 
 template <typename T>
-bool MpcWrapper<T>::setDefaultReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference)
+bool MpcWrapper<T>::setDefaultRunningReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference)
 {
-    defaultReference_ = reference.template cast<float>();
+    defaultReference_ = reference;
     return true;
 }
 
 template <typename T>
 bool MpcWrapper<T>::setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference)
 {
-    defaultEndReference_ = endReference.template cast<float>();
+    defaultEndReference_ = endReference;
     return true;
 }
 
@@ -110,13 +124,15 @@ bool MpcWrapper<T>::setReference(
     const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference,
     const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> referenceEnd)
 {
-    acado_reference_states_.block(0, 0, kRefSize, kSamples) =
+    // acado_reference_states_.block(0, 0, kRefSize, kSamples) =
+    acado_reference_states_ =
         reference.replicate(1, kSamples).template cast<float>();
 
-    acado_reference_end_state_.segment(0, kEndRefSize) =
+    // acado_reference_end_state_.segment(0, kEndRefSize) =
+    acado_reference_end_state_ =
         referenceEnd.template cast<float>();
 
-    acado_initializeNodesByForwardSimulation();
+    // acado_initializeNodesByForwardSimulation();
 
     return true;
 }
@@ -131,7 +147,8 @@ bool MpcWrapper<T>::setReference(
  * @return false 
  */
 template <typename T>
-bool MpcWrapper<T>::setTrajectory(
+// WARNING!!! DOES NOT WORK CURRENTLY
+bool MpcWrapper<T>::setReferenceTrajectory(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
     const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs)
 {
@@ -197,6 +214,13 @@ bool MpcWrapper<T>::update(
         return false;
     }
 
+    if (controller_is_reset_)
+    {
+        // Provide more accurate state estimates
+        // acado_states_ = state.replicate(1, kSamples + 1).template cast<float>();
+        controller_is_reset_ = false;
+    }
+
     // Pass airdata information
     setOnlineData(online_data);
 
@@ -206,12 +230,6 @@ bool MpcWrapper<T>::update(
     // Perform feedback step and reset preparation check.
     acado_feedbackStep();
     acado_is_prepared_ = false;
-
-    std::cout << "Got Online Data: " << acado_online_data_ << std::endl;
-    std::cout << "Got reference: " << acado_reference_states_ << std::endl;
-    std::cout << "Got measurements: " << acado_initial_state_ << std::endl;
-    std::cout << "Expected states: " << acado_states_ << std::endl;
-    std::cout << "Made input: " << acado_inputs_ << std::endl;
 
     // Check if predicted input is valid
     if (!checkInput())
@@ -290,21 +308,25 @@ template <typename T>
 bool MpcWrapper<T>::resetController()
 {
     // Clear solver memory
-    memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
-    memset(&acadoVariables, 0, sizeof(acadoVariables));
+    // memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
+    // memset(&acadoVariables, 0, sizeof(acadoVariables));
 
     // Initialize the solver
-    acado_initializeSolver();
+    // acado_initializeSolver();
+
+    // Initialize states and inputs
+    acado_states_ = kTrimState_.replicate(1, kSamples + 1).template cast<float>();
+    acado_inputs_ = kTrimInput_.replicate(1, kSamples).template cast<float>();
 
     // Initialize online data.
-    setOnlineData(kTrimOnlineData_.template cast<T>());
+    setOnlineData(kTrimOnlineData_);
 
     // Initialize the states and controls.
-    setReference(defaultReference_.template cast<T>(),
-        defaultEndReference_.template cast<T>());
+    setReference(defaultReference_, defaultEndReference_);
 
     // Initialize solver.
     prepare();
+    controller_is_reset_ = true;
 }
 
 /**
@@ -359,6 +381,16 @@ void MpcWrapper<T>::getInputs(
     Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_inputs)
 {
     return_inputs = acado_inputs_.cast<T>();
+}
+
+template <typename T>
+void MpcWrapper<T>::printSolverState()
+{
+    std::cout << "Online Data: \n" << acado_online_data_ << std::endl;
+    std::cout << "Reference:   \n" << acado_reference_states_ << std::endl;
+    std::cout << "Measurements:\n" << acado_initial_state_ << std::endl;
+    std::cout << "States:      \n" << acado_states_ << std::endl;
+    std::cout << "Input:       \n" << acado_inputs_ << std::endl;
 }
 
 template class MpcWrapper<float>;

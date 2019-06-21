@@ -21,36 +21,48 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_)
     states_.velocity.angular.y = 0;
     states_.velocity.angular.z = 0;
     states_.velocity.linear.x = 15.0;
-    states_.velocity.linear.x = 0.034;
-    states_.velocity.linear.x = 0.0;
+    states_.velocity.linear.y = 0.034;
+    states_.velocity.linear.z = 0.0;
     tprev = ros::Time::now();
     states_.header.stamp = tprev;
 
     // Initialize MPC wrapper
+    // Set default/initial states
     Eigen::Matrix<real_t, 3, 1> trimState = Eigen::Matrix<real_t, 3, 1>::Zero();
     mpcController_.setTrimState(trimState);
+    // Set default/initial inputs
     Eigen::Matrix<real_t, 3, 1> trimInput = Eigen::Matrix<real_t, 3, 1>::Zero();
     mpcController_.setTrimInput(trimInput);
+    // Set default/initial online data
     Eigen::Matrix<real_t, 3, 1> trimOnlineData = (Eigen::Matrix<real_t, 3, 1>() << 
         states_.velocity.linear.x,
         states_.velocity.linear.y,
         states_.velocity.linear.z).finished();
     mpcController_.setTrimOnlineData(trimOnlineData);
-    // Mandatory controller reset
-    mpcController_.resetController();
-
-    // Initialize airdata container
-    airdata_ << 15.0f, 0.034f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
-    mpcController_.setOnlineData(airdata_);
-    // Initialize system state
-    angularStates_ << 0.0f, 0.0f, 0.0f;
-    mpcController_.setInitialState(angularStates_);
-    // Initialize reference
+    // Initialize default reference
     refRates_ << 0.0f, 0.0f, 0.0f;
     refInputs_ << 0.0f, 0.0f, 0.0f;
     Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
     reference << refRates_, refInputs_;
-    mpcController_.setReference(reference, refRates_);
+    mpcController_.setDefaultRunningReference(reference);
+    mpcController_.setDefaultEndReference(refRates_);
+    // Mandatory controller setup (only once after instantiation)
+    mpcController_.setupMpc();
+
+    // Unneeded as same as trim values
+    // // Initialize airdata container
+    // airdata_ << 15.0f, 0.034f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
+    // mpcController_.setOnlineData(airdata_);
+    // // Initialize system state
+    // angularStates_ << 0.0f, 0.0f, 0.0f;
+    // mpcController_.setInitialState(angularStates_);
+
+    // Initialize reference
+    // refRates_ << 0.0f, 0.0f, 0.0f;
+    // refInputs_ << 0.0f, 0.0f, 0.0f;
+    // Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
+    // reference << refRates_, refInputs_;
+    // mpcController_.setReference(reference, refRates_);
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
