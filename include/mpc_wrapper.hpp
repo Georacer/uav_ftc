@@ -12,23 +12,26 @@ static constexpr int kInputSize = ACADO_NU;           // number of inputs
 static constexpr int kCostSize = ACADO_NY - ACADO_NU; // number of state costs, we do not use them in our case
 static constexpr int kOdSize = ACADO_NOD;             // number of online data
 
-const float dt = 0.05; // Be careful to set same as _solver.cpp
-
 ACADOvariables acadoVariables;
 ACADOworkspace acadoWorkspace;
 
 template <typename T>
-class RateMpcWrapper
+class MpcWrapper
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    RateMpcWrapper(); // No-argument constructor
+    MpcWrapper(T dt); // No-argument constructor
 
-
-    bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
+    bool setTrimState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
+    bool setTrimInput(const Eigen::Ref<const Eigen::Matrix<T, kInputSize, 1>> input);
+    bool setTrimOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
+    bool setDefaultReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
+    bool setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference);
+    bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
-    bool setReferencePose(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
+    bool setReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference,
+                      const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> referenceEnd);
     bool setTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
@@ -77,7 +80,15 @@ private:
 
     bool acado_is_prepared_{false};
     bool controller_is_reset_{false};
-    const T dt_{dt}; // Currently unused
-    const Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
-        (Eigen::Matrix<real_t, kInputSize, 1>() << 0.0, 0.0, 0.0).finished();
+    T dt_; // Currently unused
+    Eigen::Matrix<real_t, kInputSize, 1> kTrimInput_ =
+        Eigen::Matrix<float, kInputSize, 1>::Zero();
+    Eigen::Matrix<real_t, kStateSize, 1> kTrimState_ =
+        Eigen::Matrix<real_t, kStateSize, 1>::Zero();
+    Eigen::Matrix<real_t, kOdSize, 1> kTrimOnlineData_ =
+        Eigen::Matrix<real_t, kOdSize, 1>::Zero();
+    Eigen::Matrix<real_t, kRefSize, 1> defaultReference_ =
+        Eigen::Matrix<real_t, kRefSize, 1>::Zero();
+    Eigen::Matrix<real_t, kEndRefSize, 1> defaultEndReference_ =
+        Eigen::Matrix<real_t, kEndRefSize, 1>::Zero();
 };

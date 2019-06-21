@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include "rate_controller_wrapper.hpp"
+#include "mpc_wrapper.hpp"
 
 #include <cstdlib>
 #include <math.h>
@@ -20,15 +20,17 @@ private:
     last_letter_msgs::SimStates states_; // Complete aircraft state
     Eigen::Vector3f angularStates_;     // p, q, r measurements
     Eigen::Vector3f airdata_;
-    Eigen::Vector3f refRates_;
+    Eigen::Vector3f refRates_, refInputs_;
     Eigen::Matrix<float, 3, 1> predicted_controls_; // Stores control outputs, -1,1 range
     ros::Time tprev;
     ros::Subscriber subState, subRef;
     ros::Publisher pubCtrl;
+    float dt_ = 0.02;
+    bool statesReceivedStatus_ = false;
 
     //////////
     // Members
-    RateMpcWrapper<float> mpcController_;
+    MpcWrapper<float> mpcController_;
 
 public:
 

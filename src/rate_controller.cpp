@@ -14,27 +14,43 @@
  * 
  * @param n The ROS NodeHandle of the calling ROS node
  */
-RateController::RateController(ros::NodeHandle n) : mpcController_()
+RateController::RateController(ros::NodeHandle n) : mpcController_(dt_)
 {
     //Initialize states
     states_.velocity.angular.x = 0;
     states_.velocity.angular.y = 0;
     states_.velocity.angular.z = 0;
     states_.velocity.linear.x = 15.0;
-    states_.velocity.linear.x = 0.5;
+    states_.velocity.linear.x = 0.034;
     states_.velocity.linear.x = 0.0;
     tprev = ros::Time::now();
     states_.header.stamp = tprev;
 
+    // Initialize MPC wrapper
+    Eigen::Matrix<real_t, 3, 1> trimState = Eigen::Matrix<real_t, 3, 1>::Zero();
+    mpcController_.setTrimState(trimState);
+    Eigen::Matrix<real_t, 3, 1> trimInput = Eigen::Matrix<real_t, 3, 1>::Zero();
+    mpcController_.setTrimInput(trimInput);
+    Eigen::Matrix<real_t, 3, 1> trimOnlineData = (Eigen::Matrix<real_t, 3, 1>() << 
+        states_.velocity.linear.x,
+        states_.velocity.linear.y,
+        states_.velocity.linear.z).finished();
+    mpcController_.setTrimOnlineData(trimOnlineData);
+    // Mandatory controller reset
+    mpcController_.resetController();
+
     // Initialize airdata container
-    airdata_ << 15.0f, 0.03f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
+    airdata_ << 15.0f, 0.034f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
     mpcController_.setOnlineData(airdata_);
     // Initialize system state
     angularStates_ << 0.0f, 0.0f, 0.0f;
     mpcController_.setInitialState(angularStates_);
     // Initialize reference
     refRates_ << 0.0f, 0.0f, 0.0f;
-    mpcController_.setReferencePose(refRates_);
+    refInputs_ << 0.0f, 0.0f, 0.0f;
+    Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
+    reference << refRates_, refInputs_;
+    mpcController_.setReference(reference, refRates_);
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
@@ -57,6 +73,13 @@ RateController::~RateController()
  */
 void RateController::step()
 {
+    // Don't do anything if no states measurements have been received yet
+    if (!statesReceivedStatus_)
+    {
+        ROS_WARN("Controller tried to step without any measurements");
+        return;
+    }
+    
     // Convert airdata triplet
     geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
     airdata_(0) = airdataVec.x;
@@ -65,13 +88,16 @@ void RateController::step()
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata_(0) < 1)
     {
+        ROS_WARN("Read airspeed: %f, setting to 1m/s", airdata_(0));
         airdata_(0) = 1;
     }
 
     // refRates are already saved in the controller
 
     // Set the MPC reference state
-    mpcController_.setReferencePose(refRates_);
+    Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
+    reference << refRates_, refInputs_;
+    mpcController_.setReference(reference, refRates_);
 
     // Solve problem with given measurements
     mpcController_.update(angularStates_, airdata_);
@@ -111,6 +137,8 @@ void RateController::getStates(last_letter_msgs::SimStates inpStates)
     angularStates_(0) = inpStates.velocity.angular.x;
     angularStates_(1) = inpStates.velocity.angular.y;
     angularStates_(2) = inpStates.velocity.angular.z;
+
+    statesReceivedStatus_ = true;
 }
 
 /**

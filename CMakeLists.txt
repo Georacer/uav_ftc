@@ -133,6 +133,7 @@ include_directories(
 )
 
 ## Declare a C++ library
+
 # The rate controller solver library
 add_library(rate_controller_solver
   externals/qpoases/SRC/Bounds.cpp
@@ -145,25 +146,58 @@ add_library(rate_controller_solver
   externals/qpoases/SRC/SubjectTo.cpp
   externals/qpoases/SRC/Utils.cpp
   externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
-  mpc_models/rate_controller_mpc_solver/acado_qpoases_interface.cpp
-  mpc_models/rate_controller_mpc_solver/acado_integrator.c
-  mpc_models/rate_controller_mpc_solver/acado_solver.c
-  mpc_models/rate_controller_mpc_solver/acado_auxiliary_functions.c
+  mpc_models/rate_controller/rate_controller_mpc_solver/acado_qpoases_interface.cpp
+  mpc_models/rate_controller/rate_controller_mpc_solver/acado_integrator.c
+  mpc_models/rate_controller/rate_controller_mpc_solver/acado_solver.c
+  mpc_models/rate_controller/rate_controller_mpc_solver/acado_auxiliary_functions.c
 )
 target_include_directories(rate_controller_solver PUBLIC
-  mpc_models/rate_controller_mpc_solver/
+  mpc_models/rate_controller/rate_controller_mpc_solver/
   externals/qpoases
   externals/qpoases/INCLUDE
   externals/qpoases/SRC
 )
 
+# The trajectory controller solver library
+# add_library(trajectory_controller_solver
+#   externals/qpoases/SRC/Bounds.cpp
+#   externals/qpoases/SRC/Constraints.cpp
+#   externals/qpoases/SRC/CyclingManager.cpp
+#   externals/qpoases/SRC/Indexlist.cpp
+#   externals/qpoases/SRC/MessageHandling.cpp
+#   externals/qpoases/SRC/QProblem.cpp
+#   externals/qpoases/SRC/QProblemB.cpp
+#   externals/qpoases/SRC/SubjectTo.cpp
+#   externals/qpoases/SRC/Utils.cpp
+#   externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
+#   mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_qpoases_interface.cpp
+#   mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_integrator.c
+#   mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_solver.c
+#   mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_auxiliary_functions.c
+# )
+# target_include_directories(trajectory_controller_solver PUBLIC
+#   mpc_models/trajectory_controller/trajectory_controller_mpc_solver/
+#   externals/qpoases
+#   externals/qpoases/INCLUDE
+#   externals/qpoases/SRC
+# )
+
 # The rate controller wrapper
 add_library(rate_controller_wrapper
-  src/rate_controller_wrapper.cpp
+  src/mpc_wrapper.cpp
 )
 target_link_libraries(rate_controller_wrapper
   rate_controller_solver
 )
+
+# # The trajectory controller wrapper
+# add_library(trajectory_controller_wrapper
+#   src/trajectory_controller_wrapper.cpp
+# )
+# target_link_libraries(trajectory_controller_wrapper
+#   trajectory_controller_solver
+# )
+
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
@@ -180,6 +214,16 @@ target_link_libraries(rate_controller
   ${catkin_LIBRARIES}
   rate_controller_wrapper
 )
+
+# # The trajectory controller
+# add_executable(trajectory_controller
+#   src/trajectory_controller.cpp
+# )
+# add_dependencies(trajectory_controller ${catkin_EXPORTED_TARGETS} )
+# target_link_libraries(trajectory_controller
+#   ${catkin_LIBRARIES}
+#   trajectory_controller_wrapper
+# )
 
 # Node reading from joystick and generating reference commands
 add_executable(reference_generator
