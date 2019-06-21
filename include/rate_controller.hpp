@@ -26,6 +26,7 @@ private:
     ros::Subscriber subState, subRef;
     ros::Publisher pubCtrl;
     float dt_ = 0.02;
+    int numConstraints_ = 3;
     bool statesReceivedStatus_ = false;
 
     //////////

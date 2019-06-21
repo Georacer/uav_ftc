@@ -15,16 +15,18 @@
  * @tparam T 
  */
 template <typename T>
-MpcWrapper<T>::MpcWrapper(T dt)
+MpcWrapper<T>::MpcWrapper(T dt, int numConstraints) : 
+    // lbMatrix.resize(numConstraints, kSamples),
+    acado_lower_bounds_(acadoVariables.lbValues, numConstraints, kSamples),
+    acado_upper_bounds_(acadoVariables.ubValues, numConstraints, kSamples)
 {
     dt_ = dt;
+    kConstraintSize_ = numConstraints;
 
-    // Clear solver memory
-    memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
-    memset(&acadoVariables, 0, sizeof(acadoVariables));
-
-    // Initialize the solver
-    acado_initializeSolver();
+    // Sanity check for corrent passing of bound values
+    // std::cout << "Upper limits:\n" << acado_upper_bounds_ << std::endl;
+    // std::cout << "Lower limits:\n" << acado_lower_bounds_ << std::endl;
+    resetController();
 
     ROS_INFO("Raised an MPC with attributes:");
     ROS_INFO("# States: %d", kStateSize);
@@ -32,13 +34,6 @@ MpcWrapper<T>::MpcWrapper(T dt)
     ROS_INFO("# OnlineData: %d", kOdSize);
     ROS_INFO("# Running reference states: %d", kRefSize);
     ROS_INFO("# End reference states: %d", kEndRefSize);
-}
-
-template <typename T>
-bool MpcWrapper<T>::setupMpc()
-{
-    resetController();
-    return true;
 }
 
 template <typename T>
@@ -132,8 +127,6 @@ bool MpcWrapper<T>::setReference(
     acado_reference_end_state_ =
         referenceEnd.template cast<float>();
 
-    // acado_initializeNodesByForwardSimulation();
-
     return true;
 }
 
@@ -217,7 +210,9 @@ bool MpcWrapper<T>::update(
     if (controller_is_reset_)
     {
         // Provide more accurate state estimates
-        // acado_states_ = state.replicate(1, kSamples + 1).template cast<float>();
+        acado_states_ = state.replicate(1, kSamples + 1).template cast<float>();
+        acado_initializeNodesByForwardSimulation();
+        prepare();
         controller_is_reset_ = false;
     }
 
@@ -256,8 +251,6 @@ bool MpcWrapper<T>::shift()
     acado_shiftControls(0);
 }
 
-
-
 /**
  * @brief Call the ACADO preparation step
  * Must be triggered between iterations if not done in the update function
@@ -269,6 +262,7 @@ bool MpcWrapper<T>::shift()
 template <typename T>
 bool MpcWrapper<T>::prepare()
 {
+
     acado_preparationStep();
     acado_is_prepared_ = true;
 
@@ -308,11 +302,11 @@ template <typename T>
 bool MpcWrapper<T>::resetController()
 {
     // Clear solver memory
-    // memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
-    // memset(&acadoVariables, 0, sizeof(acadoVariables));
+    memset(&acadoWorkspace, 0, sizeof(acadoWorkspace));
+    memset(&acadoVariables, 0, sizeof(acadoVariables));
 
     // Initialize the solver
-    // acado_initializeSolver();
+    acado_initializeSolver();
 
     // Initialize states and inputs
     acado_states_ = kTrimState_.replicate(1, kSamples + 1).template cast<float>();
@@ -325,7 +319,7 @@ bool MpcWrapper<T>::resetController()
     setReference(defaultReference_, defaultEndReference_);
 
     // Initialize solver.
-    prepare();
+    // prepare();
     controller_is_reset_ = true;
 }
 

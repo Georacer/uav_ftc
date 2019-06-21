@@ -21,8 +21,7 @@ class MpcWrapper
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    MpcWrapper(T dt); // No-argument constructor
-    bool setupMpc(); // Call right after setting trim vectors
+    MpcWrapper(T dt, int numConstraints); // No-argument constructor
 
     bool setTrimState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrimInput(const Eigen::Ref<const Eigen::Matrix<T, kInputSize, 1>> input);
@@ -74,15 +73,15 @@ private:
     Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>>
         acado_online_data_{acadoVariables.od};
 
-    Eigen::Map<Eigen::Matrix<float, 3, kSamples, Eigen::ColMajor>>
-        acado_lower_bounds_{acadoVariables.lbValues};
-
-    Eigen::Map<Eigen::Matrix<float, 3, kSamples, Eigen::ColMajor>>
-        acado_upper_bounds_{acadoVariables.ubValues};
+    // ACADO common.h does not define the number of constraints.
+    // It shall be passed by the calling program and initialized at runtime
+    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_lower_bounds_;
+    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_upper_bounds_;
 
     bool acado_is_prepared_{false};
     bool controller_is_reset_{false};
     T dt_; // Currently unused
+    int kConstraintSize_;
     Eigen::Matrix<T, kInputSize, 1> kTrimInput_ =
         Eigen::Matrix<T, kInputSize, 1>::Zero();
     Eigen::Matrix<T, kStateSize, 1> kTrimState_ =

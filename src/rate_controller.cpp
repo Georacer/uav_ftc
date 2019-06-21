@@ -14,7 +14,7 @@
  * 
  * @param n The ROS NodeHandle of the calling ROS node
  */
-RateController::RateController(ros::NodeHandle n) : mpcController_(dt_)
+RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConstraints_)
 {
     //Initialize states
     states_.velocity.angular.x = 0;
@@ -46,23 +46,9 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_)
     reference << refRates_, refInputs_;
     mpcController_.setDefaultRunningReference(reference);
     mpcController_.setDefaultEndReference(refRates_);
-    // Mandatory controller setup (only once after instantiation)
-    mpcController_.setupMpc();
-
-    // Unneeded as same as trim values
-    // // Initialize airdata container
-    // airdata_ << 15.0f, 0.034f, 0.0f; // Values allow a normal-ish response, avoiding divide-by-zero errors
-    // mpcController_.setOnlineData(airdata_);
-    // // Initialize system state
-    // angularStates_ << 0.0f, 0.0f, 0.0f;
-    // mpcController_.setInitialState(angularStates_);
-
-    // Initialize reference
-    // refRates_ << 0.0f, 0.0f, 0.0f;
-    // refInputs_ << 0.0f, 0.0f, 0.0f;
-    // Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
-    // reference << refRates_, refInputs_;
-    // mpcController_.setReference(reference, refRates_);
+    // Mandatory controller setup 
+    mpcController_.resetController();
+    mpcController_.prepare();
 
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &RateController::getStates, this);
