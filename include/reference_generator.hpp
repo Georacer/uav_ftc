@@ -3,13 +3,15 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Eigen>
 
+#include <mathutils/mathutils.hpp>
+
 class ReferenceGenerator
 {
 private:
     ////////////
     // Variables
     ros::NodeHandle n_;
-    Eigen::Vector3d scaling_; // Reference commands scaling multiplier
+    Eigen::Vector3d referenceMin_, referenceMax_; // Reference commands scaling multiplier
     Eigen::Vector3d reference_;
     ros::Publisher pub_;
     ros::Subscriber sub_;
@@ -18,6 +20,7 @@ private:
     int buttonIndex_[11];
     double throwIndex_[11];
     double inpChannels_[11]; // The recorded input channels
+    int ctrlMode_;
 
 public:
     //////////

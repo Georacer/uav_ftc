@@ -229,8 +229,11 @@ bool MpcWrapper<T>::update(
         controller_is_reset_ = false;
     }
 
-    // Pass airdata information
-    setOnlineData(online_data);
+    if (kOdSize > 0)
+    {
+        // Pass airdata information
+        setOnlineData(online_data);
+    }
 
     // Pass measurement
     setInitialState(state);

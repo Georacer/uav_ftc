@@ -8,11 +8,13 @@
     <arg name="uav_name"/>
 
     <group ns="$(arg uav_name)">
-        <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen"/>
-        <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller" output="screen" launch-prefix="gdb -ex run -args"> -->
-        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
-            <remap from="refRates" to="refCmds"/>
+        <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen">
+            <remap from="refCmds" to="refTrajectory"/>
+            <!-- <remap from="refCmds" to="refRates"/> -->
         </node>
+        <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller" output="screen" launch-prefix="gdb -ex run -args"> -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>
+        <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
         <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
     </group>
 </launch>

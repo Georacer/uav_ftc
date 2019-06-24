@@ -57,17 +57,34 @@ ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
         ROS_ASSERT(listInt[i].getType() == XmlRpc::XmlRpcValue::TypeInt);
         buttonIndex_[i] = listInt[i];
     }
+    // Read the control mode
+    ROS_INFO("Reading the control mode setting");
+    if (!ros::param::getCached("ctrlMode", ctrlMode_))
+    {
+        ROS_FATAL("Invalid parameter for -/ctrlMode- in param server!");
+        ros::shutdown();
+    }
     // Read the reference commands parameters from the server:w
     ROS_INFO("Reading reference scale configuration");
-    if (!ros::param::getCached("refScale", listDouble))
+    if (!ros::param::getCached("referenceMin", listDouble))
     {
-        ROS_FATAL("Invalid parameters for -/refScale- in param server!");
+        ROS_FATAL("Invalid parameters for -/referenceMin- in param server!");
         ros::shutdown();
     }
     for (i = 0; i < listDouble.size(); ++i)
     {
         ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-        scaling_(i) = listDouble[i];
+        referenceMin_(i) = listDouble[i];
+    }
+    if (!ros::param::getCached("referenceMax", listDouble))
+    {
+        ROS_FATAL("Invalid parameters for -/referenceMax- in param server!");
+        ros::shutdown();
+    }
+    for (i = 0; i < listDouble.size(); ++i)
+    {
+        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+        referenceMax_(i) = listDouble[i];
     }
 }
 
@@ -107,9 +124,30 @@ void ReferenceGenerator::joyCallback(sensor_msgs::Joy joyMsg)
 Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
 {
     Eigen::Vector3d reference;
-    reference(0) = inputs[0] * scaling_(0); // roll channel
-    reference(1) = inputs[1] * scaling_(1); // pitch channel
-    reference(2) = inputs[3] * scaling_(2); // Yaw channel
+
+    switch (ctrlMode_)
+    {
+    case 0:  // Direct passthrough from rawPWM topic
+        ROS_ERROR("Raised reference_generator with ctrlMode parameter = 0");
+        break;
+    
+    case 1: // Generate reference rates
+        reference(0) = map(inputs[0], -1.0, 1.0, referenceMin_(0), referenceMax_(0) ); // roll channel
+        reference(1) = map(inputs[1], -1.0, 1.0, referenceMin_(1), referenceMax_(1) ); // pitch channel
+        reference(2) = map(inputs[3], -1.0, 1.0, referenceMin_(2), referenceMax_(2) ); // yaw channel
+        break;
+    
+    case 2: // Generate reference trajectory
+        // use map_centered because reference trajectories usually don't have symmetric limits
+        reference(0) = map_centered(inputs[0], -1.0, 1.0, referenceMin_(0), referenceMax_(0) ); // roll channel
+        reference(1) = map_centered(inputs[1], -1.0, 1.0, referenceMin_(1), referenceMax_(1) ); // pitch channel
+        reference(2) = map_centered(inputs[2], -1.0, 1.0, referenceMin_(2), referenceMax_(2) ); // yaw channel
+        break;
+    
+    default:
+        ROS_ERROR("Please specify a value for ctrlMode parameter");
+        break;
+    }
     return reference;
 }
 

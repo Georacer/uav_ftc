@@ -191,9 +191,9 @@ int main(int argc, char **argv)
 
     ros::WallDuration(3).sleep(); //wait for other nodes to get raised
     double ctrlRate;
-    if (!ros::param::get("ctrlRate", ctrlRate)) //frame rate in Hz
+    if (!ros::param::get("ctrlRateRate", ctrlRate)) //frame rate in Hz
     {
-        ROS_ERROR("Could not find ctrlRate parameter");
+        ROS_ERROR("Could not find ctrlRateRate parameter");
         ros::shutdown();
     }
     ros::Rate spinner(ctrlRate);

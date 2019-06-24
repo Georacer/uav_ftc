@@ -18,7 +18,7 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
 {
     rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
     surfaceSub_ = n.subscribe("ctrlSurfaceCmds", 1, &InputAggregator::surfaceCtrlsCallback, this);
-    throttleSub_ = n.subscribe("throttleCmds", 1, &InputAggregator::throttleCtrlsCallback, this);
+    throttleSub_ = n.subscribe("throttleCmd", 1, &InputAggregator::throttleCtrlsCallback, this);
 
     pub_ = n.advertise<last_letter_msgs::SimPWM>("ctrlPWM", 10);
 
@@ -50,7 +50,7 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     surfaceCtrls_.vector.y = msg.vector.y;
     surfaceCtrls_.vector.z = msg.vector.z;
 
-    if (ctrlMode_ == 1) // Publish as fast as you have control surface inputs
+    if (ctrlMode_ == 1 || ctrlMode_ == 2) // Publish as fast as you have control surface inputs
     {
         publishCtrls();
     }
@@ -85,6 +85,16 @@ void InputAggregator::mixer()
         mixedCtrls_.value[0] = FullRangeToPwm(surfaceCtrls_.vector.x); // Copy over aileron
         mixedCtrls_.value[1] = FullRangeToPwm(surfaceCtrls_.vector.y); // Copy over elevator
         mixedCtrls_.value[3] = FullRangeToPwm(surfaceCtrls_.vector.z); // Copy over rudder
+        break;
+    
+    case 2: // Use the control surface signals from the controller and throttle from the trajectory controller
+        mixedCtrls_ = rawCtrls_; // Copy over all of the raw signals
+        mixedCtrls_.header.stamp = ros::Time::now(); // Stamp the message
+        // Pick selected channels and convert them to PWM values
+        mixedCtrls_.value[0] = FullRangeToPwm(surfaceCtrls_.vector.x); // Copy over aileron
+        mixedCtrls_.value[1] = FullRangeToPwm(surfaceCtrls_.vector.y); // Copy over elevator
+        mixedCtrls_.value[3] = FullRangeToPwm(surfaceCtrls_.vector.z); // Copy over rudder
+        mixedCtrls_.value[2] = HalfRangeToPwm(throttleCtrls_.vector.x); // Copy over throttle
         break;
     
     default:

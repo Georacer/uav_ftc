@@ -215,15 +215,15 @@ target_link_libraries(rate_controller
   rate_controller_wrapper
 )
 
-# # The trajectory controller
-# add_executable(trajectory_controller
-#   src/trajectory_controller.cpp
-# )
-# add_dependencies(trajectory_controller ${catkin_EXPORTED_TARGETS} )
-# target_link_libraries(trajectory_controller
-#   ${catkin_LIBRARIES}
-#   trajectory_controller_wrapper
-# )
+# The trajectory controller
+add_executable(trajectory_controller
+  src/trajectory_controller.cpp
+)
+add_dependencies(trajectory_controller ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(trajectory_controller
+  ${catkin_LIBRARIES}
+  trajectory_controller_wrapper
+)
 
 # Node reading from joystick and generating reference commands
 add_executable(reference_generator
