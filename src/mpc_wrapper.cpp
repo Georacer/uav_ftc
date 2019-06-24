@@ -16,9 +16,22 @@
  */
 template <typename T>
 MpcWrapper<T>::MpcWrapper(T dt, int numConstraints) : 
-    // lbMatrix.resize(numConstraints, kSamples),
+    #ifdef ACADO_HAS_ONLINEDATA
+    // acado_online_data_(acadoVariables.od, kOdSize, kSamples+1, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>(1,kOdSize)),
+    acado_online_data_(acadoVariables.od, kOdSize, kSamples+1),
+    #else
+    acado_online_data_(&dummy_od_, 1, 1),
+    #endif
+
+    #ifdef ACADO_HAS_CONSTRAINTS
     acado_lower_bounds_(acadoVariables.lbValues, numConstraints, kSamples),
-    acado_upper_bounds_(acadoVariables.ubValues, numConstraints, kSamples)
+    acado_upper_bounds_(acadoVariables.ubValues, numConstraints, kSamples),
+    #else
+    acado_lower_bounds_(&dummy_bounds_, 1, 1),
+    acado_upper_bounds_(&dummy_bounds_, 1, 1),
+    #endif
+
+    dummy_var_(0)
 {
     dt_ = dt;
     kConstraintSize_ = numConstraints;

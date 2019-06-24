@@ -1,6 +1,7 @@
 #include <Eigen/Eigen>
 #include <ros/ros.h>
 
+#include "acado_problem_definitions.h"  // Edit to allow conditional access in struct members of acadoVariables
 #include "acado_auxiliary_functions.h"
 #include "acado_common.h"
 
@@ -70,8 +71,7 @@ private:
     Eigen::Map<Eigen::Matrix<float, kInputSize, kSamples, Eigen::ColMajor>>
         acado_inputs_{acadoVariables.u};
 
-    Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>>
-        acado_online_data_{acadoVariables.od};
+    Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>> acado_online_data_;
 
     // ACADO common.h does not define the number of constraints.
     // It shall be passed by the calling program and initialized at runtime
@@ -92,4 +92,9 @@ private:
         Eigen::Matrix<T, kRefSize, 1>::Zero();
     Eigen::Matrix<T, kEndRefSize, 1> defaultEndReference_ =
         Eigen::Matrix<T, kEndRefSize, 1>::Zero();
+
+    // Dummy variables to allow the plumbing to work
+    float dummy_od_ = 0;
+    float dummy_bounds_ = 0;
+    int dummy_var_;
 };
