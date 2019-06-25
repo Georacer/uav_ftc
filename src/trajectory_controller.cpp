@@ -47,10 +47,8 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     mpcController_.setTrimInput(refInputs_);
 
     // Initialize default reference states
-    Eigen::VectorXf reference(9);
-    reference << referenceTrajectory_(0), referenceTrajectory_(1), defaultRefPsi,
+    reference_ << referenceTrajectory_(0), referenceTrajectory_(1), defaultRefPsi,
                  trimState(1), trimState(2), refInputs_;
-    Eigen::Vector2f endReference_(2);
     mpcController_.setDefaultRunningReference(reference_);
     endReference_ << trimState(0), trimState(1);
     mpcController_.setDefaultEndReference(endReference_);
@@ -105,21 +103,18 @@ void TrajectoryController::step()
     // Set the MPC reference state
     mpcController_.setReference(reference_, endReference_);
 
+    mpcController_.printSolverState();
+
     // Solve problem with given measurements
-    Eigen::Matrix<float, 0, 0> dummyOnlineData;
+    Eigen::Matrix<float, 0, 1> dummyOnlineData;
     mpcController_.update(states_, dummyOnlineData);
 
     // Write the resulting controller output
     readControls();
 
     // Shift the solver state by one and re-initialize
-    mpcController_.shift();
+    // mpcController_.shift(); // Shifting seems to destabilize solution
     mpcController_.prepare();
-
-    // std::cout << "Got airdata: " << airdata_ << std::endl;
-    // std::cout << "Got reference: " << refStates_ << std::endl;
-    // std::cout << "Got measurements: " << angularStates_ << std::endl;
-    // std::cout << "Made input: " << predictedControls_ << std::endl;
 
     // Fill control commands and publish them
     writeOutput();
@@ -144,7 +139,7 @@ void TrajectoryController::getStates(last_letter_msgs::SimStates inpStates)
     geometry_msgs::Vector3 airdata = getAirData(inpStates.velocity.linear);
     states_(0) = airdata.x;
     states_(1) = airdata.y;
-    states_(2) = airdata.x;
+    states_(2) = airdata.z;
     geometry_msgs::Vector3 euler = quat2euler(inpStates.pose.orientation);
     states_(3) = euler.x;
     states_(4) = euler.y;

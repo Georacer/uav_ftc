@@ -33,6 +33,18 @@ MpcWrapper<T>::MpcWrapper(T dt, int numConstraints) :
 
     dummy_var_(0)
 {
+    #ifdef ACADO_HAS_ONLINEDATA
+    ROS_INFO("Raised MPC node with online data enabled");
+    #else
+    ROS_INFO("Raised MPC node with online data disabled");
+    #endif
+    #ifdef ACADO_HAS_CONSTRAINTS
+    ROS_INFO("Raised MPC node with constraints enabled");
+    #else
+    ROS_INFO("Raised MPC node with constraints disabled");
+    #endif
+
+
     dt_ = dt;
     kConstraintSize_ = numConstraints;
 
@@ -139,7 +151,7 @@ bool MpcWrapper<T>::setReference(
     // acado_reference_end_state_.segment(0, kEndRefSize) =
     acado_reference_end_state_ =
         referenceEnd.template cast<float>();
-
+        
     return true;
 }
 
@@ -227,6 +239,7 @@ bool MpcWrapper<T>::update(
         acado_initializeNodesByForwardSimulation();
         prepare();
         controller_is_reset_ = false;
+        ROS_INFO("Prepared controller after set/reset");
     }
 
     if (kOdSize > 0)
@@ -246,6 +259,7 @@ bool MpcWrapper<T>::update(
     if (!checkInput())
     {
         ROS_ERROR("MPC has crashed...");
+        printSolverState();
         // resetController();
         ros::shutdown();
     }
@@ -328,8 +342,11 @@ bool MpcWrapper<T>::resetController()
     acado_states_ = kTrimState_.replicate(1, kSamples + 1).template cast<float>();
     acado_inputs_ = kTrimInput_.replicate(1, kSamples).template cast<float>();
 
-    // Initialize online data.
-    setOnlineData(kTrimOnlineData_);
+    if (kOdSize > 0)
+    {
+        // Initialize online data.
+        setOnlineData(kTrimOnlineData_);
+    }
 
     // Initialize the states and controls.
     setReference(defaultReference_, defaultEndReference_);

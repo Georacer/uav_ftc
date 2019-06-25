@@ -126,11 +126,11 @@ int main()
   Q(0, 0) = 100; // Va
   Q(1, 1) = 100; // Flight path angle
   Q(2, 2) = 100; // turn rate
-  Q(3, 3) = 1;  // alpha
-  Q(4, 4) = 1;  // beta
+  Q(3, 3) = 0.01;  // alpha
+  Q(4, 4) = 0.01;  // beta
   Q(5, 5) = 1;   // p
   Q(6, 6) = 1;   // q
-  Q(7, 7) = 1;   // r
+  Q(7, 7) = 1000;   // r
   Q(8, 8) = 1;   // throttle
 
   // End cost weight matrix
@@ -148,8 +148,12 @@ int main()
   ocp.subjectTo(f);
   // Add constraints
   ocp.subjectTo(0.0 <= deltat <= deltat_max);
+  ocp.subjectTo(-1.0 <= p <= 1.0); // Constraining p to help with solution feasibility
+  ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
+  ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility
   ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
   ocp.subjectTo(-15.0*M_PI/180.0 <= beta <= 15.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
+  ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
   ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
   // Set Number of Online Data
   // ocp.setNOD(3); // No online data for this model

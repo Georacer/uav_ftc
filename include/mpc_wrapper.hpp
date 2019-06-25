@@ -71,12 +71,21 @@ private:
     Eigen::Map<Eigen::Matrix<float, kInputSize, kSamples, Eigen::ColMajor>>
         acado_inputs_{acadoVariables.u};
 
+    #ifdef ACADO_HAS_ONLINEDATA
     Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>> acado_online_data_;
+    #else
+    Eigen::Map<Eigen::Matrix<float, 1, 1, Eigen::ColMajor>> acado_online_data_;
+    #endif
 
     // ACADO common.h does not define the number of constraints.
     // It shall be passed by the calling program and initialized at runtime
+    #ifdef ACADO_HAS_CONSTRAINTS
     Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_lower_bounds_;
     Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_upper_bounds_;
+    #else
+    Eigen::Map<Eigen::Matrix<float, 1, 1>> acado_lower_bounds_;
+    Eigen::Map<Eigen::Matrix<float, 1, 1>> acado_upper_bounds_;
+    #endif
 
     bool acado_is_prepared_{false};
     bool controller_is_reset_{false};
@@ -94,6 +103,7 @@ private:
         Eigen::Matrix<T, kEndRefSize, 1>::Zero();
 
     // Dummy variables to allow the plumbing to work
+    // Eigen::Matrix<float, kOdSize, kSamples+1> dummy_od_;
     float dummy_od_ = 0;
     float dummy_bounds_ = 0;
     int dummy_var_;

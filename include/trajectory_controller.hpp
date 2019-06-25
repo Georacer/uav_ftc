@@ -20,7 +20,7 @@ private:
     last_letter_msgs::SimStates simStates_; // Complete aircraft state
     Eigen::Matrix<float, 5, 1> states_; // Va, alpha, beta, phi, theta
     Eigen::Vector3f airdata_;
-    Eigen::Matrix<float, 5, 1> reference_; // Va, gamma, psi_dot, 
+    Eigen::Matrix<float, 9, 1> reference_; // Va, gamma, psi_dot, alpha, beta
     Eigen::Vector2f endReference_;
     Eigen::Vector3f referenceTrajectory_; // Va, gamma, R
     Eigen::Vector4f refInputs_; // Stores reference inputs

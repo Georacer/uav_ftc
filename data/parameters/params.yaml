@@ -8,7 +8,7 @@ ctrlMode: 2
 # 2: Trajectory control
 
 ctrlRateRate: 50 # Frequency of the rate controller
-ctrlTrajectoryRate: 50 # Frequency of the rate controller
+ctrlTrajectoryRate: 5 # Frequency of the rate controller
 
 # Reference generator parameters
 referenceMin: [5.0, -0.52, -100.0] # Minimum trajectory limits
