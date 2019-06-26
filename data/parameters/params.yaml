@@ -12,4 +12,4 @@ ctrlTrajectoryRate: 5 # Frequency of the rate controller
 
 # Reference generator parameters
 referenceMin: [5.0, -0.52, -100.0] # Minimum trajectory limits
-referenceMax: [30.0, 0.349, 100.0] # Scaling factor of reference commands
+referenceMax: [25.0, 0.349, 100.0] # Scaling factor of reference commands

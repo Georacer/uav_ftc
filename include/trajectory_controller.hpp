@@ -15,6 +15,7 @@
 #define NUM_STATES 5
 #define NUM_REFS 9
 #define NUM_END_REFS 3
+#define NUM_INPUTS 4
 
 class TrajectoryController
 {
@@ -56,4 +57,5 @@ public:
     ~TrajectoryController();
 };
 
-float calcPsiDot(Eigen::Vector3f refTrajectory);
+float calcPsiDotDes(Eigen::Vector3f refTrajectory);
+float calcPsiDot(Eigen::Matrix<float, NUM_STATES, 1> states, Eigen::Matrix<float, NUM_INPUTS, 1> inputs);

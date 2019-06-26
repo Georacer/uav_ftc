@@ -21,7 +21,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     referenceTrajectory_(0) = 15.0; // Set airspeed
     referenceTrajectory_(1) = 0.0; // Set flight path angle
     referenceTrajectory_(2) = inf; // Set turn radius
-    float defaultRefPsi = calcPsiDot(referenceTrajectory_);
+    float defaultRefPsi = calcPsiDotDes(referenceTrajectory_);
 
     //Initialize internally stored simulation states to default values
     simStates_.velocity.angular.x = 0;
@@ -103,17 +103,18 @@ void TrajectoryController::step()
     // Set the MPC reference state
     mpcController_.setReference(reference_, endReference_);
 
-    mpcController_.printSolverState();
-
     // Solve problem with given measurements
     Eigen::Matrix<float, 0, 1> dummyOnlineData;
     mpcController_.update(states_, dummyOnlineData);
+
+    // mpcController_.printSolverState();
+    // std::cout << "Des / Achieved psi:\n" << reference_(2) << "/\t" << calcPsiDot(states_, predictedControls_) << std::endl;
 
     // Write the resulting controller output
     readControls();
 
     // Shift the solver state by one and re-initialize
-    // mpcController_.shift(); // Shifting seems to destabilize solution
+    mpcController_.shift(); // Shifting seems to destabilize solution
     // acado_initializeNodesByForwardSimulation();
     mpcController_.prepare();
 
@@ -190,7 +191,7 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
                                       (float)pRefTrajectory.vector.z;
     reference_(0) = tempTrajectory(0); // Copy over airspeed
     reference_(1) = tempTrajectory(1); // Copy over gamma   
-    float psiDotDes = calcPsiDot(tempTrajectory); // Calculate desired psi_dot
+    float psiDotDes = calcPsiDotDes(tempTrajectory); // Calculate desired psi_dot
     reference_(2) = psiDotDes;
     reference_(3) = 0.0f;
     reference_(4) = 0.0f;
@@ -210,10 +211,16 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
  * @param refTrajectory Vector with desired airspeed, flight path angle and turn radius
  * @return float The resulting turn radius in radians per second
  */
-float calcPsiDot(Eigen::Vector3f refTrajectory)
+float calcPsiDotDes(Eigen::Vector3f refTrajectory)
 {
     return refTrajectory(0)/refTrajectory(2)*cos(refTrajectory(1));
 }
+
+float calcPsiDot(Eigen::Matrix<float, NUM_STATES, 1> states, Eigen::Matrix<float, NUM_INPUTS, 1> inputs)
+{
+    return (inputs(1)*sin(states(3)) + inputs(2)*cos(states(3)))/cos(states(4));
+}
+
 
 ///////////////
 //Main function

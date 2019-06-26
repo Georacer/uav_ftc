@@ -149,8 +149,8 @@ Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
         ROS_ERROR("Please specify a value for ctrlMode parameter");
         break;
     }
-    ROS_INFO("Created reference:");
-    std::cout << reference << std::endl;
+    // ROS_INFO("Created reference:");
+    // std::cout << reference << std::endl;
     return reference;
 }
 

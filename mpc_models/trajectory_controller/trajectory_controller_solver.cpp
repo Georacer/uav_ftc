@@ -91,7 +91,8 @@ int main()
   Expression rw = -p * sa + r * ca;
 
   psi_dot = (q*sph + r*cph)/cth;
-  gamma = theta - alpha;
+  // gamma = theta - alpha; Holds only for beta==0
+  gamma = (ca*cb)*sth - (sph*sb + cph*sa*cb)*cth; // Stevens-Lewis 3.4-2
 
   // System dynamics
   DifferentialEquation f;
@@ -124,14 +125,14 @@ int main()
   // Running cost weight matrix
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
-  Q(0, 0) = 100; // Va
+  Q(0, 0) = 10; // Va
   Q(1, 1) = 100; // Flight path angle
   Q(2, 2) = 100; // turn rate
   Q(3, 3) = 0.01;  // alpha
-  Q(4, 4) = 0.01;  // beta
+  Q(4, 4) = 10;  // beta
   Q(5, 5) = 1;   // p
   Q(6, 6) = 1;   // q
-  Q(7, 7) = 1000;   // r
+  Q(7, 7) = 10;   // r
   Q(8, 8) = 1;   // throttle
 
   // End cost weight matrix

@@ -61,9 +61,10 @@ int main()
 {
 	// Desired trajectory parameters, used for simulation
 	double R = 100; // turn radius in meters	
-	double gamma_d = 0.1; // fligh path angle in radians
-	double Va_d = 15.0;
-	double psi_dot_d = Va_d/R*cos(gamma_d);
+	double gamma_d = 0.2; // fligh path angle in radians
+	double Va_d = 20.7238;
+	// double psi_dot_d = Va_d/R*cos(gamma_d);
+	double psi_dot_d = -0.4;
 
 	/* Some temporary variables. */
 	int i, iter;
@@ -77,7 +78,19 @@ int main()
 		acadoVariables.x[i] = 0.0;
 	// Initialize airspeed
 	for (i = 0; i < NX * (N + 1); i+=NX)
-		acadoVariables.x[i] = 13.0;
+		acadoVariables.x[i] = 20.654877;
+	// Initialize alpha
+	for (i = 1; i < NX * (N + 1); i+=NX)
+		acadoVariables.x[i] = -0.5638;
+	// Initialize beta
+	for (i = 2; i < NX * (N + 1); i+=NX)
+		acadoVariables.x[i] = 0.0;
+	// Initialize phi
+	for (i = 3; i < NX * (N + 1); i+=NX)
+		acadoVariables.x[i] = 0.2;
+	// Initialize theta
+	for (i = 4; i < NX * (N + 1); i+=NX)
+		acadoVariables.x[i] = -0.054035;
 
 	// Initialize controls
 	for (i = 0; i < NU * N; ++i)
@@ -167,8 +180,8 @@ int main()
 			printf("\tReal-Time Iteration %d:  KKT Tolerance = %.3e\n\n", iter, acado_getKKT());
 
 		/* Optional: shift the initialization (look at acado_common.h). */
-		acado_shiftStates(2, 0, 0);
-		acado_shiftControls(0);
+		// acado_shiftStates(2, 0, 0);
+		// acado_shiftControls(0);
 
 		/* Prepare for the next step. */
 		acado_preparationStep();
