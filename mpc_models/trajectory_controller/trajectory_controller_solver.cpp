@@ -117,7 +117,8 @@ int main()
 
   // End cost vector, cannot depend on controls, only on state
   hN << Va // Presribed airspeed 
-     << gamma; // Prescribed flight path angle
+     << gamma // Prescribed flight path angle
+     << phi;
     //  << psi_dot; // Prescribed turn radius, cannot describe it without using inputs
 
   // Running cost weight matrix
@@ -138,23 +139,31 @@ int main()
   QN.setIdentity();
   QN(0, 0) = Q(0, 0);
   QN(1, 1) = Q(1, 1);
-  // QN(2, 2) = Q(2, 2);
+  QN(2, 2) = 10;
 
   ////////////////////////////////////
   // Define an optimal control problem
   ////////////////////////////////////
   OCP ocp(t_start, t_end, N);
+
   // Add system dynamics
   ocp.subjectTo(f);
+
   // Add constraints
+  // Input constraints
   ocp.subjectTo(0.0 <= deltat <= deltat_max);
   ocp.subjectTo(-1.0 <= p <= 1.0); // Constraining p to help with solution feasibility
   ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
   ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility
+
+  // State constraints
   ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
   ocp.subjectTo(-15.0*M_PI/180.0 <= beta <= 15.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
   ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
   ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
+
+  // Other feasibility constraints
+  // ocp.subjectTo(0 <= phi*psi_dot); // Force a positive-G maneuvera the end of the horizon
   // Set Number of Online Data
   // ocp.setNOD(3); // No online data for this model
   if (!CODE_GEN)

@@ -12,16 +12,20 @@
 #include <last_letter_msgs/SimStates.h>
 #include <last_letter_msgs/SimPWM.h>
 
+#define NUM_STATES 5
+#define NUM_REFS 9
+#define NUM_END_REFS 3
+
 class TrajectoryController
 {
 private:
     ////////////
     // Variables
     last_letter_msgs::SimStates simStates_; // Complete aircraft state
-    Eigen::Matrix<float, 5, 1> states_; // Va, alpha, beta, phi, theta
+    Eigen::Matrix<float, NUM_STATES, 1> states_; // Va, alpha, beta, phi, theta
     Eigen::Vector3f airdata_;
-    Eigen::Matrix<float, 9, 1> reference_; // Va, gamma, psi_dot, alpha, beta
-    Eigen::Vector2f endReference_;
+    Eigen::Matrix<float, NUM_REFS, 1> reference_; // Va, gamma, psi_dot, alpha, beta
+    Eigen::Matrix<float, NUM_END_REFS, 1> endReference_;
     Eigen::Vector3f referenceTrajectory_; // Va, gamma, R
     Eigen::Vector4f refInputs_; // Stores reference inputs
     Eigen::Vector4f predictedControls_; // Stores control outputs

@@ -50,7 +50,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     reference_ << referenceTrajectory_(0), referenceTrajectory_(1), defaultRefPsi,
                  trimState(1), trimState(2), refInputs_;
     mpcController_.setDefaultRunningReference(reference_);
-    endReference_ << trimState(0), trimState(1);
+    endReference_ << trimState(0), trimState(1), 0.0f;
     mpcController_.setDefaultEndReference(endReference_);
 
     // Mandatory controller setup 
@@ -114,6 +114,7 @@ void TrajectoryController::step()
 
     // Shift the solver state by one and re-initialize
     // mpcController_.shift(); // Shifting seems to destabilize solution
+    // acado_initializeNodesByForwardSimulation();
     mpcController_.prepare();
 
     // Fill control commands and publish them
@@ -189,13 +190,18 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
                                       (float)pRefTrajectory.vector.z;
     reference_(0) = tempTrajectory(0); // Copy over airspeed
     reference_(1) = tempTrajectory(1); // Copy over gamma   
-    reference_(2) = calcPsiDot(tempTrajectory); // Calculate desired psi_dot
+    float psiDotDes = calcPsiDot(tempTrajectory); // Calculate desired psi_dot
+    reference_(2) = psiDotDes;
     reference_(3) = 0.0f;
     reference_(4) = 0.0f;
-    reference_.segment(5, refInputs_.size()) = refInputs_;
+    reference_.segment(NUM_STATES, refInputs_.size()) = refInputs_;
 
     endReference_(0) = tempTrajectory(0);
-    endReference_(0) = tempTrajectory(1);
+    endReference_(1) = tempTrajectory(1);
+    // Calculate an estimate for the final roll angle
+    float g = 9.81;
+    float endPhi = atan(psiDotDes*reference_(0)/g);
+    endReference_(2) = endPhi;
 }
 
 /**
