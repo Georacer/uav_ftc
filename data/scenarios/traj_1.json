@@ -1,0 +1,30 @@
+{
+    "relative_time": false,
+    "point_1": {
+        "time": 1,
+        "airspeed": 15,
+        "gamma": 0,
+        "turn_radius": Infinity
+    },
+    "point_2": {
+        "time": 5,
+        "gamma": 0.25
+    },
+    "point_3": {
+        "time": 10,
+        "gamma": -0.20
+    },
+    "point_4": {
+        "time": 15,
+        "gamma": 0,
+        "turn_radius": 150
+    },
+    "point_5": {
+        "time": 20,
+        "turn_radius": -150
+    },
+    "point_6": {
+        "time": 25,
+        "turn_radius": Infinity
+    }
+}

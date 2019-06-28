@@ -30,7 +30,7 @@ find_package(Eigen3 REQUIRED)
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+catkin_python_setup()
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -116,7 +116,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES uav_ftc
- CATKIN_DEPENDS roscpp std_msgs mathutils # message_runtime
+ CATKIN_DEPENDS roscpp std_msgs mathutils uav_utils# message_runtime
  DEPENDS EIGEN3
 )
 
@@ -232,6 +232,7 @@ add_executable(reference_generator
 add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(reference_generator
   ${catkin_LIBRARIES}
+  ${catkin_INCLUDE_DIRS}
 )
 
 # Node reading from inputs sources and combinging control signals
@@ -241,6 +242,7 @@ add_executable(input_aggregator
 add_dependencies(input_aggregator ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(input_aggregator
   ${catkin_LIBRARIES}
+  ${catkin_INCLUDE_DIRS}
 )
 
 ## With catkin_make all packages are built within a single CMake context
@@ -291,6 +293,12 @@ target_link_libraries(input_aggregator
 # )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
+# Install scenarios alongside the executables
+# TODO: This needs the install step of the catkin build command, but I'm hitting some errors there
+install(DIRECTORY data/scenarios/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    # FILES_MATCHNG PATTERN "*.json"
+)
 # install(FILES
 #   # myfile1
 #   # myfile2
