@@ -231,7 +231,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "trajectoryControlNode");
     ros::NodeHandle n;
 
-    ros::WallDuration(3).sleep(); //wait for other nodes to get raised
+    ros::WallDuration(1).sleep(); //wait for other nodes to get raised
     double ctrlRate;
     if (!ros::param::get("ctrlTrajectoryRate", ctrlRate)) //frame rate in Hz
     {

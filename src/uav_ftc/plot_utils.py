@@ -1,3 +1,4 @@
+from math import sqrt, atan2, asin, cos, pi
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -18,3 +19,43 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 
     plt.show()
 
+
+def get_airdata(u, v, w):
+    airspeed = np.sqrt(u**2+v**2+w**2)
+    alpha = np.arctan2(w, u)
+    if u == 0:
+        if v == 0:
+            beta = 0
+        else:
+            beta = np.arcsin(v/np.abs(v))
+    else:
+        beta = np.arctan2(v, u)
+
+    return (airspeed, alpha, beta)
+
+
+def get_turn_radius(va, psi_dot, gamma):
+    return va/psi_dot*np.cos(gamma)
+
+
+def quat2euler2(x, y, z, w):
+    q01 = w*x
+    q02 = w*y
+    q03 = w*z
+    q11 = x*x
+    q12 = x*y
+    q13 = x*z
+    q22 = y*y
+    q23 = y*z
+    q33 = z*z
+    psi = atan2 (2.0 * (q03 + q12), 1.0 - 2.0 * (q22 - q33))
+    if psi<0.0:
+        psi+=2.0*pi
+
+    theta = asin (2.0 * (q02 - q13))
+    phi = atan2 (2.0 * (q01 + q23), 1.0 - 2.0 * (q11 + q22))
+
+    return (phi, theta, psi)
+
+def rmse(x, y):
+    return np.sqrt(np.mean(np.power(x-y,2)))
