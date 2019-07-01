@@ -126,12 +126,12 @@ int main()
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
   Q(0, 0) = 10; // Va
-  Q(1, 1) = 100; // Flight path angle
-  Q(2, 2) = 100; // turn rate
+  Q(1, 1) = 1000; // Flight path angle
+  Q(2, 2) = 1000; // turn rate
   Q(3, 3) = 0.01;  // alpha
   Q(4, 4) = 10;  // beta
-  Q(5, 5) = 1;   // p
-  Q(6, 6) = 1;   // q
+  Q(5, 5) = 0.5;   // p
+  Q(6, 6) = 5;   // q
   Q(7, 7) = 10;   // r
   Q(8, 8) = 1;   // throttle
 
@@ -159,7 +159,7 @@ int main()
 
   // State constraints
   ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
-  ocp.subjectTo(-15.0*M_PI/180.0 <= beta <= 15.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
+  ocp.subjectTo(-10.0*M_PI/180.0 <= beta <= 10.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
   ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
   ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
 
