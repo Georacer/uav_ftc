@@ -59,3 +59,12 @@ def quat2euler2(x, y, z, w):
 
 def rmse(x, y):
     return np.sqrt(np.mean(np.power(x-y,2)))
+
+
+def plot_points(ah, point_arr, style, color):
+    x = point_arr[:, 0]
+    y = point_arr[:, 1]
+    ah.scatter(x, y, marker=style, c=color)
+
+def plot_line(ah, point_1, point_2, color):
+    ah.plot([point_1[0], point_2[0]], [point_1[1], point_2[1]], c=color)
