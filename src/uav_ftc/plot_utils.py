@@ -62,8 +62,8 @@ def rmse(x, y):
 
 
 def plot_points(ah, point_arr, style, color):
-    x = point_arr[:, 0]
-    y = point_arr[:, 1]
+    x = point_arr[0, :]
+    y = point_arr[1, :]
     ah.scatter(x, y, marker=style, c=color)
 
 def plot_line(ah, point_1, point_2, color):
