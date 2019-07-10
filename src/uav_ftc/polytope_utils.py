@@ -11,6 +11,7 @@
 import itertools as it
 import numpy as np
 import scipy as sp
+from scipy.cluster.vq import kmeans2
 import matplotlib.pyplot as plt
 import cdd
 
@@ -275,7 +276,6 @@ class SafeConvexPolytope:
         s = float('inf')*np.ones(len(self._set_no))
         # compute centroid
         p = self.points_yes.mean(axis=1).reshape(2,1)
-        print('Centroid found at\n{}'.format(p))
 
         # While not all no-points have been separated
         while np.max(s) > 0:
@@ -327,6 +327,11 @@ class SafeConvexPolytope:
 
         # Construct a new polytope from the new equation set
         self._polytope.set_equations(e_set)
+    
+    def cluster(self, num_vertices):
+        vertices = self._polytope.get_points()
+        centroids, labels = kmeans2(vertices.transpose(), num_vertices, minit='points')
+        self._polytope.set_points(centroids.transpose())
 
     # Halve resolution, resample boundary and get new safe polytope
     def enhance(self):
@@ -362,7 +367,7 @@ class SafeConvexPolytope:
             except RuntimeWarning:
                 point_2 = [x_max, y_max]
             pu.plot_line(ah, point_1, point_2, 'k')
-        plt.show()
+        plt.draw()
 
 
 # Answer if p is inside the circle c,r
@@ -398,3 +403,8 @@ if __name__ == '__main__':
     # Increase resolution and start anew
     safe_poly.enhance()
     safe_poly.plot()
+
+    # Approximate the safe convex polytope with k vertices
+    safe_poly.cluster(4)
+    safe_poly.plot()
+    plt.show()
