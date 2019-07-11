@@ -1,6 +1,7 @@
 from math import sqrt, atan2, asin, cos, pi
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
 
 def plot3_points(point_array, axes_names=['x', 'y', 'z']):

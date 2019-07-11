@@ -6,7 +6,7 @@
 # Point List: numpy MxN array
 # Vector: Mx1 array
 # Set of points: set of M-tuples
-# Equations: list of lists
+# Equations: numpy NxM array with each row the equation coefficients [A b]
 
 import itertools as it
 import numpy as np
@@ -56,25 +56,37 @@ class Polytope:
         return self._get_equations_from_cdd_matrix(e_matrix)
 
     def __contains__(self, point):
+        n_dims = point.shape[0]
         equations = self.get_equations()
         answer = True
         for equation in equations:
-            if point[0, 0]*equation[0] + point[1, 0]*equation[1] - equation[2] < 0:
+            equation = equation.reshape(n_dims+1, 1)  # TODO: optimization, equation is transposed twice
+            if np.dot(equation[:-1,:].transpose(), point) + equation[-1,:] > 0:
                 answer = False
                 break
         return answer
 
-    def _convert_equations_for_cdd(self, e_set):
+    def _convert_equations_for_cdd(self, e_array):
         converted_set = []
-        for equation in e_set:
-            converted_set.append([-equation[-1], equation[0], equation[1]])
+        for equation in e_array:
+            dim = len(equation)
+            A = equation[0:-1].reshape(dim-1)
+            b = equation[-1].reshape(1)
+            converted_set.append(np.concatenate((-b, A) ) )
         return converted_set
 
-    def _convert_equations_for_user(self, cdd_e_set):
-        converted_set = []
-        for equation in cdd_e_set:
-            converted_set.append([equation[-2], equation[-1], -equation[0]])
-        return converted_set
+    def _convert_equations_for_user(self, cdd_e_list):
+        num_equations = len(cdd_e_list)
+        n_coeffs = len(cdd_e_list[0])
+        converted_array = np.zeros((num_equations, n_coeffs))
+        idx = 0
+
+        for equation in cdd_e_list:
+            A = np.array(equation[1:]).reshape(1, n_coeffs-1)
+            b = np.array(equation[0]).reshape(1, 1)
+            converted_array[idx,:] = np.concatenate((A, -b), axis = 1)
+            idx = idx+1
+        return converted_array
 
     def _get_equations_from_cdd_matrix(self, matrix):
         cdd_e_set = matrix[:]
@@ -88,7 +100,7 @@ class SafeConvexPolytope:
     indicator = None
     points = None
     equations = None
-    eps = None
+    eps = None  # a (n_dim, ) array with the sampling resolution
     points_yes = None
     points_no = None
 
@@ -97,25 +109,26 @@ class SafeConvexPolytope:
     _set_points = None
     _set_yes = None
     _set_no = None
+    _n_dim = None
     _init_division = 4
 
     def __init__(self, ind_func, domain):
         self.indicator = ind_func
         self.domain = domain
+        self._n_dim = domain.shape[0]
         self._set_points = set()
         self._set_yes = set()
         self._set_no = set()
         self._polytope = Polytope()
         self._domain_polytope = Polytope()
-        self.eps = (domain[0, 1]-domain[0, 0])/self._init_division
+        self.eps = (domain[:, 1] - domain[:, 0])/self._init_division
 
         # define an initial polygon
-        x_min = domain[0, 0]
-        x_max = domain[0, 1]
-        y_min = domain[1, 0]
-        y_max = domain[1, 1]
-        initialization_points = np.array(
-            [[x_min, y_min], [x_min, y_max], [x_max, y_max], [x_max, y_min]]).transpose()
+        initialization_points = np.zeros((n_dim, 2**self._n_dim))
+        idx = 0
+        for point_tuple in it.product(*tuple(domain)):
+            initialization_points[:,idx] = np.array(point_tuple)
+            idx += 1
         self._polytope.set_points(initialization_points)
         self._domain_polytope.set_points(initialization_points)
 
@@ -143,7 +156,7 @@ class SafeConvexPolytope:
     @staticmethod
     def _get_bounding_box(points):
         shape = points.shape
-        dim = len(shape)
+        dim = shape[0]
         domain = np.zeros((dim, 2))
         for dim_idx in range(dim):
             domain[dim_idx, 0] = np.min(points[dim_idx, :])
@@ -153,6 +166,12 @@ class SafeConvexPolytope:
     @staticmethod
     def _get_y(equation, x):
         return (-equation[0]*x+equation[2])/equation[1]
+
+    @staticmethod
+    def _get_z(equation, x, y):
+        known_vec = np.array([x, y]).reshape(2,1)
+        equation_vec = equation.reshape(len(equation), 1)
+        return (equation_vec[-1] - np.dot(equation_vec[0:-2,:].transpose(), known_vec))/equation_vec[-2]
 
     # Set the sampling resolution
     def set_eps(self, eps):
@@ -198,51 +217,54 @@ class SafeConvexPolytope:
     # Return the coordinates which are up to eps away from the polytope boundary
     def _get_boundary_points(self, include_internal=False):
         vertices = self._polytope.get_points()
-        vertex_x_min = np.min(vertices[0, :])
-        vertex_x_max = np.max(vertices[0, :])
-        vertex_y_min = np.min(vertices[1, :])
-        vertex_y_max = np.max(vertices[1, :])
+        bbox = self._get_bounding_box(vertices)
 
-        domain_x_min = self.domain[0, 0]
-        domain_x_max = self.domain[0, 1]
-        domain_y_min = self.domain[1, 0]
-        domain_y_max = self.domain[1, 1]
+        num_intervals = np.zeros(self._n_dim)
+        sample_points = []
 
-        # Align the number resolution to eps
-        x_min = max(vertex_x_min, domain_x_min)
-        x_min = self._align_to_grid(x_min - self.eps, self.eps)
-        x_max = min(vertex_x_max, domain_x_max)
-        x_max = self._align_to_grid(x_max + self.eps, self.eps)
-        y_min = max(vertex_y_min, domain_y_min)
-        y_min = self._align_to_grid(y_min - self.eps, self.eps)
-        y_max = min(vertex_y_max, domain_y_max)
-        y_max = self._align_to_grid(y_max + self.eps, self.eps)
+        new_domain = np.zeros(bbox.shape)
+        for dim_idx in range(self._n_dim):
+            # Align the number resolution to eps
+            unaligned_min = max(bbox[dim_idx, 0], self.domain[dim_idx, 0])
+            eps = self.eps[dim_idx]
+            aligned_min = self._align_to_grid(unaligned_min - eps, eps)
+            new_domain[dim_idx, 0] = aligned_min
+            
+            unaligned_max = min(bbox[dim_idx, 1], self.domain[dim_idx, 1])
+            eps = self.eps[dim_idx]
+            aligned_max = self._align_to_grid(unaligned_max + eps, eps)
+            new_domain[dim_idx, 1] = aligned_max
 
-        n_x = int((x_max - x_min)//self.eps)
-        n_y = int((y_max - y_min)//self.eps)
-        x_samples = np.linspace(x_min, x_max, n_x+1)
-        y_samples = np.linspace(y_min, y_max, n_y+1)
+            # Construct the sampling values for each dimension
+            n = int((aligned_max-aligned_min)//eps) + 1
+            num_intervals[dim_idx] = n
+            sample_points.append(np.linspace(aligned_min, aligned_max, n))
 
-        e_set = self._polytope.get_equations()
+        e_array = self._polytope.get_equations()
 
         result = []
-        for x, y in it.product(x_samples, y_samples):
-            point = np.array([[x], [y]])
-            # verify that the point is inside the domain of interest
+        for coords_tuple in it.product(*sample_points):
+            point = np.array(coords_tuple).reshape((self._n_dim, 1))
+            # verify that the point is inside the general domain of interest
             if point not in self._domain_polytope:
                 continue
 
-            for equation in e_set:
-                w = np.array(equation[0:2])
-                b = np.array(equation[-1])
-                distance = (np.dot(w.transpose(), point) - b)/np.linalg.norm(w)
-                # Include all internal points
-                if include_internal and (distance <= self.eps):
-                    result.append((x, y))
-                    break
+            # Include all internal points if requested
+            if include_internal and point in self._polytope:
+                result.append(point)
+                continue
+
+            for equation in e_array:
+                n = equation[0:-1].reshape(self._n_dim, 1)
+                n_0 = n/np.linalg.norm(n)
+                b = equation[-1]
+                normal_vector = (np.dot(n_0.transpose(), point) - b) * n_0
+                distances = np.array(map(np.abs, normal_vector))
+                test_result = np.all(distances < self.eps)
+
                 # Include only points close to the boundary
-                elif np.abs(distance) <= self.eps:
-                    result.append((x, y))
+                if test_result:
+                    result.append(point)
                     break
 
         return np.array(result).transpose()
@@ -295,12 +317,13 @@ class SafeConvexPolytope:
             s[farthest_point_idx] = 0
 
         convex_polytope = Polytope()
-        convex_polytope.set_equations(e_set)
+        e_array = np.array(e_set)
+        convex_polytope.set_equations(e_array)
         return convex_polytope
 
     # Return a hyperplane separating no_point from the centroid of set_yes
     def _get_bounded_separator(self, no_point):
-        p = self.points_yes.mean(axis=1)
+        p = self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
         w = self._get_unit_direction(p, no_point)
         bound = np.dot(w.transpose(), no_point)
         b = self._calc_optimal_offset_constrained(w, bound)
@@ -310,7 +333,7 @@ class SafeConvexPolytope:
     def build_safe_polytope(self):
         # Create a convex polytope around set_yes
         convex_polytope = self._convex_separator()
-        e_set = convex_polytope.get_equations()
+        e_array = convex_polytope.get_equations()
 
         # Find all the invalid points inside the polytope
         invalid_points = []
@@ -318,19 +341,22 @@ class SafeConvexPolytope:
             no_point = coords.reshape(2,1)
             if no_point in convex_polytope:
                 invalid_points.append(no_point)
-                print('Adding intruding point\n {}'.format(no_point))
+                # print('Adding intruding point\n {}'.format(no_point))
 
         # Create one new equation for each one, separating them from the majority of set-yes
+        new_e_set = []
         for point in invalid_points:
             e = self._get_bounded_separator(point)
-            e_set.append(e)
+            new_e_set.append(e)
+        new_e_array = np.array(new_e_set)
+        e_array = np.vstack((e_array, new_e_array) )
 
         # Construct a new polytope from the new equation set
-        self._polytope.set_equations(e_set)
+        self._polytope.set_equations(e_array)
     
     def cluster(self, num_vertices):
         vertices = self._polytope.get_points()
-        centroids, labels = kmeans2(vertices.transpose(), num_vertices, minit='points')
+        centroids, _ = kmeans2(vertices.transpose(), num_vertices, minit='points')
         self._polytope.set_points(centroids.transpose())
 
     # Halve resolution, resample boundary and get new safe polytope
@@ -378,33 +404,52 @@ def circle_ind(p):
     return distance <= r
 
 
+def sphere_ind(p):
+    c = 4*np.ones((3,1))
+    r = 6
+    distance = np.linalg.norm(p-c)
+    return distance <= r
+
+
 if __name__ == '__main__':
 
-    # define a domain
-    x_lim = [-10, 10]
-    y_lim = [-10, 10]
-    domain = np.array([x_lim, y_lim])
+    # Select the number of dimensions for this example
+    n_dim = 2
 
-    safe_poly = SafeConvexPolytope(circle_ind, domain)
-    safe_poly.set_eps(5)
+    if n_dim==2:
+        ind_func = circle_ind
+    elif n_dim==3:
+        ind_func = sphere_ind
 
-    # Add manual points
-    additional_yes_points = np.array([[0, 0], [0, -2]]).transpose()
+    # define a domain as a n_dim x 2 array
+    domain = np.zeros((n_dim, 2))
+    domain[:,0] = -10
+    domain[:,1] = 10
+
+    safe_poly = SafeConvexPolytope(ind_func, domain)
+    safe_poly.set_eps(np.array([5, 5]))
+
+    # Manually add random
+    point_1 = np.random.rand(n_dim).reshape(n_dim,1)
+    point_1 = 10*(point_1 - 0.5*np.ones((n_dim,1)))
+    point_2 = np.random.rand(n_dim).reshape(n_dim,1)
+    point_2 = 10*(point_2 - 0.5*np.ones((n_dim,1)))
+    additional_yes_points = np.concatenate((point_1, point_2), axis=1)
     safe_poly.add_yes_points(additional_yes_points)
 
     # Create the safe convex polytope
     safe_poly.build_safe_polytope()
-    # safe_poly.plot()
+    safe_poly.plot()
 
     # Increase resolution and start anew
     safe_poly.enhance()
-    # safe_poly.plot()
+    safe_poly.plot()
 
     # Increase resolution and start anew
     safe_poly.enhance()
     safe_poly.plot()
 
     # Approximate the safe convex polytope with k vertices
-    safe_poly.cluster(4)
+    safe_poly.cluster(2**n_dim)
     safe_poly.plot()
     plt.show()
