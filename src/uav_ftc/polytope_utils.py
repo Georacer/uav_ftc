@@ -163,6 +163,22 @@ class SafeConvexPolytope:
             domain[dim_idx, 1] = np.max(points[dim_idx, :])
         return domain
 
+    # Get the distance of a point from a hypersurface
+    # Essentially this is an evaluation of the point for the hypersurface expression
+    # Applicable to multiple points and equations at once
+    @staticmethod
+    def _evaluate_hypersurface(points, equations):
+        # Catch case of single-dimensional equation array
+        if len(equations.shape)==1:
+            equations = equations.reshape(1, -1)
+        if len(points.shape)==1:
+            points = points.reshape(-1, 1)
+
+        A = equations[:, 0:-1]
+        b = equations[:, -1]
+        distances = (np.dot(A, points) - b)
+        return distances
+
     @staticmethod
     def _get_y(equation, x):
         return (-equation[0]*x+equation[2])/equation[1]
@@ -175,6 +191,8 @@ class SafeConvexPolytope:
 
     # Set the sampling resolution
     def set_eps(self, eps):
+        if self.eps.shape != eps.shape:
+            raise IndexError('Eps dimension mismatch')
         self.eps = eps
 
     def _update_points(self):
@@ -257,8 +275,9 @@ class SafeConvexPolytope:
             for equation in e_array:
                 n = equation[0:-1].reshape(self._n_dim, 1)
                 n_0 = n/np.linalg.norm(n)
-                b = equation[-1]
-                normal_vector = (np.dot(n_0.transpose(), point) - b) * n_0
+                # b = equation[-1]
+                normal_vector = self._evaluate_hypersurface(point, equation) * n_0
+                # normal_vector = (np.dot(n_0.transpose(), point) - b) * n_0
                 distances = np.array(map(np.abs, normal_vector))
                 test_result = np.all(distances < self.eps)
 
@@ -273,7 +292,7 @@ class SafeConvexPolytope:
     def sample(self, init=False):
         boundary_points = self._get_boundary_points(init)
         for coords in boundary_points.transpose():
-            point = coords.reshape(2, 1)
+            point = coords.reshape(self._n_dim, 1)
             sample = self.indicator(point)
             if sample:
                 self.add_yes_points(point)
@@ -297,7 +316,7 @@ class SafeConvexPolytope:
         # Set no-points dinstances to inf
         s = float('inf')*np.ones(len(self._set_no))
         # compute centroid
-        p = self.points_yes.mean(axis=1).reshape(2,1)
+        p = self.points_yes.mean(axis=1).reshape(self._n_dim,1)
 
         # While not all no-points have been separated
         while np.max(s) > 0:
@@ -308,10 +327,11 @@ class SafeConvexPolytope:
             w = self._get_unit_direction(p, farthest_point)
             # find the optimal line separator from set_yes
             b = self._calc_optimal_offset(w)
+            equation = np.vstack((w, b)).transpose().reshape((1, -1))
             # add it to the E-set
-            e_set.append(list(np.append(w.transpose(), b)))
+            e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
-            current_distances = np.dot(w.transpose(), self.points_no) - b
+            current_distances = self._evaluate_hypersurface(self.points_no, equation)
             for idx in range(s.shape[0]):
                 s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
@@ -338,7 +358,7 @@ class SafeConvexPolytope:
         # Find all the invalid points inside the polytope
         invalid_points = []
         for coords in self.points_no.transpose():
-            no_point = coords.reshape(2,1)
+            no_point = coords.reshape(self._n_dim,1)
             if no_point in convex_polytope:
                 invalid_points.append(no_point)
                 # print('Adding intruding point\n {}'.format(no_point))
@@ -365,47 +385,90 @@ class SafeConvexPolytope:
         self.sample()
         self.build_safe_polytope()
 
+    # Return a list containing one MxN array for each face of the polytope
+    # where M is the domain dimension and N is the number of points on each face, which may vary
+    def _get_face_points(self):
+        face_list = []
+        all_points = self._polytope.get_points()
+        all_equations = self._polytope.get_equations()
+        
+        for equation in all_equations:
+            face_points = []
+            for point in all_points.transpose():
+                if np.abs(self._evaluate_hypersurface(point, equation)) < 1e-5:
+                    face_points.append(point)
+            face_list.append(face_points)
+        return face_list
+
     def plot(self):
-        equations = self._polytope.get_equations()
 
-        fig = plt.figure()
-        ah = fig.add_subplot(111)
-        pu.plot_points(ah, self.points_yes, 'o', 'g')
-        pu.plot_points(ah, self.points_no, 'X', 'r')
-        ah.set_xlim(left=-10, right=10)
-        ah.set_ylim(top=-10, bottom=10)
+        # 2D plotting
+        if self._n_dim == 2:
+            all_points = self._set_to_array(self._set_points)
+            domain = self._get_bounding_box(all_points)
+            x_min = domain[0, 0]
+            x_max = domain[0, 1]
+            y_min = domain[1, 0]
+            y_max = domain[1, 1]
 
-        # Plot half-planes
-        all_points = self._set_to_array(self._set_points)
-        domain = self._get_bounding_box(all_points)
-        x_min = domain[0, 0]
-        x_max = domain[0, 1]
-        y_min = domain[1, 0]
-        y_max = domain[1, 1]
+            fig = plt.figure()
+            ah = fig.add_subplot(111)
+            pu.plot_points(ah, self.points_yes, 'o', 'g')
+            pu.plot_points(ah, self.points_no, 'X', 'r')
+            ah.set_xlim(x_min, x_max)
+            ah.set_ylim(y_min, y_max)
 
-        for equation in equations:
-            try:
-                point_1 = [x_min, self._get_y(equation, x_min)]
-            except RuntimeWarning:
-                point_1 = [x_min, y_min]
-            try:
-                point_2 = [x_max, self._get_y(equation, x_max)]
-            except RuntimeWarning:
-                point_2 = [x_max, y_max]
-            pu.plot_line(ah, point_1, point_2, 'k')
-        plt.draw()
+            # Plot half-planes
+            all_points = self._set_to_array(self._set_points)
+            domain = self._get_bounding_box(all_points)
 
+            equations = self._polytope.get_equations()
+            for equation in equations:
+                try:
+                    point_1 = [x_min, self._get_y(equation, x_min)]
+                except ZeroDivisionError:
+                    point_1 = [x_min, y_min]
+                try:
+                    point_2 = [x_max, self._get_y(equation, x_max)]
+                except ZeroDivisionError:
+                    point_2 = [x_max, y_max]
+                pu.plot_line(ah, point_1, point_2, 'k')
+            plt.draw()
 
-# Answer if p is inside the circle c,r
-def circle_ind(p):
-    c = np.array([[4], [4]])
-    r = 6
-    distance = np.linalg.norm(p-c)
-    return distance <= r
+        # 3D plotting
+        if self._n_dim == 3:
+            # Get the plotting domain
+            all_points = self._set_to_array(self._set_points)
+            domain = self._get_bounding_box(all_points)
+            x_min = domain[0, 0]
+            x_max = domain[0, 1]
+            y_min = domain[1, 0]
+            y_max = domain[1, 1]
+            z_min = domain[2, 0]
+            z_max = domain[2, 1]
 
+            # Build the polytope faces
+            face_points = self._get_face_points()
 
-def sphere_ind(p):
-    c = 4*np.ones((3,1))
+            fig = plt.figure()
+            ah = fig.add_subplot(111, projection='3d', proj_type='ortho')
+            pu.plot_points_3(ah, self.points_yes, 'o', 'g')
+            pu.plot_points_3(ah, self.points_no, 'X', 'r', alpha=0.2)
+            pu.plot_polygons_3(ah, face_points)
+
+            ah.set_xlim(x_min, x_max)
+            ah.set_ylim(y_min, y_max)
+            ah.set_zlim(z_min, z_max)
+
+            plt.draw()
+
+        if self._n_dim >3:
+            raise UserWarning('Plotting not implemented for more than 3 dimensions')
+            
+
+# Answer if p is inside the hypersphere c, r
+def hypersphere(p):
+    c = 4*np.ones(p.shape)
     r = 6
     distance = np.linalg.norm(p-c)
     return distance <= r
@@ -414,20 +477,20 @@ def sphere_ind(p):
 if __name__ == '__main__':
 
     # Select the number of dimensions for this example
-    n_dim = 2
+    n_dim = 4
 
-    if n_dim==2:
-        ind_func = circle_ind
-    elif n_dim==3:
-        ind_func = sphere_ind
+    ind_func = hypersphere
 
     # define a domain as a n_dim x 2 array
+    print('Creating problem domain and sampling initial points')
     domain = np.zeros((n_dim, 2))
     domain[:,0] = -10
     domain[:,1] = 10
 
     safe_poly = SafeConvexPolytope(ind_func, domain)
-    safe_poly.set_eps(np.array([5, 5]))
+
+    # Set the starting precision
+    safe_poly.set_eps(5*np.ones((safe_poly._n_dim)))
 
     # Manually add random
     point_1 = np.random.rand(n_dim).reshape(n_dim,1)
@@ -438,16 +501,19 @@ if __name__ == '__main__':
     safe_poly.add_yes_points(additional_yes_points)
 
     # Create the safe convex polytope
+    print('Building first-pass safe polytope')
     safe_poly.build_safe_polytope()
-    safe_poly.plot()
+    # safe_poly.plot()
 
     # Increase resolution and start anew
+    print('Building second-pass safe polytope')
     safe_poly.enhance()
-    safe_poly.plot()
+    # safe_poly.plot()
 
     # Increase resolution and start anew
+    print('Building third-pass safe polytope')
     safe_poly.enhance()
-    safe_poly.plot()
+    # safe_poly.plot()
 
     # Approximate the safe convex polytope with k vertices
     safe_poly.cluster(2**n_dim)
