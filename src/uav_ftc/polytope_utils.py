@@ -83,7 +83,13 @@ class Polytope:
     def get_points(self):
         return self._points
 
-    def __contains__(self, points):
+    def __contains__(self, point):
+        if point.shape[1]>1:
+            raise IndexError('Use explicit "contains" method to test multiple points')
+        return self.contains(point)
+
+    # Explicit containment method for multidimensional output
+    def contains(self, points):
         equations = self.get_equations()
         distances = evaluate_hypersurface(points, equations)
         answer = np.all(distances>=0, axis=0)
@@ -243,6 +249,10 @@ class SafeConvexPolytope:
         set_new_points = points-self._set_points
         return np.array(set_new_points).transpose()
 
+    def get_centroid(self):
+        # compute centroid
+        return self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
+
     # Return the coordinates which are up to eps away from the polytope boundary
     def _get_boundary_points(self, include_internal=False):
         vertices = self._polytope.get_points()
@@ -338,8 +348,8 @@ class SafeConvexPolytope:
         e_set = []
         # Set no-points dinstances to inf
         s = float('inf')*np.ones(len(self._set_no))
-        # compute centroid
-        p = self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
+        # get centroid
+        p = self.get_centroid()
 
         # While not all no-points have been separated
         while np.max(s) > 0:
@@ -366,7 +376,7 @@ class SafeConvexPolytope:
 
     # Return a hyperplane separating no_point from the centroid of set_yes
     def _get_bounded_separator(self, no_point):
-        p = self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
+        p = self.get_centroid()
         w = self._get_unit_direction(p, no_point)
         bound = np.dot(w.transpose(), no_point)
         b = self._calc_optimal_offset_constrained(w, bound)
@@ -417,9 +427,54 @@ class SafeConvexPolytope:
         self._set_no = self._array_to_set(self.points_no)
         self._set_points = self._set_yes | self._set_no
 
-    # Delete points which are more than eps away from the inside of the polytope
-    def remove_distanct_points_2(self):
-        pass
+    # Delete points which are more than eps away from the boundary of the polytope
+    # judging radially from the centroid
+    def remove_distant_points_2(self):
+        # get centroid
+        p = self.get_centroid()
+        # Set contraction distance
+        eps_out = 1.5*np.max(self.eps)
+        eps_in = 1.5*np.max(self.eps)
+
+        # Contract points and delete outside points
+        recentered_yes_points = (self.points_yes - p)
+        norms_yes = np.linalg.norm(recentered_yes_points, axis=0).reshape(1, -1)
+        factors_yes = np.repeat((norms_yes-eps_out)/norms_yes, p.shape[0], axis=0)
+        contracted_yes_points = recentered_yes_points*factors_yes + p
+        points_to_keep_mask = self._polytope.contains(contracted_yes_points)
+        self.points_yes = self.points_yes[:, points_to_keep_mask]
+
+        # Contract polytope and delete inside points
+        polytope_points = self._polytope.get_points()-p
+        norms_polytope_points = np.linalg.norm(polytope_points, axis=0).reshape(1,-1)
+        factors_yes = np.repeat((norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
+        contracted_polytope_points = polytope_points*factors_yes + p
+        contracted_polytope = Polytope()
+        contracted_polytope.set_points(contracted_polytope_points)
+        points_to_keep_mask = contracted_polytope.contains(self.points_yes)==False
+        self.points_yes = self.points_yes[:, points_to_keep_mask]
+
+        # Contract points and delete outside points
+        recentered_no_points = (self.points_no - p)
+        norms_no = np.linalg.norm(recentered_no_points, axis=0).reshape(1, -1)
+        factors_no = np.repeat((norms_no-eps_out)/norms_no, p.shape[0], axis=0)
+        contracted_no_points = recentered_no_points*factors_no + p
+        points_to_keep_mask = self._polytope.contains(contracted_no_points)
+        self.points_no = self.points_no[:, points_to_keep_mask]
+
+        # Contract polytope and delete inside points
+        polytope_points = self._polytope.get_points()-p
+        norms_polytope_points = np.linalg.norm(polytope_points, axis=0).reshape(1,-1)
+        factors_no = np.repeat((norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
+        contracted_polytope_points = polytope_points*factors_no + p
+        contracted_polytope = Polytope()
+        contracted_polytope.set_points(contracted_polytope_points)
+        points_to_keep_mask = contracted_polytope.contains(self.points_no)==False
+        self.points_no = self.points_no[:, points_to_keep_mask]
+
+        self._set_yes = self._array_to_set(self.points_yes)
+        self._set_no = self._array_to_set(self.points_no)
+        self._set_points = self._set_yes | self._set_no
 
     def cluster(self, num_vertices):
         vertices = self._polytope.get_points()
@@ -432,7 +487,7 @@ class SafeConvexPolytope:
         self.eps = self.eps/2
         self.sample()
         self.build_safe_polytope()
-        self.remove_distant_points()
+        self.remove_distant_points_2()
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
@@ -533,8 +588,8 @@ if __name__ == '__main__':
 
     ind_func = hypersphere
 
-    flag_plot = True
-    # flag_plot = False
+    # flag_plot = True
+    flag_plot = False
 
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
