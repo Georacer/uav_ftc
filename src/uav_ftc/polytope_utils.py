@@ -15,7 +15,6 @@ import scipy as sp
 from scipy.cluster.vq import kmeans2
 import matplotlib.pyplot as plt
 import cdd
-import cProfile
 
 import plot_utils as pu
 
@@ -70,13 +69,11 @@ class Polytope:
         return self._points
 
     def __contains__(self, point):
-        n_dims = point.shape[0]
         equations = self.get_equations()
         answer = True
         for equation in equations:
-            # TODO: optimization, equation is transposed twice
-            equation = equation.reshape(n_dims+1, 1)
-            if np.dot(equation[:-1, :].transpose(), point) + equation[-1, :] > 0:
+            equation = equation.reshape(1, -1)
+            if np.dot(equation[:, :-1], point) + equation[:, -1] > 0:
                 answer = False
                 break
         return answer
@@ -540,12 +537,12 @@ if __name__ == '__main__':
     # Increase resolution and start anew
     print('Building third-pass safe polytope')
     safe_poly.enhance()
-    # safe_poly.plot()
+    safe_poly.plot()
 
     # Approximate the safe convex polytope with k vertices
     print('Performing clustering')
     safe_poly.cluster(2**n_dim)
 
-    # print('Plotting')
-    # safe_poly.plot()
-    # plt.show()
+    print('Plotting')
+    safe_poly.plot()
+    plt.show()
