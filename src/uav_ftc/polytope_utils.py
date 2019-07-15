@@ -18,6 +18,21 @@ import cdd
 
 import plot_utils as pu
 
+# Get the distance of a point from a hypersurface
+# Essentially this is an evaluation of the point for the hypersurface expression
+# Applicable to multiple points and equations at once
+def evaluate_hypersurface(points, equations):
+    # Catch case of single-dimensional equation array
+    if len(equations.shape) == 1:
+        equations = equations.reshape(1, -1)
+    if len(points.shape) == 1:
+        points = points.reshape(-1, 1)
+
+    A = equations[:, 0:-1]
+    b = np.repeat(equations[:, [-1]], points.shape[1], axis=1)
+    distances = (np.dot(A, points) - b)
+    return distances
+
 
 class Polytope:
     _polytope_engine = None
@@ -68,14 +83,11 @@ class Polytope:
     def get_points(self):
         return self._points
 
-    def __contains__(self, point):
+    def __contains__(self, points):
         equations = self.get_equations()
-        answer = True
-        for equation in equations:
-            equation = equation.reshape(1, -1)
-            if np.dot(equation[:, :-1], point) + equation[:, -1] > 0:
-                answer = False
-                break
+        distances = evaluate_hypersurface(points, equations)
+        answer = np.all(distances>=0, axis=0)
+
         return answer
 
     def _convert_equations_for_cdd(self, e_array):
@@ -110,7 +122,6 @@ class SafeConvexPolytope:
 
     domain = None
     indicator = None
-    points = None
     equations = None
     eps = None  # a (n_dim, ) array with the sampling resolution
     points_yes = None
@@ -177,22 +188,6 @@ class SafeConvexPolytope:
             domain[dim_idx, 0] = np.min(points[dim_idx, :])
             domain[dim_idx, 1] = np.max(points[dim_idx, :])
         return domain
-
-    # Get the distance of a point from a hypersurface
-    # Essentially this is an evaluation of the point for the hypersurface expression
-    # Applicable to multiple points and equations at once
-    @staticmethod
-    def _evaluate_hypersurface(points, equations):
-        # Catch case of single-dimensional equation array
-        if len(equations.shape) == 1:
-            equations = equations.reshape(1, -1)
-        if len(points.shape) == 1:
-            points = points.reshape(-1, 1)
-
-        A = equations[:, 0:-1]
-        b = equations[:, -1]
-        distances = (np.dot(A, points) - b)
-        return distances
 
     @staticmethod
     def _get_y(equation, x):
@@ -274,48 +269,49 @@ class SafeConvexPolytope:
             num_intervals[dim_idx] = n
             sample_points.append(np.linspace(aligned_min, aligned_max, n))
 
-        e_array = self._polytope.get_equations()
-
         result = []
         for coords_tuple in it.product(*sample_points):
             point = np.array(coords_tuple).reshape((self._n_dim, 1))
-            # verify that the point is inside the general domain of interest
-            if point not in self._domain_polytope:
-                continue
 
-            # Include all internal points if requested
-            if include_internal and point in self._polytope:
-                result.append(point[:,0].transpose())
-                continue
-
-            for equation in e_array:
-                n = equation[0:-1].reshape(self._n_dim, 1)
-                n_0 = n/np.linalg.norm(n)
-                # b = equation[-1]
-                normal_vector = self._evaluate_hypersurface(
-                    point, equation) * n_0
-                # normal_vector = (np.dot(n_0.transpose(), point) - b) * n_0
-                distances = np.array(map(np.abs, normal_vector))
-                test_result = np.all(distances < self.eps)
-
-                # Include only points close to the boundary
-                if test_result:
-                    result.append(point[:,0].transpose())
-                    break
+            if self._is_point_eligible(point, include_internal):
+                result.append(point[:, 0].transpose())
 
         return np.array(result).transpose()
 
+    # Check if a point is eligible for inclusion in the sampling grid
+    def _is_point_eligible(self, point, include_internal=False):
+        # verify that the point is inside the general domain of interest
+        if point not in self._domain_polytope:
+            return False
+
+        # Do not resample already sampled points
+        if tuple(point.transpose()[0, :]) in self._set_points:
+            return False
+
+        # Include all internal points if requested
+        if include_internal:
+            return True
+
+        # Include if the points is close to any boundary line
+        e_array = self._polytope.get_equations()
+        for equation in e_array:
+            n = equation[0:-1].reshape(self._n_dim, 1)
+            n_0 = n/np.linalg.norm(n)
+            normal_vector = evaluate_hypersurface( point, equation) * n_0
+            distances = np.array(map(np.abs, normal_vector))
+            if  np.all(distances < self.eps):
+                return True
+
     # Sample points around a polytope boundary
     def sample(self, init=False):
-        points = self._get_boundary_points(init)
-        boundary_points = self._array_to_set(points)
+        boundary_points = self._array_to_set(self._get_boundary_points(init))
         boundary_points -= self._set_points
         yes_points = []
         no_points = []
         for coords in boundary_points:
-            point = np.array(coords).reshape(-1,1)
+            point = np.array(coords).reshape(-1, 1)
             sample = self.indicator(point)
-            coords_tuple = tuple(point.transpose()[0,:])
+            coords_tuple = tuple(point.transpose()[0, :])
             if sample:
                 yes_points.append(coords_tuple)
             else:
@@ -358,8 +354,7 @@ class SafeConvexPolytope:
             # add it to the E-set
             e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
-            current_distances = self._evaluate_hypersurface(
-                self.points_no, equation)
+            current_distances = evaluate_hypersurface( self.points_no, equation)
             for idx in range(s.shape[0]):
                 s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
@@ -389,7 +384,6 @@ class SafeConvexPolytope:
             no_point = coords.reshape(self._n_dim, 1)
             if no_point in convex_polytope:
                 invalid_points.append(no_point)
-                # print('Adding intruding point\n {}'.format(no_point))
 
         # Create one new equation for each one, separating them from the majority of set-yes
         new_e_set = []
@@ -397,10 +391,35 @@ class SafeConvexPolytope:
             e = self._get_bounded_separator(point)
             new_e_set.append(e)
         new_e_array = np.array(new_e_set)
-        e_array = np.vstack((e_array, new_e_array))
+        if len(new_e_array)>0:
+            e_array = np.vstack((e_array, new_e_array))
 
         # Construct a new polytope from the new equation set
         self._polytope.set_equations(e_array)
+
+    # Delete points which are more than eps away from boundaries
+    def remove_distant_points(self):
+        all_equations = self._polytope.get_equations()
+        # all_points = np.hstack((self.points_yes, self.points_no))
+
+        # Evaluate the distances of k hypersurface from m points (k x m array)
+        yes_distances = np.abs(evaluate_hypersurface(self.points_yes, all_equations))
+        eps_array = np.max(self.eps) * np.ones(yes_distances.shape)
+        points_to_keep_mask = np.any(yes_distances<=eps_array, axis=0)
+        self.points_yes = self.points_yes[:, points_to_keep_mask]
+
+        no_distances = np.abs(evaluate_hypersurface(self.points_no, all_equations))
+        eps_array = np.max(self.eps) * np.ones(no_distances.shape)
+        points_to_keep_mask = np.any(no_distances<=eps_array, axis=0)
+        self.points_no = self.points_no[:, points_to_keep_mask]
+
+        self._set_yes = self._array_to_set(self.points_yes)
+        self._set_no = self._array_to_set(self.points_no)
+        self._set_points = self._set_yes | self._set_no
+
+    # Delete points which are more than eps away from the inside of the polytope
+    def remove_distanct_points_2(self):
+        pass
 
     def cluster(self, num_vertices):
         vertices = self._polytope.get_points()
@@ -413,6 +432,7 @@ class SafeConvexPolytope:
         self.eps = self.eps/2
         self.sample()
         self.build_safe_polytope()
+        self.remove_distant_points()
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
@@ -424,7 +444,7 @@ class SafeConvexPolytope:
         for equation in all_equations:
             face_points = []
             for point in all_points.transpose():
-                if np.abs(self._evaluate_hypersurface(point, equation)) < 1e-5:
+                if np.abs(evaluate_hypersurface(point, equation)) < 1e-5:
                     face_points.append(point)
             face_list.append(face_points)
         return face_list
@@ -513,8 +533,8 @@ if __name__ == '__main__':
 
     ind_func = hypersphere
 
-    # flag_plot = True
-    flag_plot = False
+    flag_plot = True
+    # flag_plot = False
 
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
