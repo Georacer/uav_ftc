@@ -308,13 +308,21 @@ class SafeConvexPolytope:
     # Sample points around a polytope boundary
     def sample(self, init=False):
         boundary_points = self._get_boundary_points(init)
+        yes_points = set()
+        no_points = set()
         for coords in boundary_points.transpose():
             point = coords.reshape(self._n_dim, 1)
             sample = self.indicator(point)
+            coords_tuple = tuple(point.transpose()[0,:])
             if sample:
-                self.add_yes_points(point)
+                yes_points.add(coords_tuple)
             else:
-                self.add_no_points(point)
+                no_points.add(coords_tuple)
+
+        self._set_yes = self._set_yes | yes_points
+        self._set_no = self._set_no | no_points
+        self._set_points = yes_points | no_points
+        self._update_points()
 
     def _calc_optimal_offset(self, w):
         b_array = np.dot(w.transpose(), self.points_yes)
@@ -423,8 +431,7 @@ class SafeConvexPolytope:
 
         # 2D plotting
         if self._n_dim == 2:
-            all_points = self._set_to_array(self._set_points)
-            domain = self._get_bounding_box(all_points)
+            domain = self.domain
             x_min = domain[0, 0]
             x_max = domain[0, 1]
             y_min = domain[1, 0]
@@ -537,12 +544,12 @@ if __name__ == '__main__':
     # Increase resolution and start anew
     print('Building third-pass safe polytope')
     safe_poly.enhance()
-    safe_poly.plot()
+    # safe_poly.plot()
 
     # Approximate the safe convex polytope with k vertices
     print('Performing clustering')
     safe_poly.cluster(2**n_dim)
 
-    print('Plotting')
-    safe_poly.plot()
-    plt.show()
+    # print('Plotting')
+    # safe_poly.plot()
+    # plt.show()
