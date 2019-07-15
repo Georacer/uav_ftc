@@ -285,7 +285,7 @@ class SafeConvexPolytope:
 
             # Include all internal points if requested
             if include_internal and point in self._polytope:
-                result.append(point)
+                result.append(point[:,0].transpose())
                 continue
 
             for equation in e_array:
@@ -300,28 +300,30 @@ class SafeConvexPolytope:
 
                 # Include only points close to the boundary
                 if test_result:
-                    result.append(point)
+                    result.append(point[:,0].transpose())
                     break
 
         return np.array(result).transpose()
 
     # Sample points around a polytope boundary
     def sample(self, init=False):
-        boundary_points = self._get_boundary_points(init)
-        yes_points = set()
-        no_points = set()
-        for coords in boundary_points.transpose():
-            point = coords.reshape(self._n_dim, 1)
+        points = self._get_boundary_points(init)
+        boundary_points = self._array_to_set(points)
+        boundary_points -= self._set_points
+        yes_points = []
+        no_points = []
+        for coords in boundary_points:
+            point = np.array(coords).reshape(-1,1)
             sample = self.indicator(point)
             coords_tuple = tuple(point.transpose()[0,:])
             if sample:
-                yes_points.add(coords_tuple)
+                yes_points.append(coords_tuple)
             else:
-                no_points.add(coords_tuple)
+                no_points.append(coords_tuple)
 
-        self._set_yes = self._set_yes | yes_points
-        self._set_no = self._set_no | no_points
-        self._set_points = yes_points | no_points
+        self._set_yes.update(yes_points)
+        self._set_no.update(no_points)
+        self._set_points = self._set_yes | self._set_no
         self._update_points()
 
     def _calc_optimal_offset(self, w):
@@ -511,6 +513,9 @@ if __name__ == '__main__':
 
     ind_func = hypersphere
 
+    # flag_plot = True
+    flag_plot = False
+
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
     domain = np.zeros((n_dim, 2))
@@ -534,22 +539,26 @@ if __name__ == '__main__':
     # Create the safe convex polytope
     print('Building first-pass safe polytope')
     safe_poly.build_safe_polytope()
-    # safe_poly.plot()
+    if flag_plot:
+        safe_poly.plot()
 
     # Increase resolution and start anew
     print('Building second-pass safe polytope')
     safe_poly.enhance()
-    # safe_poly.plot()
+    if flag_plot:
+        safe_poly.plot()
 
     # Increase resolution and start anew
     print('Building third-pass safe polytope')
     safe_poly.enhance()
-    # safe_poly.plot()
+    if flag_plot:
+        safe_poly.plot()
 
     # Approximate the safe convex polytope with k vertices
     print('Performing clustering')
     safe_poly.cluster(2**n_dim)
 
-    # print('Plotting')
-    # safe_poly.plot()
-    # plt.show()
+    if flag_plot:
+        print('Plotting')
+        safe_poly.plot()
+        plt.show()
