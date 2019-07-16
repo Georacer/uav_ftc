@@ -9,13 +9,16 @@
 # Equations: numpy NxM array with each row the equation coefficients [A b]
 
 import sys
+from warnings import warn
 import itertools as it
+
 import numpy as np
 import scipy as sp
 from scipy.cluster.vq import kmeans2
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import cdd
+import click
 
 import plot_utils as pu
 
@@ -70,15 +73,17 @@ class Polytope:
     def _build_points(self):
         points = []
         points_matrix = self._polytope_engine.get_generators()
-        for point_idx in range(points_matrix.row_size):
-            row = points_matrix[point_idx]
-            if row[0] == 1:  # This is a point
-                points.append(row[1:])
-        self._points = np.array(points).transpose()  # Convert to a numpy array
+        points = np.array(points_matrix[:])
+        points_mask = points[:,0]==1  # Only rows starting with 1 are points
+        points = points[points_mask, 1:]
+        self._points = points.T
 
     def _build_equations(self):
         e_matrix = self._polytope_engine.get_inequalities()
-        self._equations = self._get_equations_from_cdd_matrix(e_matrix)
+        try:
+            self._equations = self._get_equations_from_cdd_matrix(e_matrix)
+        except IndexError:
+            raise IndexError('Could not build cdd equations. e_matrix = {}'.format(e_matrix))
 
     def get_equations(self):
         return self._equations
@@ -111,6 +116,8 @@ class Polytope:
 
     def _convert_equations_for_user(self, cdd_e_list):
         num_equations = len(cdd_e_list)
+        if len(cdd_e_list)==0:
+            raise IndexError('Equation list is empty')
         n_coeffs = len(cdd_e_list[0])
         converted_array = np.zeros((num_equations, n_coeffs))
         idx = 0
@@ -325,18 +332,21 @@ class SafeConvexPolytope:
         # samples_norm = np.repeat(np.linalg.norm(samples, axis=0).reshape(1,-1), self._n_dim, axis=0)
         samples /= np.linalg.norm(samples, axis=0)
 
-        # For each unit vector find its projection onto the hyperplanes
         p = self.get_centroid()
 
-        vertices_centered = self._polytope.get_points() - p
-        poly_centered = Polytope()
-        poly_centered.set_points(vertices_centered)
-        all_equations = poly_centered.get_equations()
+        # Transfer the polytope at the centroid
+        all_equations = self._polytope.get_equations()
+        all_equations[:,[-1]] -= np.matmul(all_equations[:, :-1], p)
+
+        # vertices_centered = self._polytope.get_points() - p
+        # poly_centered = Polytope()
+        # poly_centered.set_points(vertices_centered)
+        # all_equations = poly_centered.get_equations()
 
         A = all_equations[:, :-1]
         b = np.repeat(all_equations[:, [-1]], samples.shape[1], axis=1)
 
-        # and keep the closest one
+        # For each unit vector find its projection onto the hyperplane sand keep the closest one
         all_k = b/np.dot(A, samples)
         all_k[all_k < 0] = np.inf
         k_indices = np.argmin((all_k), axis=0)
@@ -352,6 +362,7 @@ class SafeConvexPolytope:
         return samples
 
     # Check if a point is eligible for inclusion in the sampling grid
+    # UNUSED
     def _is_point_eligible(self, point, include_internal=False):
         # verify that the point is inside the general domain of interest
         if point not in self._domain_polytope:
@@ -418,7 +429,10 @@ class SafeConvexPolytope:
         # Set no-points dinstances to inf
         s = float('inf')*np.ones(len(self._set_no))
         # get centroid
-        p = self.get_centroid()
+        try:
+            p = self.get_centroid()
+        except IndexError:
+            raise IndexError('Could not obtain centroid. Size of points_yes: {}'.format(self.points_yes.shape))
 
         # While not all no-points have been separated
         while np.max(s) > 0:
@@ -434,8 +448,11 @@ class SafeConvexPolytope:
             e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
             current_distances = evaluate_hyperplane(self.points_no, equation)
-            for idx in range(s.shape[0]):
-                s[idx] = min(s[idx], current_distances[0, idx])
+            d_len = current_distances.shape[1]
+            range_mask = s > current_distances[0,np.arange(d_len)]
+            s[range_mask] = current_distances[0,range_mask]
+            # for idx in range(s.shape[0]):
+            #     s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
 
         convex_polytope = Polytope()
@@ -554,7 +571,10 @@ class SafeConvexPolytope:
             (norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
         contracted_polytope_points = polytope_points*factors_yes + p
         contracted_polytope = Polytope()
-        contracted_polytope.set_points(contracted_polytope_points)
+        try:
+            contracted_polytope.set_points(contracted_polytope_points)
+        except RuntimeError:
+            warn('Failed to create contracted polyhedron. Skipping removal of inside points...', UserWarning)
         points_to_keep_mask = contracted_polytope.contains(
             self.points_yes) == False
         self.points_yes = self.points_yes[:, points_to_keep_mask]
@@ -623,14 +643,22 @@ class SafeConvexPolytope:
     # Take more samples and re-fit the safe convex polygon
     def improve_polytope(self, init=False):
         self.sample(init=init, method=self._sampling_method)
-        convergence = self.build_safe_polytope()
-        return convergence
+        try:
+            convergence = self.build_safe_polytope()
+            return convergence
+        except IndexError:
+            warn('Could not build a safe polytope', UserWarning)
+            return False
 
     def new_plot(self):
         self._axis_handle = None
         self.plot()
 
     def plot(self, color='k'):
+
+        if self._n_dim > 3:
+            warn('Plotting not implemented for more than 3 dimensions', UserWarning)
+            return None
 
         # Create axis handle
         if self._axis_handle is None:
@@ -699,10 +727,6 @@ class SafeConvexPolytope:
             plt.draw()
             plt.pause(0.01)
 
-        if self._n_dim > 3:
-            raise UserWarning(
-                'Plotting not implemented for more than 3 dimensions')
-
         # Return the axis handle for later use
         return ah
 
@@ -715,18 +739,16 @@ def hypersphere(p):
     return distance <= r
 
 
-if __name__ == '__main__':
-    # Select the number of dimensions for this example
-    if len(sys.argv) > 1:
-        n_dim = int(sys.argv[1])
-    else:
-        n_dim = 2
+@click.command()
+@click.option('-d', '--dimensions', default=2, type=int, help='Dimensions of the problem')
+@click.option('-p', '--plot', is_flag=True, help='Enable plotting. Only for 2D and 3D problems')
+def test_code(dimensions, plot):
+
+    n_dim = dimensions
     print('Testing polytope code for {} dimensions'.format(n_dim))
+    flag_plot = plot
 
     ind_func = hypersphere
-
-    # flag_plot = True
-    flag_plot = False
 
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
@@ -756,6 +778,7 @@ if __name__ == '__main__':
     print('Progressive sampling of the polytope')
     algorithm_end = False
     while not algorithm_end:
+        print('Getting new samples form the polytope')
         algorithm_end = safe_poly.step()
 
     print('Final number of sampled points: {}'.format(len(safe_poly._set_points)))
@@ -768,3 +791,7 @@ if __name__ == '__main__':
         print('Plotting')
         safe_poly.plot(color='r')
         plt.show()
+
+
+if __name__ == '__main__':
+    test_code()
