@@ -76,9 +76,15 @@ def plot_points_3(ah, point_arr, style, color, alpha=1):
 def plot_line(ah, point_1, point_2, color):
     ah.plot([point_1[0], point_2[0]], [point_1[1], point_2[1]], c=color)
 
-def plot_polygons_3(ah, face_points):
+def plot_polygons_3(ah, face_points, colorcode=None):
+    # Select the plane color
+    if colorcode == 'r':
+        plane_color = [0.3, 0, 0]
+    else:
+        plane_color = [0, 1, 0.2]
+
     poly_collection = mplot3d.art3d.Poly3DCollection(face_points)
     poly_collection.set_alpha = 0.3
-    poly_collection.set_color([0, 1, 0.2])
+    poly_collection.set_color(plane_color)
     poly_collection.set_edgecolor('k')
     ah.add_collection3d(poly_collection)

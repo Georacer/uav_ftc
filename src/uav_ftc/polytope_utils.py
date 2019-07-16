@@ -145,8 +145,10 @@ class SafeConvexPolytope:
     _set_yes = None
     _set_no = None
     _n_dim = None
+    _initialized = False
     _init_division = 2**2
     _final_division = 2**4
+    _current_division = _init_division
     _volume_approx_factor = 0.1
     _sampling_method = 'rectilinear'
 
@@ -170,9 +172,6 @@ class SafeConvexPolytope:
 
         # Initialize the polytope and the domain polytope
         self.reset_polytope()
-
-        # Run a polytope generation iteration
-        self.improve_polytope(init=True)
 
     @staticmethod
     def _array_to_set(points):
@@ -457,6 +456,21 @@ class SafeConvexPolytope:
         hull = ConvexHull(points.T)
         return hull.volume
 
+    # Return a list containing one MxN array for each face of the polytope
+    # where M is the domain dimension and N is the number of points on each face, which may vary
+    def _get_face_points(self):
+        face_list = []
+        all_points = self._polytope.get_points()
+        all_equations = self._polytope.get_equations()
+
+        for equation in all_equations:
+            face_points = []
+            for point in all_points.transpose():
+                if np.abs(evaluate_hyperplane(point, equation)) < 1e-5:
+                    face_points.append(point)
+            face_list.append(face_points)
+        return face_list
+
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
@@ -576,12 +590,32 @@ class SafeConvexPolytope:
                                num_vertices, minit='points')
         self._polytope.set_points(centroids.transpose())
 
+    # Make a step of the polytope fitting problem
     def step(self):
-        convergence = self.improve_polytope()
+        convergence = self.improve_polytope(not self._initialized)
         self.remove_distant_points_2()
-        return convergence
+
+        if not self._initialized:
+            self._initialized = True
+
+        if self.enable_plotting:
+            self.plot()
+
+        algorithm_end = False
+        if convergence:
+            print('Polytope converged in the current eps value')
+            if self._current_division >= self._final_division:
+                print('Desired polytope accuracy achieved')
+                algorithm_end = True
+            else:
+                print('Increasing sampling accuracy')
+                self._current_division *= 2
+                self.eps /= 2
+        
+        return algorithm_end
 
     # Halve resolution, resample boundary and get new safe polytope
+    # DEPRECATED
     def enhance(self):
         self.eps = self.eps/2
         self.step()
@@ -592,30 +626,21 @@ class SafeConvexPolytope:
         convergence = self.build_safe_polytope()
         return convergence
 
-    # Return a list containing one MxN array for each face of the polytope
-    # where M is the domain dimension and N is the number of points on each face, which may vary
-    def _get_face_points(self):
-        face_list = []
-        all_points = self._polytope.get_points()
-        all_equations = self._polytope.get_equations()
+    def new_plot(self):
+        self._axis_handle = None
+        self.plot()
 
-        for equation in all_equations:
-            face_points = []
-            for point in all_points.transpose():
-                if np.abs(evaluate_hyperplane(point, equation)) < 1e-5:
-                    face_points.append(point)
-            face_list.append(face_points)
-        return face_list
-
-    def plot(self, ah=None):
+    def plot(self, color='k'):
 
         # Create axis handle
-        if ah is None:
+        if self._axis_handle is None:
             fig = plt.figure()
             if self._n_dim == 2:
-                ah = fig.add_subplot(111)
+                self._axis_handle = fig.add_subplot(111)
             if self._n_dim == 3:
-                ah = fig.add_subplot(111, projection='3d', proj_type='ortho')
+                self._axis_handle = fig.add_subplot(111, projection='3d', proj_type='ortho')
+        ah = self._axis_handle
+        ah.clear()
 
         # 2D plotting
         if self._n_dim == 2:
@@ -644,8 +669,9 @@ class SafeConvexPolytope:
                     point_2 = [x_max, self._get_y(equation, x_max)]
                 except ZeroDivisionError:
                     point_2 = [x_max, y_max]
-                pu.plot_line(ah, point_1, point_2, 'k')
+                pu.plot_line(ah, point_1, point_2, color)
             plt.draw()
+            plt.pause(0.01)
 
         # 3D plotting
         if self._n_dim == 3:
@@ -664,13 +690,14 @@ class SafeConvexPolytope:
 
             pu.plot_points_3(ah, self.points_yes, 'o', 'g')
             pu.plot_points_3(ah, self.points_no, 'X', 'r', alpha=0.2)
-            pu.plot_polygons_3(ah, face_points)
+            pu.plot_polygons_3(ah, face_points, colorcode=color)
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
             ah.set_zlim(z_min, z_max)
 
             plt.draw()
+            plt.pause(0.01)
 
         if self._n_dim > 3:
             raise UserWarning(
@@ -722,44 +749,14 @@ if __name__ == '__main__':
     additional_yes_points = np.concatenate((point_1, point_2), axis=1)
     safe_poly.add_yes_points(additional_yes_points)
 
-    # Create the safe convex polytope
-    print('Building first-pass safe polytope')
-    safe_poly.build_safe_polytope()
     if flag_plot:
-        ah = safe_poly.plot()
-    # Iteratively sample the polytope
-    convergence = False
-    while not convergence:
-        convergence = safe_poly.step()
-        if flag_plot:
-            safe_poly.plot(ah)
-            plt.pause(0.01)
+        safe_poly.enable_plotting = True
 
-    # Increase resolution and start anew
-    print('Building second-pass safe polytope')
-    safe_poly.enhance()
-    if flag_plot:
-        ah = safe_poly.plot()
     # Iteratively sample the polytope
-    convergence = False
-    while not convergence:
-        convergence = safe_poly.step()
-        if flag_plot:
-            safe_poly.plot(ah)
-            plt.pause(0.01)
-
-    # Increase resolution and start anew
-    print('Building third-pass safe polytope')
-    safe_poly.enhance()
-    if flag_plot:
-        ah = safe_poly.plot()
-    # Iteratively sample the polytope
-    convergence = False
-    while not convergence:
-        convergence = safe_poly.step()
-        if flag_plot:
-            safe_poly.plot(ah)
-            plt.pause(0.01)
+    print('Progressive sampling of the polytope')
+    algorithm_end = False
+    while not algorithm_end:
+        algorithm_end = safe_poly.step()
 
     print('Final number of sampled points: {}'.format(len(safe_poly._set_points)))
 
@@ -769,5 +766,5 @@ if __name__ == '__main__':
 
     if flag_plot:
         print('Plotting')
-        safe_poly.plot()
+        safe_poly.plot(color='r')
         plt.show()
