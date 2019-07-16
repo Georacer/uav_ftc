@@ -21,7 +21,7 @@ import plot_utils as pu
 # Get the distance of a point from a hypersurface
 # Essentially this is an evaluation of the point for the hypersurface expression
 # Applicable to multiple points and equations at once
-def evaluate_hypersurface(points, equations):
+def evaluate_hyperplane(points, equations):
     # Catch case of single-dimensional equation array
     if len(equations.shape) == 1:
         equations = equations.reshape(1, -1)
@@ -91,7 +91,7 @@ class Polytope:
     # Explicit containment method for multidimensional output
     def contains(self, points):
         equations = self.get_equations()
-        distances = evaluate_hypersurface(points, equations)
+        distances = evaluate_hyperplane(points, equations)
         answer = np.all(distances>=0, axis=0)
 
         return answer
@@ -156,19 +156,13 @@ class SafeConvexPolytope:
             self.eps = (domain[:, 1] - domain[:, 0])/self._init_division
         else:
             self.set_eps(eps)
-        self.angular_sample_no = 2**6*self._n_dim
+        self.angular_sample_no = 2**6
 
-        # define an initial polygon
-        initialization_points = np.zeros((self._n_dim, 2**self._n_dim))
-        idx = 0
-        for point_tuple in it.product(*tuple(domain)):
-            initialization_points[:, idx] = np.array(point_tuple)
-            idx += 1
-        self._polytope.set_points(initialization_points)
-        self._domain_polytope.set_points(initialization_points)
+        # Initialize the polytope and the domain polytope
+        self.reset_polytope()
 
         # Run a polytope generation iteration
-        self.sample(init=True)
+        self.improve_polytope(init=True)
 
     @staticmethod
     def _array_to_set(points):
@@ -218,9 +212,26 @@ class SafeConvexPolytope:
     def set_sampling_method(self, method):
         self._sampling_method = method
 
+    def reset_polytope(self):
+        # define an initial polygon
+        initialization_points = np.zeros((self._n_dim, 2**self._n_dim))
+        idx = 0
+        for point_tuple in it.product(*tuple(self.domain)):
+            initialization_points[:, idx] = np.array(point_tuple)
+            idx += 1
+        self._polytope.set_points(initialization_points)
+        self._domain_polytope.set_points(initialization_points)
+
     def _update_points(self):
         self.points_yes = self._set_to_array(self._set_yes)
         self.points_no = self._set_to_array(self._set_no)
+
+    def clear_points(self):
+        self._set_yes = set()
+        self._set_no = set()
+        self._set_points = set()
+        self.points_yes = np.array([])
+        self.points_no = np.array([])
 
     def add_points(self, points):
         new_points = self._filter_points(points)
@@ -349,7 +360,7 @@ class SafeConvexPolytope:
         for equation in e_array:
             n = equation[0:-1].reshape(self._n_dim, 1)
             n_0 = n/np.linalg.norm(n)
-            normal_vector = evaluate_hypersurface( point, equation) * n_0
+            normal_vector = evaluate_hyperplane( point, equation) * n_0
             distances = np.array(map(np.abs, normal_vector))
             if  np.all(distances < self.eps):
                 return True
@@ -410,7 +421,7 @@ class SafeConvexPolytope:
             # add it to the E-set
             e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
-            current_distances = evaluate_hypersurface( self.points_no, equation)
+            current_distances = evaluate_hyperplane( self.points_no, equation)
             for idx in range(s.shape[0]):
                 s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
@@ -459,12 +470,12 @@ class SafeConvexPolytope:
         # all_points = np.hstack((self.points_yes, self.points_no))
 
         # Evaluate the distances of k hypersurface from m points (k x m array)
-        yes_distances = np.abs(evaluate_hypersurface(self.points_yes, all_equations))
+        yes_distances = np.abs(evaluate_hyperplane(self.points_yes, all_equations))
         eps_array = np.max(self.eps) * np.ones(yes_distances.shape)
         points_to_keep_mask = np.any(yes_distances<=eps_array, axis=0)
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
-        no_distances = np.abs(evaluate_hypersurface(self.points_no, all_equations))
+        no_distances = np.abs(evaluate_hyperplane(self.points_no, all_equations))
         eps_array = np.max(self.eps) * np.ones(no_distances.shape)
         points_to_keep_mask = np.any(no_distances<=eps_array, axis=0)
         self.points_no = self.points_no[:, points_to_keep_mask]
@@ -528,12 +539,19 @@ class SafeConvexPolytope:
                                num_vertices, minit='points')
         self._polytope.set_points(centroids.transpose())
 
+    def step(self):
+        self.improve_polytope()
+        self.remove_distant_points_2()
+
     # Halve resolution, resample boundary and get new safe polytope
     def enhance(self):
         self.eps = self.eps/2
-        self.sample(method=self._sampling_method)
+        self.step()
+
+    # Take more samples and re-fit the safe convex polygon
+    def improve_polytope(self, init=False):
+        self.sample(init=init, method=self._sampling_method)
         self.build_safe_polytope()
-        self.remove_distant_points_2()
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
@@ -545,7 +563,7 @@ class SafeConvexPolytope:
         for equation in all_equations:
             face_points = []
             for point in all_points.transpose():
-                if np.abs(evaluate_hypersurface(point, equation)) < 1e-5:
+                if np.abs(evaluate_hyperplane(point, equation)) < 1e-5:
                     face_points.append(point)
             face_list.append(face_points)
         return face_list
@@ -634,8 +652,8 @@ if __name__ == '__main__':
 
     ind_func = hypersphere
 
-    # flag_plot = True
-    flag_plot = False
+    flag_plot = True
+    # flag_plot = False
 
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
