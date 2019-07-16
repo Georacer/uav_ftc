@@ -13,6 +13,7 @@ import itertools as it
 import numpy as np
 import scipy as sp
 from scipy.cluster.vq import kmeans2
+from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import cdd
 
@@ -21,6 +22,8 @@ import plot_utils as pu
 # Get the distance of a point from a hypersurface
 # Essentially this is an evaluation of the point for the hypersurface expression
 # Applicable to multiple points and equations at once
+
+
 def evaluate_hyperplane(points, equations):
     # Catch case of single-dimensional equation array
     if len(equations.shape) == 1:
@@ -84,15 +87,16 @@ class Polytope:
         return self._points
 
     def __contains__(self, point):
-        if point.shape[1]>1:
-            raise IndexError('Use explicit "contains" method to test multiple points')
+        if point.shape[1] > 1:
+            raise IndexError(
+                'Use explicit "contains" method to test multiple points')
         return self.contains(point)
 
     # Explicit containment method for multidimensional output
     def contains(self, points):
         equations = self.get_equations()
         distances = evaluate_hyperplane(points, equations)
-        answer = np.all(distances>=0, axis=0)
+        answer = np.all(distances >= 0, axis=0)
 
         return answer
 
@@ -133,6 +137,7 @@ class SafeConvexPolytope:
     angular_sample_no = None
     points_yes = None
     points_no = None
+    enable_plotting = False
 
     _polytope = None
     _domain_polytope = None
@@ -140,8 +145,13 @@ class SafeConvexPolytope:
     _set_yes = None
     _set_no = None
     _n_dim = None
-    _init_division = 4
+    _init_division = 2**2
+    _final_division = 2**4
+    _volume_approx_factor = 0.1
     _sampling_method = 'rectilinear'
+
+    _figure_handle = None
+    _axis_handle = None
 
     def __init__(self, ind_func, domain, eps=None):
         self.indicator = ind_func
@@ -324,20 +334,21 @@ class SafeConvexPolytope:
         poly_centered.set_points(vertices_centered)
         all_equations = poly_centered.get_equations()
 
-        A = all_equations[:,:-1]
-        b = np.repeat(all_equations[:,[-1]], samples.shape[1], axis=1)
+        A = all_equations[:, :-1]
+        b = np.repeat(all_equations[:, [-1]], samples.shape[1], axis=1)
 
         # and keep the closest one
         all_k = b/np.dot(A, samples)
-        all_k[all_k<0] = np.inf
+        all_k[all_k < 0] = np.inf
         k_indices = np.argmin((all_k), axis=0)
-        k = all_k[k_indices, range(len(k_indices))]#.reshape(1, -1)
+        k = all_k[k_indices, range(len(k_indices))]  # .reshape(1, -1)
 
         # Add 3 samples for each
         samples_boundary = k*samples  # Scale samples onto the bounding polytope
         samples_inside = (k-eps)*samples
         samples_outside = (k+eps)*samples
-        samples = np.hstack((samples_boundary, samples_inside, samples_outside)) + p
+        samples = np.hstack(
+            (samples_boundary, samples_inside, samples_outside)) + p
 
         return samples
 
@@ -360,17 +371,19 @@ class SafeConvexPolytope:
         for equation in e_array:
             n = equation[0:-1].reshape(self._n_dim, 1)
             n_0 = n/np.linalg.norm(n)
-            normal_vector = evaluate_hyperplane( point, equation) * n_0
+            normal_vector = evaluate_hyperplane(point, equation) * n_0
             distances = np.array(map(np.abs, normal_vector))
-            if  np.all(distances < self.eps):
+            if np.all(distances < self.eps):
                 return True
 
     # Sample points around a polytope boundary
     def sample(self, init=False, method='rectilinear'):
-        if method=='rectilinear' or init:
-            boundary_points = self._array_to_set(self._get_boundary_points(init))
-        elif method=='radial':
-            boundary_points = self._array_to_set(self._get_boundary_points_radial())
+        if method == 'rectilinear' or init:
+            boundary_points = self._array_to_set(
+                self._get_boundary_points(init))
+        elif method == 'radial':
+            boundary_points = self._array_to_set(
+                self._get_boundary_points_radial())
 
         boundary_points -= self._set_points
         yes_points = []
@@ -421,7 +434,7 @@ class SafeConvexPolytope:
             # add it to the E-set
             e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
-            current_distances = evaluate_hyperplane( self.points_no, equation)
+            current_distances = evaluate_hyperplane(self.points_no, equation)
             for idx in range(s.shape[0]):
                 s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
@@ -439,8 +452,16 @@ class SafeConvexPolytope:
         b = self._calc_optimal_offset_constrained(w, bound)
         return list(np.append(w.transpose(), b))
 
+    def _get_polytope_volume(self):
+        points = self._polytope.get_points()
+        hull = ConvexHull(points.T)
+        return hull.volume
+
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
+        # Calculate the volume of the old polytope, as an index of approximation convergence
+        old_volume = self._get_polytope_volume()
+
         # Create a convex polytope around set_yes
         convex_polytope = self._convex_separator()
         e_array = convex_polytope.get_equations()
@@ -458,11 +479,17 @@ class SafeConvexPolytope:
             e = self._get_bounded_separator(point)
             new_e_set.append(e)
         new_e_array = np.array(new_e_set)
-        if len(new_e_array)>0:
+        if len(new_e_array) > 0:
             e_array = np.vstack((e_array, new_e_array))
 
         # Construct a new polytope from the new equation set
         self._polytope.set_equations(e_array)
+
+        new_volume = self._get_polytope_volume()
+        if abs((new_volume-old_volume)/old_volume) < self._volume_approx_factor:
+            return True
+        else:
+            return False
 
     # Delete points which are more than eps away from boundaries
     def remove_distant_points(self):
@@ -470,14 +497,16 @@ class SafeConvexPolytope:
         # all_points = np.hstack((self.points_yes, self.points_no))
 
         # Evaluate the distances of k hypersurface from m points (k x m array)
-        yes_distances = np.abs(evaluate_hyperplane(self.points_yes, all_equations))
+        yes_distances = np.abs(evaluate_hyperplane(
+            self.points_yes, all_equations))
         eps_array = np.max(self.eps) * np.ones(yes_distances.shape)
-        points_to_keep_mask = np.any(yes_distances<=eps_array, axis=0)
+        points_to_keep_mask = np.any(yes_distances <= eps_array, axis=0)
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
-        no_distances = np.abs(evaluate_hyperplane(self.points_no, all_equations))
+        no_distances = np.abs(evaluate_hyperplane(
+            self.points_no, all_equations))
         eps_array = np.max(self.eps) * np.ones(no_distances.shape)
-        points_to_keep_mask = np.any(no_distances<=eps_array, axis=0)
+        points_to_keep_mask = np.any(no_distances <= eps_array, axis=0)
         self.points_no = self.points_no[:, points_to_keep_mask]
 
         self._set_yes = self._array_to_set(self.points_yes)
@@ -495,20 +524,25 @@ class SafeConvexPolytope:
 
         # Contract points and delete outside points
         recentered_yes_points = (self.points_yes - p)
-        norms_yes = np.linalg.norm(recentered_yes_points, axis=0).reshape(1, -1)
-        factors_yes = np.repeat((norms_yes-eps_out)/norms_yes, p.shape[0], axis=0)
+        norms_yes = np.linalg.norm(
+            recentered_yes_points, axis=0).reshape(1, -1)
+        factors_yes = np.repeat((norms_yes-eps_out) /
+                                norms_yes, p.shape[0], axis=0)
         contracted_yes_points = recentered_yes_points*factors_yes + p
         points_to_keep_mask = self._polytope.contains(contracted_yes_points)
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
         # Contract polytope and delete inside points
         polytope_points = self._polytope.get_points()-p
-        norms_polytope_points = np.linalg.norm(polytope_points, axis=0).reshape(1,-1)
-        factors_yes = np.repeat((norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
+        norms_polytope_points = np.linalg.norm(
+            polytope_points, axis=0).reshape(1, -1)
+        factors_yes = np.repeat(
+            (norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
         contracted_polytope_points = polytope_points*factors_yes + p
         contracted_polytope = Polytope()
         contracted_polytope.set_points(contracted_polytope_points)
-        points_to_keep_mask = contracted_polytope.contains(self.points_yes)==False
+        points_to_keep_mask = contracted_polytope.contains(
+            self.points_yes) == False
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
         # Contract points and delete outside points
@@ -521,12 +555,15 @@ class SafeConvexPolytope:
 
         # Contract polytope and delete inside points
         polytope_points = self._polytope.get_points()-p
-        norms_polytope_points = np.linalg.norm(polytope_points, axis=0).reshape(1,-1)
-        factors_no = np.repeat((norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
+        norms_polytope_points = np.linalg.norm(
+            polytope_points, axis=0).reshape(1, -1)
+        factors_no = np.repeat(
+            (norms_polytope_points-eps_in)/norms_polytope_points, p.shape[0], axis=0)
         contracted_polytope_points = polytope_points*factors_no + p
         contracted_polytope = Polytope()
         contracted_polytope.set_points(contracted_polytope_points)
-        points_to_keep_mask = contracted_polytope.contains(self.points_no)==False
+        points_to_keep_mask = contracted_polytope.contains(
+            self.points_no) == False
         self.points_no = self.points_no[:, points_to_keep_mask]
 
         self._set_yes = self._array_to_set(self.points_yes)
@@ -540,8 +577,9 @@ class SafeConvexPolytope:
         self._polytope.set_points(centroids.transpose())
 
     def step(self):
-        self.improve_polytope()
+        convergence = self.improve_polytope()
         self.remove_distant_points_2()
+        return convergence
 
     # Halve resolution, resample boundary and get new safe polytope
     def enhance(self):
@@ -551,7 +589,8 @@ class SafeConvexPolytope:
     # Take more samples and re-fit the safe convex polygon
     def improve_polytope(self, init=False):
         self.sample(init=init, method=self._sampling_method)
-        self.build_safe_polytope()
+        convergence = self.build_safe_polytope()
+        return convergence
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
@@ -568,7 +607,15 @@ class SafeConvexPolytope:
             face_list.append(face_points)
         return face_list
 
-    def plot(self):
+    def plot(self, ah=None):
+
+        # Create axis handle
+        if ah is None:
+            fig = plt.figure()
+            if self._n_dim == 2:
+                ah = fig.add_subplot(111)
+            if self._n_dim == 3:
+                ah = fig.add_subplot(111, projection='3d', proj_type='ortho')
 
         # 2D plotting
         if self._n_dim == 2:
@@ -578,8 +625,6 @@ class SafeConvexPolytope:
             y_min = domain[1, 0]
             y_max = domain[1, 1]
 
-            fig = plt.figure()
-            ah = fig.add_subplot(111)
             pu.plot_points(ah, self.points_yes, 'o', 'g')
             pu.plot_points(ah, self.points_no, 'X', 'r')
             ah.set_xlim(x_min, x_max)
@@ -617,8 +662,6 @@ class SafeConvexPolytope:
             # Build the polytope faces
             face_points = self._get_face_points()
 
-            fig = plt.figure()
-            ah = fig.add_subplot(111, projection='3d', proj_type='ortho')
             pu.plot_points_3(ah, self.points_yes, 'o', 'g')
             pu.plot_points_3(ah, self.points_no, 'X', 'r', alpha=0.2)
             pu.plot_polygons_3(ah, face_points)
@@ -632,6 +675,9 @@ class SafeConvexPolytope:
         if self._n_dim > 3:
             raise UserWarning(
                 'Plotting not implemented for more than 3 dimensions')
+
+        # Return the axis handle for later use
+        return ah
 
 
 # Answer if p is inside the hypersphere c, r
@@ -652,8 +698,8 @@ if __name__ == '__main__':
 
     ind_func = hypersphere
 
-    flag_plot = True
-    # flag_plot = False
+    # flag_plot = True
+    flag_plot = False
 
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
@@ -680,19 +726,40 @@ if __name__ == '__main__':
     print('Building first-pass safe polytope')
     safe_poly.build_safe_polytope()
     if flag_plot:
-        safe_poly.plot()
+        ah = safe_poly.plot()
+    # Iteratively sample the polytope
+    convergence = False
+    while not convergence:
+        convergence = safe_poly.step()
+        if flag_plot:
+            safe_poly.plot(ah)
+            plt.pause(0.01)
 
     # Increase resolution and start anew
     print('Building second-pass safe polytope')
     safe_poly.enhance()
     if flag_plot:
-        safe_poly.plot()
+        ah = safe_poly.plot()
+    # Iteratively sample the polytope
+    convergence = False
+    while not convergence:
+        convergence = safe_poly.step()
+        if flag_plot:
+            safe_poly.plot(ah)
+            plt.pause(0.01)
 
     # Increase resolution and start anew
     print('Building third-pass safe polytope')
     safe_poly.enhance()
     if flag_plot:
-        safe_poly.plot()
+        ah = safe_poly.plot()
+    # Iteratively sample the polytope
+    convergence = False
+    while not convergence:
+        convergence = safe_poly.step()
+        if flag_plot:
+            safe_poly.plot(ah)
+            plt.pause(0.01)
 
     print('Final number of sampled points: {}'.format(len(safe_poly._set_points)))
 
