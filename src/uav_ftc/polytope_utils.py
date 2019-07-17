@@ -703,35 +703,6 @@ class SafeConvexPolytope:
         points_to_keep_mask = np.invert(self._polytope.contains(contracted_no_points))
         self.points_no = self.points_no[:, points_to_keep_mask]
 
-        ########################3
-        # Contract polytope and delete inside points
-        # polytope_points = self._polytope.get_points() - p
-        # norms_polytope_points = np.linalg.norm(polytope_points, axis=0).reshape(1, -1)
-        # factors_polytope = np.repeat(
-        #     (norms_polytope_points - eps_in) / norms_polytope_points, p.shape[0], axis=0
-        # )
-        # # Dont' allow the contracted point to fly to the other side of p
-        # factors_polytope = np.maximum(
-        #     factors_polytope, np.zeros(factors_polytope.shape)
-        # )
-        # contracted_polytope_points = polytope_points * factors_polytope + p
-        # contracted_polytope = Polytope()
-        # try:
-        #     contracted_polytope.set_points(contracted_polytope_points)
-        # except RuntimeError:
-        #     warn(
-        #         "Failed to create contracted polyhedron. Skipping removal of inside points...",
-        #         UserWarning,
-        #     )
-        #     return
-
-        # points_to_keep_mask = contracted_polytope.contains(self.points_yes) == False
-        # self.points_yes = self.points_yes[:, points_to_keep_mask]
-
-        # points_to_keep_mask = contracted_polytope.contains(self.points_no) == False
-        # self.points_no = self.points_no[:, points_to_keep_mask]
-        ###########################3
-
         self._set_yes = self._array_to_set(self.points_yes)
         self._set_no = self._array_to_set(self.points_no)
         self._set_points = self._set_yes | self._set_no
@@ -773,8 +744,6 @@ class SafeConvexPolytope:
                 return False
         except QhullError as e:
             self._reset_polytope()
-        except Exception as e:
-            raise e
 
 
         print("Removing distant points")
@@ -824,14 +793,22 @@ class SafeConvexPolytope:
         except QhullError as e:
             print('QHull could not create a hull')
             raise e
-        except Exception as e:
-            print(type(e).__name__)
-            print(e)
-            raise e
 
     def new_plot(self):
         self._axis_handle = None
         self.plot()
+
+    @staticmethod
+    def _slice_face_points(face_points, slice):
+        new_face_points = []
+        for idx_outer in range(len(face_points)):
+            point_list = face_points[idx_outer]
+            new_point_list = []
+            for idx_inner in range(len(point_list)):
+                point = point_list[idx_inner]
+                new_point_list.append(point[slice])
+            new_face_points.append(new_point_list)
+        return new_face_points
 
     def _plot_polytope_2d(self, ah, polytope, color="k"):
         x_min = self._normalized_domain[0, 0]
@@ -854,8 +831,7 @@ class SafeConvexPolytope:
     def plot(self, color="k"):
 
         if self._n_dim > 3:
-            warn("Plotting not implemented for more than 3 dimensions", UserWarning)
-            return None
+            warn("Plotting a slice of polytope in 3D space", UserWarning)
 
         # Create axis handle
         if self._axis_handle is None:
@@ -864,7 +840,7 @@ class SafeConvexPolytope:
             # figcanvas.mpl_connect('key_press_event', self._figure_event_callback)
             if self._n_dim == 2:
                 self._axis_handle = fig.add_subplot(111)
-            if self._n_dim == 3:
+            if self._n_dim >= 3:
                 self._axis_handle = fig.add_subplot(
                     111, projection="3d", proj_type="ortho"
                 )
@@ -902,7 +878,7 @@ class SafeConvexPolytope:
                 self._plot_polytope_2d(ah, self._reduced_polytope, color="r")
 
         # 3D plotting
-        if self._n_dim == 3:
+        if self._n_dim >= 3:
             # Get the plotting domain
             x_min = domain[0, 0]
             x_max = domain[0, 1]
@@ -912,18 +888,31 @@ class SafeConvexPolytope:
             z_max = domain[2, 1]
 
             # Plot the points
-            pu.plot_points_3(ah, self.points_yes, "o", "g")
-            pu.plot_points_3(ah, self.points_no, "X", "r", alpha=0.2)
+            if self._n_dim == 3:
+                pu.plot_points_3(ah, self.points_yes, "o", "g")
+                pu.plot_points_3(ah, self.points_no, "X", "r", alpha=0.2)
+            else:
+                pu.plot_points_3(ah, self.points_yes[0:3,:], "o", "g")
+                pu.plot_points_3(ah, self.points_no[0:3,:], "X", "r", alpha=0.2)
 
             # Plot the detailed polytope
-            if self._reduced_polytope is None:
-                face_points = self._get_face_points(self._polytope)
-                pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
-                # Trasparency not working, probably due to matplotlib bug: https://github.com/matplotlib/matplotlib/issues/10237
+            if self._n_dim == 3:
+                if self._reduced_polytope is None:
+                    face_points = self._get_face_points(self._polytope)
+                    pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
+                    # Trasparency not working, probably due to matplotlib bug: https://github.com/matplotlib/matplotlib/issues/10237
+                else:
+                    # Plot the reduced polytope
+                    face_points = self._get_face_points(self._reduced_polytope)
+                    pu.plot_polygons_3(ah, face_points, colorcode="r")
             else:
-                # Plot the reduced polytope
-                face_points = self._get_face_points(self._reduced_polytope)
-                pu.plot_polygons_3(ah, face_points, colorcode="r")
+                if self._reduced_polytope is None:
+                    face_points = self._slice_face_points(self._get_face_points(self._polytope), slice(0,3))
+                    pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
+                else:
+                    # Plot the reduced polytope
+                    face_points = self._slice_face_points(self._get_face_points(self._polytope), slice(0,3))
+                    pu.plot_polygons_3(ah, face_points, colorcode="r")
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
