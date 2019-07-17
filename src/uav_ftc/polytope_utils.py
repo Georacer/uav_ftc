@@ -11,6 +11,7 @@
 import sys
 from warnings import warn
 import itertools as it
+import time
 
 import numpy as np
 import scipy as sp
@@ -140,26 +141,30 @@ class SafeConvexPolytope:
     domain = None
     indicator = None
     equations = None
-    eps = None  # a (n_dim, ) array with the sampling resolution
+    eps = None  # a (n_dim, ) array with the desired final sampling resolution
     angular_sample_no = None
     points_yes = None
     points_no = None
     enable_plotting = False
+    wait_for_user = False
 
     _polytope = None
+    _reduced_polytope = None
     _domain_polytope = None
+    _normalized_domain = None
     _set_points = None
     _set_yes = None
     _set_no = None
     _n_dim = None
     _initialized = False
-    _init_division = 2**2
-    _final_division = 2**4
-    _current_division = _init_division
+    _default_init_division = 2**2 # Default initial division of the search space
+    _default_final_division = 2**4 # Default final division of the search space
+    _normalized_eps = None ##
+    _final_normalized_eps = 1 ##
     _volume_approx_factor = 0.1
-    _sampling_method = 'rectilinear'
+    _sampling_method = 'radial'
+    _samples_taken = 0
 
-    _figure_handle = None
     _axis_handle = None
 
     def __init__(self, ind_func, domain, eps=None):
@@ -171,10 +176,10 @@ class SafeConvexPolytope:
         self._set_no = set()
         self._polytope = Polytope()
         self._domain_polytope = Polytope()
-        if any(eps == None):
-            self.eps = (domain[:, 1] - domain[:, 0])/self._init_division
-        else:
-            self.set_eps(eps)
+        # Set sampling precision values
+        self.eps = eps
+        self._normalize_domain(domain, eps)
+
         self.angular_sample_no = 2**6
 
         # Initialize the polytope and the domain polytope
@@ -218,7 +223,25 @@ class SafeConvexPolytope:
         equation_vec = equation.reshape(len(equation), 1)
         return (equation_vec[-1] - np.dot(equation_vec[0:-2, :].transpose(), known_vec))/equation_vec[-2]
 
+    # Normalize the domain over eps to achieve a hypersquare grid
+    def _normalize_domain(self, domain, eps):
+        ranges = np.diff(domain, axis=1)
+        # If eps is not provided
+        if len(eps)==1 and (eps is None):
+            eps = ranges/self._default_final_division
+        # If eps is partially provided
+        else:
+            for idx in range(len(eps)):
+                if eps[idx] is None:
+                    eps[idx] = ranges[idx]/self._default_final_division
+
+        eps_ext = np.repeat(np.array(eps).reshape(self._n_dim,1), 2, axis=1)
+        self._normalized_domain = (domain/eps_ext).astype(int)
+        normalized_ranges = np.diff(self._normalized_domain, axis=1)
+        self._normalized_eps = np.maximum(normalized_ranges/self._default_init_division, np.ones(normalized_ranges.shape))
+
     # Set the sampling resolution
+    # TODO: Needs conversion to normalized logic
     def set_eps(self, eps):
         dimensions = self.domain.shape[0]
         if tuple([dimensions]) != eps.shape:
@@ -232,7 +255,7 @@ class SafeConvexPolytope:
         # define an initial polygon
         initialization_points = np.zeros((self._n_dim, 2**self._n_dim))
         idx = 0
-        for point_tuple in it.product(*tuple(self.domain)):
+        for point_tuple in it.product(*tuple(self._normalized_domain)):
             initialization_points[:, idx] = np.array(point_tuple)
             idx += 1
         self._polytope.set_points(initialization_points)
@@ -286,6 +309,15 @@ class SafeConvexPolytope:
         # compute centroid
         return self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
 
+    # Sample a rectilinear grid, aligning with the coordinate center
+    def _sample_rectilinear(self):
+        sampling_domain = self._normalized_domain
+        intervals = []
+        for dim in range(self._n_dim):
+            intervals.append(slice(sampling_domain[dim,0], sampling_domain[dim,1]+1, self._normalized_eps[dim]))
+        samples = np.mgrid[intervals].reshape(self._n_dim, -1)
+        return samples
+    
     # Return the coordinates which are up to eps away from the polytope boundary
     # Sampled from a rectilinear grid
     def _get_boundary_points(self, include_internal=False):
@@ -299,12 +331,12 @@ class SafeConvexPolytope:
         for dim_idx in range(self._n_dim):
             # Align the number resolution to eps
             unaligned_min = max(bbox[dim_idx, 0], self.domain[dim_idx, 0])
-            eps = self.eps[dim_idx]
+            eps = self._normalized_eps[dim_idx]
             aligned_min = self._align_to_grid(unaligned_min - eps, eps)
             new_domain[dim_idx, 0] = aligned_min
 
             unaligned_max = min(bbox[dim_idx, 1], self.domain[dim_idx, 1])
-            eps = self.eps[dim_idx]
+            eps = self._normalized_eps[dim_idx]
             aligned_max = self._align_to_grid(unaligned_max + eps, eps)
             new_domain[dim_idx, 1] = aligned_max
 
@@ -325,7 +357,7 @@ class SafeConvexPolytope:
     # Sample boundary points in a radial grid
     def _get_boundary_points_radial(self):
         # Build unit vectors
-        eps = np.max(self.eps)
+        eps = self._normalized_eps
         samples = np.random.randn(self._n_dim, self.angular_sample_no)
         # intervals = self._n_dim*[slice(-1, 1, complex(0, self.angular_sample_no))]
         # samples = np.mgrid[intervals].reshape(self._n_dim, -1)
@@ -338,11 +370,6 @@ class SafeConvexPolytope:
         all_equations = self._polytope.get_equations()
         all_equations[:,[-1]] -= np.matmul(all_equations[:, :-1], p)
 
-        # vertices_centered = self._polytope.get_points() - p
-        # poly_centered = Polytope()
-        # poly_centered.set_points(vertices_centered)
-        # all_equations = poly_centered.get_equations()
-
         A = all_equations[:, :-1]
         b = np.repeat(all_equations[:, [-1]], samples.shape[1], axis=1)
 
@@ -354,15 +381,22 @@ class SafeConvexPolytope:
 
         # Add 3 samples for each
         samples_boundary = k*samples  # Scale samples onto the bounding polytope
-        samples_inside = (k-eps)*samples
-        samples_outside = (k+eps)*samples
+        samples_inside = (k-np.matmul(eps.T, samples))*samples
+        samples_outside = (k+np.matmul(eps.T, samples))*samples
         samples = np.hstack(
             (samples_boundary, samples_inside, samples_outside)) + p
+        
+        # Remove out-of-bounds samples
+        lower_bound = np.repeat(self.domain[:,[0]], samples.shape[1], axis=1)
+        upper_bound = np.repeat(self.domain[:,[1]], samples.shape[1], axis=1)
+        lower_bound_mask = np.all(samples > lower_bound, axis=0)
+        upper_bound_mask = np.all(samples < upper_bound, axis=0)
+        mask = lower_bound_mask & upper_bound_mask
+        samples = samples[:, mask]
 
         return samples
 
     # Check if a point is eligible for inclusion in the sampling grid
-    # UNUSED
     def _is_point_eligible(self, point, include_internal=False):
         # verify that the point is inside the general domain of interest
         if point not in self._domain_polytope:
@@ -383,22 +417,28 @@ class SafeConvexPolytope:
             n_0 = n/np.linalg.norm(n)
             normal_vector = evaluate_hyperplane(point, equation) * n_0
             distances = np.array(map(np.abs, normal_vector))
-            if np.all(distances < self.eps):
+            if np.all(distances < self._normalized_eps):
                 return True
 
     # Sample points around a polytope boundary
     def sample(self, init=False, method='rectilinear'):
-        if method == 'rectilinear' or init:
-            boundary_points = self._array_to_set(
-                self._get_boundary_points(init))
-        elif method == 'radial':
-            boundary_points = self._array_to_set(
-                self._get_boundary_points_radial())
+        if init: # First-pass sample of the grid
+            sampled_points = self._array_to_set(self._sample_rectilinear())
+        else:
+            if method == 'rectilinear' or init:
+                sampled_points = self._array_to_set(
+                    self._get_boundary_points(init))
+                # Do not add points which are already sampled
+                sampled_points -= self._set_points
+            elif method == 'radial':
+                sampled_points = self._array_to_set(
+                    self._get_boundary_points_radial())
+                # No need to check if samples already exist, because they are sampled randomly
 
-        boundary_points -= self._set_points
+        self._samples_taken += len(sampled_points)
         yes_points = []
         no_points = []
-        for coords in boundary_points:
+        for coords in sampled_points:
             point = np.array(coords).reshape(-1, 1)
             sample = self.indicator(point)
             coords_tuple = tuple(point.transpose()[0, :])
@@ -409,6 +449,32 @@ class SafeConvexPolytope:
 
         self._set_yes.update(yes_points)
         self._set_no.update(no_points)
+        self._set_points = self._set_yes | self._set_no
+        self._update_points()
+
+    # Restrict points on the domain boundary
+    def _restrict_domain_boundary(self):
+        sampling_domain = self._normalized_domain
+        samples_list = []
+        # Build the slice list
+        intervals = []
+        for dim in range(self._n_dim):
+            intervals.append(slice(sampling_domain[dim,0], sampling_domain[dim,1]+1, self._normalized_eps[dim]))
+        # Iterate over all dimensions and capture the domain end-points
+        for dim in range(self._n_dim):
+            # Pick one dimension to enforce boundary condition
+            # Sample min
+            temp_intervals = list(intervals)
+            temp_intervals[dim] = slice(sampling_domain[dim,0],(sampling_domain[dim,0]+1))
+            samples_list.append(np.mgrid[temp_intervals].reshape(self._n_dim, -1))
+            # Sample max
+            temp_intervals = list(intervals)
+            temp_intervals[dim] = slice(sampling_domain[dim,1],(sampling_domain[dim,1]+1))
+            samples_list.append(np.mgrid[temp_intervals].reshape(self._n_dim, -1))
+
+        boundary_samples = np.hstack(samples_list)        
+
+        self._set_no.update(self._array_to_set(boundary_samples))
         self._set_points = self._set_yes | self._set_no
         self._update_points()
 
@@ -475,10 +541,10 @@ class SafeConvexPolytope:
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
-    def _get_face_points(self):
+    def _get_face_points(self, polytope):
         face_list = []
-        all_points = self._polytope.get_points()
-        all_equations = self._polytope.get_equations()
+        all_points = polytope.get_points()
+        all_equations = polytope.get_equations()
 
         for equation in all_equations:
             face_points = []
@@ -530,13 +596,13 @@ class SafeConvexPolytope:
         # Evaluate the distances of k hypersurface from m points (k x m array)
         yes_distances = np.abs(evaluate_hyperplane(
             self.points_yes, all_equations))
-        eps_array = np.max(self.eps) * np.ones(yes_distances.shape)
+        eps_array = np.max(self._normalized_eps) * np.ones(yes_distances.shape)
         points_to_keep_mask = np.any(yes_distances <= eps_array, axis=0)
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
         no_distances = np.abs(evaluate_hyperplane(
             self.points_no, all_equations))
-        eps_array = np.max(self.eps) * np.ones(no_distances.shape)
+        eps_array = np.max(self._normalized_eps) * np.ones(no_distances.shape)
         points_to_keep_mask = np.any(no_distances <= eps_array, axis=0)
         self.points_no = self.points_no[:, points_to_keep_mask]
 
@@ -550,8 +616,8 @@ class SafeConvexPolytope:
         # get centroid
         p = self.get_centroid()
         # Set contraction distance
-        eps_out = 1.5*np.max(self.eps)
-        eps_in = 1.5*np.max(self.eps)
+        eps_out = 1.5*np.max(self._normalized_eps)
+        eps_in = 1.5*np.max(self._normalized_eps)
 
         # Contract points and delete outside points
         recentered_yes_points = (self.points_yes - p)
@@ -608,10 +674,15 @@ class SafeConvexPolytope:
         vertices = self._polytope.get_points()
         centroids, _ = kmeans2(vertices.transpose(),
                                num_vertices, minit='points')
-        self._polytope.set_points(centroids.transpose())
+        self._reduced_polytope = Polytope()
+        self._reduced_polytope.set_points(centroids.transpose())
 
     # Make a step of the polytope fitting problem
     def step(self):
+        if not self._initialized:
+            # Restrict the domain boundaries at the current resolution
+            self._restrict_domain_boundary()
+
         convergence = self.improve_polytope(not self._initialized)
         self.remove_distant_points_2()
 
@@ -624,20 +695,21 @@ class SafeConvexPolytope:
         algorithm_end = False
         if convergence:
             print('Polytope converged in the current eps value')
-            if self._current_division >= self._final_division:
+            if np.all(self._normalized_eps <= self._final_normalized_eps):
                 print('Desired polytope accuracy achieved')
                 algorithm_end = True
             else:
                 print('Increasing sampling accuracy')
-                self._current_division *= 2
-                self.eps /= 2
+                self._normalized_eps = np.maximum(self._normalized_eps/2, np.ones(self._normalized_eps.shape))
+                # Restrict the domain boundaries at the current resolution
+                self._restrict_domain_boundary()
         
         return algorithm_end
 
     # Halve resolution, resample boundary and get new safe polytope
     # DEPRECATED
     def enhance(self):
-        self.eps = self.eps/2
+        self._normalized_eps = np.maximum(self._normalized_eps/2, np.ones(self._normalized_eps.shape))
         self.step()
 
     # Take more samples and re-fit the safe convex polygon
@@ -654,6 +726,24 @@ class SafeConvexPolytope:
         self._axis_handle = None
         self.plot()
 
+    def _plot_polytope_2d(self, ah, polytope, color='k'):
+        x_min = self.domain[0,0]
+        x_max = self.domain[0,1]
+        y_min = self.domain[1,0]
+        y_max = self.domain[1,1]
+
+        equations = polytope.get_equations()
+        for equation in equations:
+            try:
+                point_1 = [x_min, self._get_y(equation, x_min)]
+            except ZeroDivisionError:
+                point_1 = [x_min, y_min]
+            try:
+                point_2 = [x_max, self._get_y(equation, x_max)]
+            except ZeroDivisionError:
+                point_2 = [x_max, y_max]
+            pu.plot_line(ah, point_1, point_2, color)
+
     def plot(self, color='k'):
 
         if self._n_dim > 3:
@@ -662,7 +752,9 @@ class SafeConvexPolytope:
 
         # Create axis handle
         if self._axis_handle is None:
-            fig = plt.figure()
+            self._figure_handle = plt.figure()
+            fig = self._figure_handle
+            # figcanvas.mpl_connect('key_press_event', self._figure_event_callback)
             if self._n_dim == 2:
                 self._axis_handle = fig.add_subplot(111)
             if self._n_dim == 3:
@@ -670,9 +762,10 @@ class SafeConvexPolytope:
         ah = self._axis_handle
         ah.clear()
 
+        domain = self._normalized_domain
+
         # 2D plotting
         if self._n_dim == 2:
-            domain = self.domain
             x_min = domain[0, 0]
             x_max = domain[0, 1]
             y_min = domain[1, 0]
@@ -683,29 +776,16 @@ class SafeConvexPolytope:
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
 
-            # Plot half-planes
-            all_points = self._set_to_array(self._set_points)
-            domain = self._get_bounding_box(all_points)
-
-            equations = self._polytope.get_equations()
-            for equation in equations:
-                try:
-                    point_1 = [x_min, self._get_y(equation, x_min)]
-                except ZeroDivisionError:
-                    point_1 = [x_min, y_min]
-                try:
-                    point_2 = [x_max, self._get_y(equation, x_max)]
-                except ZeroDivisionError:
-                    point_2 = [x_max, y_max]
-                pu.plot_line(ah, point_1, point_2, color)
-            plt.draw()
-            plt.pause(0.01)
+            # Plot polytope half-planes
+            self._plot_polytope_2d(ah, self._polytope)
+            
+            # Plot reduced polytope half-planes
+            if self._reduced_polytope is not None:
+                self._plot_polytope_2d(ah, self._reduced_polytope, color='r')
 
         # 3D plotting
         if self._n_dim == 3:
             # Get the plotting domain
-            all_points = self._set_to_array(self._set_points)
-            domain = self._get_bounding_box(all_points)
             x_min = domain[0, 0]
             x_max = domain[0, 1]
             y_min = domain[1, 0]
@@ -713,19 +793,28 @@ class SafeConvexPolytope:
             z_min = domain[2, 0]
             z_max = domain[2, 1]
 
-            # Build the polytope faces
-            face_points = self._get_face_points()
-
+            # Plot the points
             pu.plot_points_3(ah, self.points_yes, 'o', 'g')
             pu.plot_points_3(ah, self.points_no, 'X', 'r', alpha=0.2)
-            pu.plot_polygons_3(ah, face_points, colorcode=color)
+
+            # Plot the detailed polytope
+            if self._reduced_polytope is None:
+                face_points = self._get_face_points(self._polytope)
+                pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
+                # Trasparency not working, probably due to matplotlib bug: https://github.com/matplotlib/matplotlib/issues/10237
+            else:
+                # Plot the reduced polytope
+                face_points = self._get_face_points(self._reduced_polytope)
+                pu.plot_polygons_3(ah, face_points, colorcode='r')
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
             ah.set_zlim(z_min, z_max)
 
-            plt.draw()
-            plt.pause(0.01)
+        plt.draw()
+        plt.pause(0.01)
+        if self.wait_for_user:
+            plt.waitforbuttonpress(timeout=-1)
 
         # Return the axis handle for later use
         return ah
@@ -741,26 +830,27 @@ def hypersphere(p):
 
 @click.command()
 @click.option('-d', '--dimensions', default=2, type=int, help='Dimensions of the problem')
-@click.option('-p', '--plot', is_flag=True, help='Enable plotting. Only for 2D and 3D problems')
-def test_code(dimensions, plot):
+@click.option('-p', '--plot', is_flag=True, help='Enable plotting. Only for 2D and 3D problems.')
+@click.option('-i', '--interactive', is_flag=True, help='Wait for user input after each plot refresh')
+def test_code(dimensions, plot, interactive):
 
     n_dim = dimensions
     print('Testing polytope code for {} dimensions'.format(n_dim))
     flag_plot = plot
 
+    # define the indicator function to approximate
     ind_func = hypersphere
-
     # define a domain as a n_dim x 2 array
     print('Creating problem domain and sampling initial points')
     domain = np.zeros((n_dim, 2))
-    domain[:, 0] = -10
-    domain[:, 1] = 10
+    domain[:, 0] = -(np.arange(n_dim) + 5)
+    domain[:, 1] = np.arange(n_dim) + 5
+    # Set the desired precision
+    eps = 1*np.ones(n_dim)
 
-    # Set the starting precision
-    eps = 5*np.ones((n_dim))
+    # Initialize the polytope
     safe_poly = SafeConvexPolytope(ind_func, domain, eps)
-
-    safe_poly.set_eps(5*np.ones((safe_poly._n_dim)))
+    # safe_poly.set_eps(eps)
     safe_poly.set_sampling_method('radial')
 
     # Manually add random
@@ -773,15 +863,18 @@ def test_code(dimensions, plot):
 
     if flag_plot:
         safe_poly.enable_plotting = True
+    if interactive:
+        safe_poly.wait_for_user = True
 
     # Iteratively sample the polytope
     print('Progressive sampling of the polytope')
     algorithm_end = False
     while not algorithm_end:
-        print('Getting new samples form the polytope')
+        print('Getting new samples from the polytope')
         algorithm_end = safe_poly.step()
 
     print('Final number of sampled points: {}'.format(len(safe_poly._set_points)))
+    print('Total number of samples taken: {}'.format(safe_poly._samples_taken))
 
     # Approximate the safe convex polytope with k vertices
     print('Performing clustering')
@@ -789,7 +882,7 @@ def test_code(dimensions, plot):
 
     if flag_plot:
         print('Plotting')
-        safe_poly.plot(color='r')
+        safe_poly.plot()
         plt.show()
 
 
