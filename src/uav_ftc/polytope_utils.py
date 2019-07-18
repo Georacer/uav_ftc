@@ -114,7 +114,7 @@ class Polytope:
     # Return a new polytope which is scaled on its axes by the axis_multipliers
     # axis_mutlipliers is an nparray of dimension (D,), where D is the polytope dimension
     def scale(self, axis_multipliers):
-        scale = axis_multipliers.reshape(-1,1)
+        scale = axis_multipliers.reshape(-1, 1)
         scaled_points = self.get_points() * scale
         scaled_polytope = Polytope()
         scaled_polytope.set_points(scaled_points)
@@ -224,6 +224,15 @@ class SafeConvexPolytope:
             domain[dim_idx, 0] = np.min(points[dim_idx, :])
             domain[dim_idx, 1] = np.max(points[dim_idx, :])
         return domain
+
+    # Check if a point is inside a rectilinear domain
+    @staticmethod
+    def _is_in_domain(point, domain):
+        if np.any(point<domain[:,[0]]):
+            return False
+        if np.any(point > domain[:,[1]]):
+            return False
+        return True
 
     @staticmethod
     def _get_y(equation, x):
@@ -418,17 +427,18 @@ class SafeConvexPolytope:
         samples_outside = (k + np.matmul(eps.T, samples)) * samples
         samples = np.hstack((samples_boundary, samples_inside, samples_outside)) + p
 
-        # Remove out-of-bounds samples
-        lower_bound = np.repeat(
-            self._normalized_domain[:, [0]], samples.shape[1], axis=1
-        )
-        upper_bound = np.repeat(
-            self._normalized_domain[:, [1]], samples.shape[1], axis=1
-        )
-        lower_bound_mask = np.all(samples > lower_bound, axis=0)
-        upper_bound_mask = np.all(samples < upper_bound, axis=0)
-        mask = lower_bound_mask & upper_bound_mask
-        samples = samples[:, mask]
+        # Force out-of bounds samples onto boundary
+        # Not needed because polytope includes boundary constraints
+        # lower_bound = np.repeat(
+        #     self._normalized_domain[:, [0]], samples.shape[1], axis=1
+        # )
+        # upper_bound = np.repeat(
+        #     self._normalized_domain[:, [1]], samples.shape[1], axis=1
+        # )
+        # lower_bound_mask = np.all(samples > lower_bound, axis=0)
+        # upper_bound_mask = np.all(samples < upper_bound, axis=0)
+        # mask = lower_bound_mask & upper_bound_mask
+        # samples = samples[:, mask]
 
         return samples
 
@@ -474,12 +484,15 @@ class SafeConvexPolytope:
         no_points = []
         for coords in sampled_points:
             point = np.array(coords).reshape(-1, 1)
+            coords_tuple = tuple(point.transpose()[0, :])
             # Sample the point to find in which set it belongs
             # Scale the point to real coordinates
-            sample = self.indicator(point * self.eps.reshape(point.shape))
-            coords_tuple = tuple(point.transpose()[0, :])
-            if sample:
-                yes_points.append(coords_tuple)
+            if self._is_in_domain(point, self._normalized_domain):
+                sample = self.indicator(point * self.eps.reshape(point.shape))
+                if sample:
+                    yes_points.append(coords_tuple)
+                else:
+                    no_points.append(coords_tuple)
             else:
                 no_points.append(coords_tuple)
 
@@ -636,6 +649,9 @@ class SafeConvexPolytope:
         new_e_array = np.array(new_e_set)
         if len(new_e_array) > 0:
             e_array = np.vstack((e_array, new_e_array))
+        
+        # Add the domain constraints
+        e_array = np.vstack((e_array, self._domain_polytope.get_equations()))
 
         # Construct a new polytope from the new equation set
         self._polytope.set_equations(e_array)
@@ -733,9 +749,9 @@ class SafeConvexPolytope:
 
     # Make a step of the polytope fitting problem
     def step(self):
-        if not self._initialized:
-            # Restrict the domain boundaries at the current resolution
-            self._restrict_domain_boundary()
+        # if not self._initialized:
+        #     # Restrict the domain boundaries at the current resolution
+        #     self._restrict_domain_boundary()
 
         try:
             convergence = self.improve_polytope(not self._initialized)
@@ -789,8 +805,6 @@ class SafeConvexPolytope:
                 print("Increasing sampling accuracy")
                 self._decrease_eps()
                 print("New normalized eps:\n{}".format(self._normalized_eps))
-                # Restrict the domain boundaries at the current resolution
-                self._restrict_domain_boundary()
 
         return algorithm_end
 
@@ -945,7 +959,7 @@ class SafeConvexPolytope:
                 face_points = self._slice_face_points(face_points, slice(0, 3))
 
             # Plot the convex polytope
-            pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha = alpha)
+            pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
@@ -974,7 +988,7 @@ class SafeConvexPolytope:
 # Answer if p is inside the hypersphere c, r
 def hypersphere(p):
     c = 4 * np.ones(p.shape)
-    r = 6
+    r = 4
     distance = np.linalg.norm(p - c)
     # print('Evaluated point {} with distance {} as {}'.format(p, distance, distance<=r))
     return distance <= r
@@ -982,8 +996,8 @@ def hypersphere(p):
 
 def hypercube(p):
     c = 4 * np.ones(p.shape)
-    r = 6
-    distance = np.max(p - c)
+    r = 4
+    distance = np.max(np.abs(p - c))
     return distance <= r
 
 
@@ -1027,7 +1041,7 @@ def test_code(dimensions, plot, interactive, shape):
     domain[:, 0] = -5
     domain[:, 1] = 10
     # Set the desired precision
-    eps = 0.5 * np.ones(n_dim)
+    eps = 1 * np.ones(n_dim)
 
     # Initialize the polytope
     safe_poly = SafeConvexPolytope(ind_func, domain, eps)
