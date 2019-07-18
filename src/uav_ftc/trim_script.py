@@ -7,13 +7,16 @@ from scipy.spatial import ConvexHull
 import xarray as xr
 import xyzpy as xyz
 import timeit
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 import uav_model as mdl  # Import UAV model library
 import plot_utils as plu  # Import plotting utilities
+import polytope_utils as poly  # Used for SafeConvexPoly class
 
 
 # Raise an error when invalid floating-point operations occur
-np.seterr(invalid='raise')
+np.seterr(invalid="raise")
 
 
 class Trimmer:
@@ -42,12 +45,13 @@ class Trimmer:
 
     optim_bounds = None
 
-    def __init__(self,
-                 model=mdl.get_derivatives,
-                 x0=mdl.aircraft_state(),
-                 u0=mdl.Inputs(),
-                 dx0=mdl.aircraft_state()
-                 ):
+    def __init__(
+        self,
+        model=mdl.get_derivatives,
+        x0=mdl.aircraft_state(),
+        u0=mdl.Inputs(),
+        dx0=mdl.aircraft_state(),
+    ):
         self.model = model
         self.set_init_values(x0, u0, dx0)
 
@@ -56,11 +60,7 @@ class Trimmer:
         self.idx = slice(2, 11)  # Indices of trim derivatives
         self.iu = []
 
-    def set_init_values(self,
-                        x0=None,
-                        u0=None,
-                        dx0=None
-                        ):
+    def set_init_values(self, x0=None, u0=None, dx0=None):
         if x0 is not None:
             self.x0 = x0
         if u0 is not None:
@@ -82,8 +82,8 @@ class Trimmer:
         self.ix = [6, 8]  # Indices of trim states which should be satisfied
 
         self.x_dot_des = mdl.aircraft_state()
-        self.x_dot_des.pos.z = -Va*sin(gamma)
-        self.x_dot_des.att.z = Va/R*cos(gamma)
+        self.x_dot_des.pos.z = -Va * sin(gamma)
+        self.x_dot_des.att.z = Va / R * cos(gamma)
         # Indices of trim derivatives which should be satisfied
         self.idx = slice(2, 12)
 
@@ -94,9 +94,9 @@ class Trimmer:
         self.x_des = mdl.aircraft_state()
 
         # Calculate dependent state elements
-        k = r/(cos(phi)*cos(theta))  # Calculate Va/R*cos(gamma)
-        p = -k*sin(theta)
-        q = k*sin(phi)*cos(theta)
+        k = r / (cos(phi) * cos(theta))  # Calculate Va/R*cos(gamma)
+        p = -k * sin(theta)
+        q = k * sin(phi) * cos(theta)
 
         # Fix state requirements
         self.x_des.att.x = phi
@@ -111,12 +111,12 @@ class Trimmer:
         # Calculate derived quantities
         gamma = theta - alpha
         try:
-            R = Va/r*cos(gamma)*cos(phi)*cos(theta)
+            R = Va / r * cos(gamma) * cos(phi) * cos(theta)
         except ZeroDivisionError:
             R = np.inf
 
         self.x_dot_des = mdl.aircraft_state()
-        self.x_dot_des.pos.z = -Va*sin(gamma)
+        self.x_dot_des.pos.z = -Va * sin(gamma)
         self.x_dot_des.att.z = k  # k=Va/R*cos(gamma)
 
         # Set error indices
@@ -125,43 +125,66 @@ class Trimmer:
         self.iu = []
 
         if verbose:
-            print(f'Requested trajectory:\n'
-                  f'Airspeed: {Va} m/s\n'
-                  f'Flight Path Angle: {np.rad2deg(gamma)} degrees\n'
-                  f'Turn Radius: {R} m')
+            print(
+                """
+                Requested trajectory:\n
+                Airspeed: {Va} m/s\n
+                Flight Path Angle: {np.rad2deg(gamma)} degrees\n
+                Turn Radius: {R} m
+                """.format(
+                    Va, gamma, R
+                )
+            )
 
     def find_trim_state(self, verbose=False):
         # Find a trim state which satisfies the trim trajectory requirement
         # Returns a tuple with the trim states and trim inputs
         if self.x_dot_des is None or self.x_des is None:
-            raise ValueError('Target model derivatives or states not set')
+            raise ValueError("Target model derivatives or states not set")
 
         ix_argument = [3, 4, 6, 7, 8, 9, 10, 11]
         # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
-        init_vector = np.concatenate((self.x0.to_array()[ix_argument],
-                                      self.u0.to_array()), axis=0)
-        self.optim_bounds = (self.bound_phi, self.bound_theta,
-                             self.bound_Va, self.bound_alpha, self.bound_beta,
-                             self.bound_p, self.bound_q, self.bound_r,
-                             self.bound_deltaa, self.bound_deltae,
-                             self.bound_deltat, self.bound_deltar
-                             )
-        res = minimize(self.cost_function_state_input_wrapper,
-                       init_vector,
-                       method='SLSQP', options={'disp': True},
-                       #    method='L-BFGS-B',
-                       bounds=self.optim_bounds,
-                       callback=self.optim_callback
-                       )
+        init_vector = np.concatenate(
+            (self.x0.to_array()[ix_argument], self.u0.to_array()), axis=0
+        )
+        self.optim_bounds = (
+            self.bound_phi,
+            self.bound_theta,
+            self.bound_Va,
+            self.bound_alpha,
+            self.bound_beta,
+            self.bound_p,
+            self.bound_q,
+            self.bound_r,
+            self.bound_deltaa,
+            self.bound_deltae,
+            self.bound_deltat,
+            self.bound_deltar,
+        )
+        res = minimize(
+            self.cost_function_state_input_wrapper,
+            init_vector,
+            method="SLSQP",
+            options={"disp": True},
+            #    method='L-BFGS-B',
+            bounds=self.optim_bounds,
+            callback=self.optim_callback,
+        )
         if res.success:
-            optim_result_s = 'SUCCESS'
+            optim_result_s = "SUCCESS"
         else:
-            optim_result_s = 'FAILURE'
+            optim_result_s = "FAILURE"
 
         if verbose:
-            print(f'Optimization result: {optim_result_s}\n {res.message}')
-            print(f' Optimization ended in {res.nit} iterations\n'
-                  f' Optimization error: {res.fun}')
+            print("Optimization result: {}\n {}".format(optim_result_s, res.message))
+            print(
+                """
+                Optimization ended in {} iterations\n
+                Optimization error: {}
+                """.format(
+                    res.init, res.fun
+                )
+            )
 
         if res.success:
             trim_state = mdl.aircraft_state()
@@ -179,39 +202,79 @@ class Trimmer:
         else:
             return (None, None)
 
+    # Indicator function for use with polytope discovery module
+    def indicator(self, point):
+        phi, theta, Va, alpha, beta, r = tuple(point.reshape(-1))
+        self.setup_trim_states(phi, theta, Va, alpha, beta, r)
+        _, _, success = self.find_trim_input()
+        return success
+
+    # Return a wrapped indicator function for use in SafeConvexPolytope operations
+    def get_indicator(self, list_defaults, list_fixed):
+        def indicator_wrapper(point):
+            # point: a Mx1 numpy array
+            if len(list_fixed) - sum(list_fixed) != point.shape[0]:
+                raise AssertionError(
+                    "Provided non-fixed parameters are not as many as free dimension"
+                )
+
+            # Populate the trimmer function arguments
+            state = np.array((len(list_defaults), 1))
+            idx2 = 0
+            for idx in range(len(list_defaults)):
+                if list_fixed[idx]:
+                    state[:, idx] = list_defaults[idx]
+                else:
+                    state[:, idx] = point[idx2]
+                    idx2 += 1
+            return self.indicator(state)
+
+        return indicator_wrapper
+
     def find_trim_input(self, verbose=False):
         # Find a trim input wich satisfies the trim state
         # Returns: The optimal trim input
         # The final optimization cost
         # The success flag
         if self.x_des is None:
-            raise ValueError('Target state not set')
+            raise ValueError("Target state not set")
 
         # arguments: phi, theta, Va, alpha, beta, p, q, r, da, de, dt, dr
         init_vector = self.u0.to_array()
-        self.optim_bounds = (self.bound_deltaa, self.bound_deltae,
-                             self.bound_deltat, self.bound_deltar)
-        res = minimize(self.cost_function_input_wrapper,
-                       init_vector,
-                       #   method='SLSQP', options={'disp': True},
-                       method='L-BFGS-B',
-                       #    method='TNC'
-                       #   bounds=self.optim_bounds,
-                       )
+        self.optim_bounds = (
+            self.bound_deltaa,
+            self.bound_deltae,
+            self.bound_deltat,
+            self.bound_deltar,
+        )
+        res = minimize(
+            self.cost_function_input_wrapper,
+            init_vector,
+            #   method='SLSQP', options={'disp': True},
+            method="L-BFGS-B",
+            #    method='TNC'
+            #   bounds=self.optim_bounds,
+        )
         if res.success:
-            optim_result_s = 'SUCCESS'
+            optim_result_s = "SUCCESS"
         else:
-            optim_result_s = 'FAILURE'
+            optim_result_s = "FAILURE"
 
         if verbose:
-            print(f'Optimization result: {optim_result_s}\n {res.message}')
-            print(f' Optimization ended in {res.nit} iterations\n'
-                  f' Optimization error: {res.fun}')
+            print("Optimization result: {}\n {}".format(optim_result_s, res.message))
+            print(
+                """
+                Optimization ended in {} iterations\n
+                Optimization error: {}
+                """.format(
+                    res.init, res.fun
+                )
+            )
 
         # if res.success:
         trim_inputs = mdl.Inputs(*res.x)
         # else:
-            # trim_inputs = mdl.Inputs(None, None, None, None)
+        # trim_inputs = mdl.Inputs(None, None, None, None)
 
         return (trim_inputs, res.fun, res.success)
 
@@ -276,9 +339,7 @@ class Trimmer:
         state.ang_vel = mdl.Vector3(p, q, r)
         inputs = mdl.Inputs(da, de, dt, dr)
 
-        print(f'Current optimization step:'
-              f'{state}',
-              f'{inputs}')
+        print("Current optimization step: {}, {}".format(state, inputs))
 
 
 class FlightEnvelope:
@@ -290,31 +351,36 @@ class FlightEnvelope:
 
     def __init__(self, axes_dict: dict, trimmer: Trimmer):
         self.axes_dict = axes_dict
-        self.axes_names = ['Va', 'alpha', 'beta', 'phi', 'theta', 'r']
+        self.axes_names = ["Va", "alpha", "beta", "phi", "theta", "r"]
         self.trimmer = trimmer
 
         # Verify axes_dict has the correct axes names
         if not set(self.axes_dict.keys()) == set(self.axes_names):
-            raise KeyError('Not all state parameters provided')
+            raise KeyError("Not all state parameters provided")
 
     def find_static_trim(self):
         # Get data values dimension
         # domain_tuples = self.axes_dict.items()
-        runner = xyz.Runner(build_fe_element,
-                            var_names=['delta_a', 'delta_e', 'delta_t', 'delta_r', 'cost', 'success'],
-                            # var_dims={'cost': [self.axes_names]},  # This duplicates the arguments for some reason
-                            # 'cost': self.axes_names,
-                            #   'success': self.axes_names},
-                            resources={'trimmer': self.trimmer},
-                            fn_args=['phi', 'theta', 'Va', 'alpha', 'beta', 'r', 'trimmer']
-                            )
+        runner = xyz.Runner(
+            build_fe_element,
+            var_names=["delta_a", "delta_e", "delta_t", "delta_r", "cost", "success"],
+            # var_dims={'cost': [self.axes_names]},  # This duplicates the arguments for some reason
+            # 'cost': self.axes_names,
+            #   'success': self.axes_names},
+            resources={"trimmer": self.trimmer},
+            fn_args=["phi", "theta", "Va", "alpha", "beta", "r", "trimmer"],
+        )
         self.static_trim = runner.run_combos(self.axes_dict)
 
 
 def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
     # build state polyhedron
     fl_env = np.fromfunction(  # Function must support vector inputs
-        np.vectorize(build_fe_element, excluded=('axes_dict', 'trimmer')), fl_env_dimension, axes_dict=axes_dict, trimmer=trimmer)
+        np.vectorize(build_fe_element, excluded=("axes_dict", "trimmer")),
+        fl_env_dimension,
+        axes_dict=axes_dict,
+        trimmer=trimmer,
+    )
     # # iterate over all points
     # # calculate trim inputs for each point
 
@@ -325,25 +391,34 @@ def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
 def build_fe_element(phi, theta, Va, alpha, beta, r, trimmer=Trimmer()):
     trimmer.setup_trim_states(phi, theta, Va, alpha, beta, r)
     trim_inputs, cost, success = trimmer.find_trim_input()
-    return trim_inputs.delta_a, trim_inputs.delta_e, trim_inputs.delta_t, trim_inputs.delta_r, cost, success
+    return (
+        trim_inputs.delta_a,
+        trim_inputs.delta_e,
+        trim_inputs.delta_t,
+        trim_inputs.delta_r,
+        cost,
+        success,
+    )
 
-    
+
 def find_nav_trim(points_vector):
     # Use self.static_trim to calculate navigation Va, R, gamma triplet
     # f = np.vectorize(state_to_nav_vec, otypes=[float, float, float])
     # return f(points_vector)
     return np.apply_along_axis(state_to_nav_vec, 1, points_vector)
 
+
 def state_to_nav(Va, alpha, beta, phi, theta, r):
     # Convert from aircraft trim state to navigation triplet Va, R, gamma
     R_max = 1000
 
     gamma = theta - alpha  # Disregards wind
-    R = Va/r*cos(gamma)*cos(phi)*cos(theta)  # Disregards wind
+    R = Va / r * cos(gamma) * cos(phi) * cos(theta)  # Disregards wind
     if np.isinf(R):
         R = R_max
-    
+
     return Va, gamma, R
+
 
 def state_to_nav_vec(states):
     return state_to_nav(*tuple(states))
@@ -354,24 +429,33 @@ def build_feasible_fe(fe):
     # fe: a FlightEnvelope object
     # ds_f: a xarray.DataSet
     ds_f = fe.copy(deep=True)
-    optim_mask = ds_f.success==1
+    optim_mask = ds_f.success == 1
     cost_mask = ds_f.cost < 50000
-    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (ds_f.delta_t.data <= trimmer.bound_deltat[1])
-    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (ds_f.delta_a.data <= trimmer.bound_deltaa[1])
-    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (ds_f.delta_e.data <= trimmer.bound_deltae[1])
-    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (ds_f.delta_r.data <= trimmer.bound_deltar[1])
+    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (
+        ds_f.delta_t.data <= trimmer.bound_deltat[1]
+    )
+    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (
+        ds_f.delta_a.data <= trimmer.bound_deltaa[1]
+    )
+    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (
+        ds_f.delta_e.data <= trimmer.bound_deltae[1]
+    )
+    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (
+        ds_f.delta_r.data <= trimmer.bound_deltar[1]
+    )
     overall_mask = optim_mask * cost_mask * da_mask * de_mask * dt_mask * dr_mask
 
-    ds_f['delta_t'] = ds_f.delta_t.where(overall_mask)
-    ds_f['delta_e'] = ds_f.delta_e.where(overall_mask)
-    ds_f['delta_a'] = ds_f.delta_a.where(overall_mask)
-    ds_f['delta_r'] = ds_f.delta_r.where(overall_mask)
-    ds_f['cost'] = ds_f.cost.where(overall_mask)
-    ds_f['success'] = ds_f.success.where(overall_mask)
+    ds_f["delta_t"] = ds_f.delta_t.where(overall_mask)
+    ds_f["delta_e"] = ds_f.delta_e.where(overall_mask)
+    ds_f["delta_a"] = ds_f.delta_a.where(overall_mask)
+    ds_f["delta_r"] = ds_f.delta_r.where(overall_mask)
+    ds_f["cost"] = ds_f.cost.where(overall_mask)
+    ds_f["success"] = ds_f.success.where(overall_mask)
 
     ds_f = ds_f.where(overall_mask, drop=True)
 
     return ds_f
+
 
 def build_convex_hull(ds):
     # Build the convex hull of the flight envelope datapoints
@@ -380,15 +464,28 @@ def build_convex_hull(ds):
     # Create a list of points
     ds_f_s = ds_f.stack(t=list(ds_f.coords.keys()))  # Create a new stacked dimension
     coords = ds_f_s.t.values  # Get the N x 1 np.array of coordinates
-    point_vals = ds_f.delta_t.values.reshape(coords.shape[0],)
-    point_vec = np.array([coord for (value, coord) in zip(point_vals, coords) if not np.isnan(value)])
+    point_vals = ds_f.delta_t.values.reshape(coords.shape[0])
+    point_vec = np.array(
+        [coord for (value, coord) in zip(point_vals, coords) if not np.isnan(value)]
+    )
 
-    return ConvexHull(point_vec, qhull_options='QJ')  # Juggle the input because most of the points are coplanar
+    return ConvexHull(
+        point_vec, qhull_options="QJ"
+    )  # Juggle the input because most of the points are coplanar
     # resulting in numerical issues
 
 
-if __name__ == "__main__":
-
+@click.command()
+@click.option(
+    "-p", "--plot", is_flag=True, help="Enable plotting. Only for 2D and 3D problems."
+)
+@click.option(
+    "-i",
+    "--interactive",
+    is_flag=True,
+    help="Wait for user input after each plot refresh",
+)
+def test_code(plot, interactive):
     trimmer = Trimmer()
 
     # Trajectory Trimming
@@ -398,45 +495,114 @@ if __name__ == "__main__":
     # trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
     # (trim_state, trim_inputs) = trimmer.find_trim_state()
 
-    # State trimming
-    # Va_des = 15
-    # alpha_des = np.deg2rad(2)
-    # beta_des = np.deg2rad(0)
-    # phi_des = np.deg2rad(30)
-    # theta_des = np.deg2rad(15)
-    # r_des = np.deg2rad(5)
-    # Va_des = 15
-    # alpha_des = np.deg2rad(1.5)
-    # beta_des = np.deg2rad(0)
-    # phi_des = np.deg2rad(0)
-    # theta_des = np.deg2rad(1.5)
-    # r_des = np.deg2rad(0)
-    # trimmer.setup_trim_states(
-    #     phi_des, theta_des, Va_des, alpha_des, beta_des, r_des)
-    # trim_inputs = trimmer.find_trim_input()
+    # Provide default values
+    phi_des = np.deg2rad(0)
+    theta_des = np.deg2rad(0)
+    Va_des = 15
+    alpha_des = np.deg2rad(2)
+    beta_des = np.deg2rad(0)
+    r_des = np.deg2rad(5)
+    list_defaults = [phi_des, theta_des, Va_des, alpha_des, beta_des, r_des]
 
-    # Static Flight envelope construction
-    domain = {'Va': np.linspace(5, 30, 8),
-              'alpha': np.linspace(np.deg2rad(-10), np.deg2rad(45), 8),
-              'beta': [0],
-              'phi': [0],
-              'theta': np.linspace(np.deg2rad(-45), np.deg2rad(45), 8),
-              'r': [0]}
+    # Set search degrees of freedom
+    fix_phi = True
+    fix_theta = True
+    fix_Va = False
+    fix_alpha = True
+    fix_beta = True
+    fix_r = False
+    list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
-    flight_envelope = FlightEnvelope(domain, trimmer)
-    flight_envelope.find_static_trim()
-    # plt_figure = flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
-    # flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
+    # Provide domain bounds
+    phi_domain = (-np.deg2rad(20), np.deg2rad(20))
+    theta_domain = (-np.deg2rad(10), np.deg2rad(10))
+    Va_domain = (10, 20)
+    alpha_domain = (-np.deg2rad(-5), np.deg2rad(15))
+    beta_domain = (-np.deg2rad(-5), np.deg2rad(5))
+    r_domain = [-0.5, 0.5]
+    domain = np.array(
+        [phi_domain, theta_domain, Va_domain, alpha_domain, beta_domain, r_domain]
+    )
+    n_dim = len(domain)
+    current_domain = domain(np.invert(list_fixed))
 
-    #Create a new flight_envelope with only feasible trim points
-    ds_f = build_feasible_fe(flight_envelope.static_trim)
+    # Set trimmer optimization bounds
+    trimmer.bound_phi = phi_domain
+    trimmer.bound_theta = theta_domain
+    trimmer.bound_Va = Va_domain
+    trimmer.bound_alpha = alpha_domain
+    trimmer.bound_beta = beta_domain
+    trimmer.bound_r = r_domain
 
-    # Create the convex hull of the flight envelope
-    convex_hull = build_convex_hull(ds_f)
-    # Plot a 3D slice
-    plu.plot3_points(convex_hull.points[:,[0, 1, 4]], ['Va', 'alpha', 'theta'])
+    # Create indicator function
+    indicator = trimmer.get_indicator(list_defaults, list_fixed)
 
-    # Build the Va, R, gamma variables for each trim point
-    flight_envelope.nav_trim = find_nav_trim(convex_hull.points)
-    # Plot the navigation envelope
-    plu.plot3_points(flight_envelope.nav_trim, ['Va', 'gamma', 'R'])
+    # Select eps values
+    eps_phi = np.deg2rad(0.5)
+    eps_theta = np.deg2rad(0.5)
+    eps_Va = 1
+    eps_alpha = np.deg2rad(1)
+    eps_beta = np.deg2rad(1)
+    eps_r = 0.05
+    eps = np.array([eps_phi, eps_theta, eps_Va, eps_alpha, eps_beta, eps_r])
+    current_eps = eps[np.invert(list_fixed)]
+
+    # Initialize the polytope
+    safe_poly = poly.SafeConvexPolytope(indicator, current_domain, current_eps)
+
+    # User interface options
+    if plot:
+        safe_poly.enable_plotting = True
+    if interactive:
+        safe_poly.wait_for_user = True
+
+    # Iteratively sample the polytope
+    print("Progressive sampling of the polytope")
+    algorithm_end = False
+    while not algorithm_end:
+        print("New safe convex polytope iteration")
+        algorithm_end = safe_poly.step()
+
+    print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
+    print("Total number of samples taken: {}".format(safe_poly._samples_taken))
+
+    # Approximate the safe convex polytope with k vertices
+    print("Performing clustering")
+    safe_poly.cluster(2 ** n_dim)
+
+    if plot:
+        print("Plotting")
+        safe_poly.plot()
+        plt.show()
+
+    # # Static Flight envelope construction
+    # domain = {
+    #     "Va": np.linspace(5, 30, 8),
+    #     "alpha": np.linspace(np.deg2rad(-10), np.deg2rad(45), 8),
+    #     "beta": [0],
+    #     "phi": [0],
+    #     "theta": np.linspace(np.deg2rad(-45), np.deg2rad(45), 8),
+    #     "r": [0],
+    # }
+
+    # flight_envelope = FlightEnvelope(domain, trimmer)
+    # flight_envelope.find_static_trim()
+    # # plt_figure = flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
+    # # flight_envelope.static_trim.xyz.heatmap(x='Va', y='alpha', z='delta_t', colors=True, colormap='viridis')
+
+    # # Create a new flight_envelope with only feasible trim points
+    # ds_f = build_feasible_fe(flight_envelope.static_trim)
+
+    # # Create the convex hull of the flight envelope
+    # convex_hull = build_convex_hull(ds_f)
+    # # Plot a 3D slice
+    # plu.plot3_points(convex_hull.points[:, [0, 1, 4]], ["Va", "alpha", "theta"])
+
+    # # Build the Va, R, gamma variables for each trim point
+    # flight_envelope.nav_trim = find_nav_trim(convex_hull.points)
+    # # Plot the navigation envelope
+    # plu.plot3_points(flight_envelope.nav_trim, ["Va", "gamma", "R"])
+
+
+if __name__ == "__main__":
+    test_code()
