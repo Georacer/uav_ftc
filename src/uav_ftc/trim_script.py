@@ -5,10 +5,11 @@ from numpy import cos, sin
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull
 import xarray as xr
-import xyzpy as xyz
+# import xyzpy as xyz
 import timeit
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import click
 
 import uav_model as mdl  # Import UAV model library
 import plot_utils as plu  # Import plotting utilities
@@ -128,11 +129,11 @@ class Trimmer:
             print(
                 """
                 Requested trajectory:\n
-                Airspeed: {Va} m/s\n
-                Flight Path Angle: {np.rad2deg(gamma)} degrees\n
-                Turn Radius: {R} m
+                Airspeed: {} m/s\n
+                Flight Path Angle: {} degrees\n
+                Turn Radius: {} m
                 """.format(
-                    Va, gamma, R
+                    Va, np.rad2deg(gamma), R
                 )
             )
 
@@ -182,7 +183,7 @@ class Trimmer:
                 Optimization ended in {} iterations\n
                 Optimization error: {}
                 """.format(
-                    res.init, res.fun
+                    res.nit, res.fun
                 )
             )
 
@@ -206,7 +207,7 @@ class Trimmer:
     def indicator(self, point):
         phi, theta, Va, alpha, beta, r = tuple(point.reshape(-1))
         self.setup_trim_states(phi, theta, Va, alpha, beta, r)
-        _, _, success = self.find_trim_input()
+        _, _, success = self.find_trim_input(verbose=True)
         return success
 
     # Return a wrapped indicator function for use in SafeConvexPolytope operations
@@ -219,13 +220,13 @@ class Trimmer:
                 )
 
             # Populate the trimmer function arguments
-            state = np.array((len(list_defaults), 1))
+            state = np.zeros((len(list_defaults), 1))
             idx2 = 0
             for idx in range(len(list_defaults)):
                 if list_fixed[idx]:
-                    state[:, idx] = list_defaults[idx]
+                    state[idx, 0] = list_defaults[idx]
                 else:
-                    state[:, idx] = point[idx2]
+                    state[idx, 0] = point[idx2]
                     idx2 += 1
             return self.indicator(state)
 
@@ -260,6 +261,8 @@ class Trimmer:
         else:
             optim_result_s = "FAILURE"
 
+        trim_inputs = mdl.Inputs(*res.x)
+
         if verbose:
             print("Optimization result: {}\n {}".format(optim_result_s, res.message))
             print(
@@ -267,14 +270,10 @@ class Trimmer:
                 Optimization ended in {} iterations\n
                 Optimization error: {}
                 """.format(
-                    res.init, res.fun
+                    res.nit, res.fun
                 )
             )
-
-        # if res.success:
-        trim_inputs = mdl.Inputs(*res.x)
-        # else:
-        # trim_inputs = mdl.Inputs(None, None, None, None)
+            print("Optimization result:\n{}".format(trim_inputs))
 
         return (trim_inputs, res.fun, res.success)
 
@@ -304,21 +303,21 @@ class Trimmer:
 
         return self.cost_function(state, inputs)
 
-    def cost_function(self, state: mdl.aircraft_state, inputs: mdl.Inputs):
+    def cost_function(self, state, inputs):
         # Penalize derivatives and states errors as well as input
 
         x_dot = self.model(state, inputs).to_array()
         x_dot_err = self.x_dot_des.to_array()[self.idx] - x_dot[self.idx]
         der_error_weight = 1000 * np.eye(x_dot_err.shape[0])
-        x_dot_term = x_dot_err.T @ der_error_weight @ x_dot_err
+        x_dot_term = reduce(np.matmul, [x_dot_err.T, der_error_weight, x_dot_err])
 
         x_err = self.x_des.to_array()[self.ix] - state.to_array()[self.ix]
         x_error_weight = 10 * np.eye(x_err.shape[0])
-        x_term = x_err.T @ x_error_weight @ x_err
+        x_term = reduce(np.matmul, [x_err.T, x_error_weight, x_err])
 
         input_vec = inputs.to_array()[self.iu]
         input_weight = 10 * np.eye(input_vec.shape[0])
-        input_term = input_vec.T @ input_weight @ input_vec
+        input_term = reduce(np.matmul, [input_vec.T, input_weight, input_vec])
 
         cost = x_dot_term + x_term + input_term
 
@@ -342,38 +341,38 @@ class Trimmer:
         print("Current optimization step: {}, {}".format(state, inputs))
 
 
-class FlightEnvelope:
+# class FlightEnvelope:
 
-    axes_dict = None
-    axes_names = None
-    trimmer = None
-    static_trim = None
+#     axes_dict = None
+#     axes_names = None
+#     trimmer = None
+#     static_trim = None
 
-    def __init__(self, axes_dict: dict, trimmer: Trimmer):
-        self.axes_dict = axes_dict
-        self.axes_names = ["Va", "alpha", "beta", "phi", "theta", "r"]
-        self.trimmer = trimmer
+#     def __init__(self, axes_dict, trimmer):
+#         self.axes_dict = axes_dict
+#         self.axes_names = ["Va", "alpha", "beta", "phi", "theta", "r"]
+#         self.trimmer = trimmer
 
-        # Verify axes_dict has the correct axes names
-        if not set(self.axes_dict.keys()) == set(self.axes_names):
-            raise KeyError("Not all state parameters provided")
+#         # Verify axes_dict has the correct axes names
+#         if not set(self.axes_dict.keys()) == set(self.axes_names):
+#             raise KeyError("Not all state parameters provided")
 
-    def find_static_trim(self):
-        # Get data values dimension
-        # domain_tuples = self.axes_dict.items()
-        runner = xyz.Runner(
-            build_fe_element,
-            var_names=["delta_a", "delta_e", "delta_t", "delta_r", "cost", "success"],
-            # var_dims={'cost': [self.axes_names]},  # This duplicates the arguments for some reason
-            # 'cost': self.axes_names,
-            #   'success': self.axes_names},
-            resources={"trimmer": self.trimmer},
-            fn_args=["phi", "theta", "Va", "alpha", "beta", "r", "trimmer"],
-        )
-        self.static_trim = runner.run_combos(self.axes_dict)
+#     def find_static_trim(self):
+#         # Get data values dimension
+#         # domain_tuples = self.axes_dict.items()
+#         runner = xyz.Runner(
+#             build_fe_element,
+#             var_names=["delta_a", "delta_e", "delta_t", "delta_r", "cost", "success"],
+#             # var_dims={'cost': [self.axes_names]},  # This duplicates the arguments for some reason
+#             # 'cost': self.axes_names,
+#             #   'success': self.axes_names},
+#             resources={"trimmer": self.trimmer},
+#             fn_args=["phi", "theta", "Va", "alpha", "beta", "r", "trimmer"],
+#         )
+#         self.static_trim = runner.run_combos(self.axes_dict)
 
 
-def build_envelope_ndarray(trimmer: Trimmer, fl_env_dimension, axes_dict):
+def build_envelope_ndarray(trimmer, fl_env_dimension, axes_dict):
     # build state polyhedron
     fl_env = np.fromfunction(  # Function must support vector inputs
         np.vectorize(build_fe_element, excluded=("axes_dict", "trimmer")),
@@ -431,17 +430,17 @@ def build_feasible_fe(fe):
     ds_f = fe.copy(deep=True)
     optim_mask = ds_f.success == 1
     cost_mask = ds_f.cost < 50000
-    dt_mask = (ds_f.delta_t.data >= trimmer.bound_deltat[0]) * (
-        ds_f.delta_t.data <= trimmer.bound_deltat[1]
+    dt_mask = (ds_f.delta_t.data >= fe.trimmer.bound_deltat[0]) * (
+        ds_f.delta_t.data <= fe.trimmer.bound_deltat[1]
     )
-    da_mask = (ds_f.delta_a.data >= trimmer.bound_deltaa[0]) * (
-        ds_f.delta_a.data <= trimmer.bound_deltaa[1]
+    da_mask = (ds_f.delta_a.data >= fe.trimmer.bound_deltaa[0]) * (
+        ds_f.delta_a.data <= fe.trimmer.bound_deltaa[1]
     )
-    de_mask = (ds_f.delta_e.data >= trimmer.bound_deltae[0]) * (
-        ds_f.delta_e.data <= trimmer.bound_deltae[1]
+    de_mask = (ds_f.delta_e.data >= fe.trimmer.bound_deltae[0]) * (
+        ds_f.delta_e.data <= fe.trimmer.bound_deltae[1]
     )
-    dr_mask = (ds_f.delta_r.data >= trimmer.bound_deltar[0]) * (
-        ds_f.delta_r.data <= trimmer.bound_deltar[1]
+    dr_mask = (ds_f.delta_r.data >= fe.trimmer.bound_deltar[0]) * (
+        ds_f.delta_r.data <= fe.trimmer.bound_deltar[1]
     )
     overall_mask = optim_mask * cost_mask * da_mask * de_mask * dt_mask * dr_mask
 
@@ -462,9 +461,9 @@ def build_convex_hull(ds):
     # fe: a xarray.DataSet
 
     # Create a list of points
-    ds_f_s = ds_f.stack(t=list(ds_f.coords.keys()))  # Create a new stacked dimension
-    coords = ds_f_s.t.values  # Get the N x 1 np.array of coordinates
-    point_vals = ds_f.delta_t.values.reshape(coords.shape[0])
+    ds_s = ds.stack(t=list(ds.coords.keys()))  # Create a new stacked dimension
+    coords = ds_s.t.values  # Get the N x 1 np.array of coordinates
+    point_vals = ds.delta_t.values.reshape(coords.shape[0])
     point_vec = np.array(
         [coord for (value, coord) in zip(point_vals, coords) if not np.isnan(value)]
     )
@@ -508,23 +507,23 @@ def test_code(plot, interactive):
     fix_phi = True
     fix_theta = True
     fix_Va = False
-    fix_alpha = True
+    fix_alpha = False
     fix_beta = True
-    fix_r = False
+    fix_r = True
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
-    phi_domain = (-np.deg2rad(20), np.deg2rad(20))
-    theta_domain = (-np.deg2rad(10), np.deg2rad(10))
+    phi_domain = (np.deg2rad(-20), np.deg2rad(20))
+    theta_domain = (np.deg2rad(-10), np.deg2rad(10))
     Va_domain = (10, 20)
-    alpha_domain = (-np.deg2rad(-5), np.deg2rad(15))
-    beta_domain = (-np.deg2rad(-5), np.deg2rad(5))
-    r_domain = [-0.5, 0.5]
+    alpha_domain = (np.deg2rad(-30), np.deg2rad(55))
+    beta_domain = (np.deg2rad(-5), np.deg2rad(5))
+    r_domain = [-5, 5]
     domain = np.array(
         [phi_domain, theta_domain, Va_domain, alpha_domain, beta_domain, r_domain]
     )
-    n_dim = len(domain)
-    current_domain = domain(np.invert(list_fixed))
+    current_domain = domain[np.invert(list_fixed)]
+    n_dim = len(current_domain)
 
     # Set trimmer optimization bounds
     trimmer.bound_phi = phi_domain
@@ -543,7 +542,7 @@ def test_code(plot, interactive):
     eps_Va = 1
     eps_alpha = np.deg2rad(1)
     eps_beta = np.deg2rad(1)
-    eps_r = 0.05
+    eps_r = 0.1
     eps = np.array([eps_phi, eps_theta, eps_Va, eps_alpha, eps_beta, eps_r])
     current_eps = eps[np.invert(list_fixed)]
 
