@@ -502,14 +502,7 @@ class SafeConvexPolytope:
         self._update_points()
 
     # Restrict points on the domain boundary
-    # Apply only if the current polytope steps outside of the domain boundaries
     def _restrict_domain_boundary(self):
-        # If all points of the polytope are inside the domain, the return
-        points = self._polytope.get_points()
-        if np.all(self._domain_polytope.contains(points)):
-            return
-
-        # Otherwise, add more no-points
         sampling_domain = self._normalized_domain
         samples_list = []
         # Build the slice list
@@ -813,6 +806,10 @@ class SafeConvexPolytope:
         print("Getting polytope samples")
         self.sample(init=init, method=self._sampling_method)
 
+        # Add boundary no-points if none were found
+        if len(self.points_no)==0:
+            self._restrict_domain_boundary()
+
         if self.enable_plotting:
             self.plot()
 
@@ -854,11 +851,11 @@ class SafeConvexPolytope:
         for equation in equations:
             try:
                 point_1 = np.array([x_min, self._get_y(equation, x_min)])
-            except ZeroDivisionError:
+            except (FloatingPointError, ZeroDivisionError):
                 point_1 = [x_min, y_min]
             try:
                 point_2 = [x_max, self._get_y(equation, x_max)]
-            except ZeroDivisionError:
+            except (FloatingPointError, ZeroDivisionError):
                 point_2 = [x_max, y_max]
             pu.plot_line(ah, point_1, point_2, color)
 
