@@ -38,7 +38,9 @@ def evaluate_hyperplane(points, equations):
         points = points.reshape(-1, 1)
 
     A = equations[:, 0:-1]
-    b = np.repeat(equations[:, [-1]], points.shape[1], axis=1)
+    b = np.dot(
+        equations[:, [-1]], np.ones((1, points.shape[1]))
+    )  # Faster than np.repeat, esp. for large sizes
     distances = np.dot(A, points) - b
     return distances
 
@@ -109,6 +111,15 @@ class Polytope:
 
         return answer
 
+    # Return a new polytope which is scaled on its axes by the axis_multipliers
+    # axis_mutlipliers is an nparray of dimension (D,), where D is the polytope dimension
+    def scale(self, axis_multipliers):
+        scale = axis_multipliers.reshape(-1,1)
+        scaled_points = self.get_points() * scale
+        scaled_polytope = Polytope()
+        scaled_polytope.set_points(scaled_points)
+        return scaled_polytope
+
     def _convert_equations_for_cdd(self, e_array):
         converted_set = []
         for equation in e_array:
@@ -145,7 +156,7 @@ class SafeConvexPolytope:
     indicator = None
     equations = None
     eps = None  # a (n_dim, ) array with the desired final sampling resolution
-    angular_sample_no = None
+    angular_sample_no = 2 ** 4
     points_yes = None
     points_no = None
     enable_plotting = False
@@ -182,8 +193,6 @@ class SafeConvexPolytope:
         # Set sampling precision values
         self.eps = eps
         self._normalize_domain(domain, eps)
-
-        self.angular_sample_no = 2 ** 6
 
         # Initialize the polytope and the domain polytope
         self._reset_polytope()
@@ -266,7 +275,7 @@ class SafeConvexPolytope:
         self._sampling_method = method
 
     def _reset_polytope(self):
-        print('Resetting Polytope')
+        print("Resetting Polytope")
         self._initialized = False
         # define an initial polygon
         initialization_points = np.zeros((self._n_dim, 2 ** self._n_dim))
@@ -322,9 +331,10 @@ class SafeConvexPolytope:
         set_new_points = points - self._set_points
         return np.array(set_new_points).transpose()
 
-    def get_centroid(self):
+    @staticmethod
+    def get_centroid(points):
         # compute centroid
-        return self.points_yes.mean(axis=1).reshape(self._n_dim, 1)
+        return points.mean(axis=1).reshape(-1, 1)
 
     # Sample a rectilinear grid, aligning with the coordinate center
     def _sample_rectilinear(self):
@@ -385,7 +395,7 @@ class SafeConvexPolytope:
         # samples = np.random.randn(self._n_dim, 1)
         samples /= np.linalg.norm(samples, axis=0)
 
-        p = self.get_centroid()
+        p = self.get_centroid(self.points_yes)
         if np.any(np.isnan(p)):
             raise RuntimeError("points_yes set is empty")
 
@@ -466,7 +476,7 @@ class SafeConvexPolytope:
             point = np.array(coords).reshape(-1, 1)
             # Sample the point to find in which set it belongs
             # Scale the point to real coordinates
-            sample = self.indicator(point * self.eps)
+            sample = self.indicator(point * self.eps.reshape(point.shape))
             coords_tuple = tuple(point.transpose()[0, :])
             if sample:
                 yes_points.append(coords_tuple)
@@ -538,7 +548,7 @@ class SafeConvexPolytope:
         # Set no-points dinstances to inf
         s = float("inf") * np.ones(len(self._set_no))
         # get centroid
-        p = self.get_centroid()
+        p = self.get_centroid(self.points_yes)
         if np.any(np.isnan(p)):
             raise IndexError(
                 "Could not obtain centroid for convex separator. Size of points_yes: {}".format(
@@ -574,7 +584,7 @@ class SafeConvexPolytope:
 
     # Return a hyperplane separating no_point from the centroid of set_yes
     def _get_bounded_separator(self, no_point):
-        p = self.get_centroid()
+        p = self.get_centroid(self.points_yes)
         w = self._get_unit_direction(p, no_point)
         bound = np.dot(w.transpose(), no_point)
         b = self._calc_optimal_offset_constrained(w, bound)
@@ -582,7 +592,8 @@ class SafeConvexPolytope:
 
     def _get_polytope_volume(self):
         points = self._polytope.get_points()
-        hull = ConvexHull(points.T, qhull_options='QJ')
+        hull = ConvexHull(points.T, qhull_options="QJ")
+        # hull = ConvexHull(points.T)
         return hull.volume
 
     # Return a list containing one MxN array for each face of the polytope
@@ -603,6 +614,7 @@ class SafeConvexPolytope:
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
+        # print('Calculating existing polytope volume')
         old_volume = self._get_polytope_volume()
 
         # Create a convex polytope around set_yes
@@ -628,6 +640,7 @@ class SafeConvexPolytope:
         # Construct a new polytope from the new equation set
         self._polytope.set_equations(e_array)
 
+        # print('Calculating new polytope volume')
         new_volume = self._get_polytope_volume()
         if abs((new_volume - old_volume) / old_volume) < self._volume_approx_factor:
             return True
@@ -658,7 +671,7 @@ class SafeConvexPolytope:
     # judging radially from the centroid
     def remove_distant_points_2(self):
         # get centroid
-        p = self.get_centroid()
+        p = self.get_centroid(self.points_yes)
         # Set contraction distance
         eps_out = 1 * np.max(self._normalized_eps)
         eps_in = 1 * np.max(self._normalized_eps)
@@ -742,9 +755,14 @@ class SafeConvexPolytope:
             else:
                 self._reset_polytope()
                 return False
-        except QhullError as e:
+        except QhullError as e:  # QHull could not build a hull out of the previous or current safe polytope
+            # It should not be because of the previous polytope, because it would have crashed in the previous iteration (as current polytope)
+            warn(
+                "QHull could not build a convex polytope out of the polytopes",
+                UserWarning,
+            )
             self._reset_polytope()
-
+            return False
 
         print("Removing distant points")
         self.remove_distant_points_2()
@@ -791,7 +809,7 @@ class SafeConvexPolytope:
         except IndexError:
             raise RuntimeError("Could not build a safe polytope")
         except QhullError as e:
-            print('QHull could not create a hull')
+            print("QHull could not create a hull")
             raise e
 
     def new_plot(self):
@@ -810,16 +828,18 @@ class SafeConvexPolytope:
             new_face_points.append(new_point_list)
         return new_face_points
 
-    def _plot_polytope_2d(self, ah, polytope, color="k"):
-        x_min = self._normalized_domain[0, 0]
-        x_max = self._normalized_domain[0, 1]
-        y_min = self._normalized_domain[1, 0]
-        y_max = self._normalized_domain[1, 1]
+    def _plot_polytope_2d(self, ah, domain, polytope, color="k"):
+        # It would be nicer if I could plot the polytope given and not intervene
+        # Maybe introduce a scaling method for Polytope class?
+        x_min = self.domain[0, 0]
+        x_max = self.domain[0, 1]
+        y_min = self.domain[1, 0]
+        y_max = self.domain[1, 1]
 
         equations = polytope.get_equations()
         for equation in equations:
             try:
-                point_1 = [x_min, self._get_y(equation, x_min)]
+                point_1 = np.array([x_min, self._get_y(equation, x_min)])
             except ZeroDivisionError:
                 point_1 = [x_min, y_min]
             try:
@@ -847,7 +867,17 @@ class SafeConvexPolytope:
         ah = self._axis_handle
         ah.clear()
 
-        domain = self._normalized_domain
+        # Use non-normalized coordinates
+        domain = self.domain
+        eps = self.eps.reshape(self._n_dim, 1)
+        polytope = self._polytope.scale(eps)
+        if self._reduced_polytope is None:
+            reduced_polytope = None
+        else:
+            reduced_polytope = self._reduced_polytope.scale(eps)
+        points_yes = self.points_yes * eps
+        points_no = self.points_no * eps
+        p = self.get_centroid(self.points_yes) * eps
 
         # 2D plotting
         if self._n_dim == 2:
@@ -856,26 +886,25 @@ class SafeConvexPolytope:
             y_min = domain[1, 0]
             y_max = domain[1, 1]
 
-            pu.plot_points(ah, self.points_yes, "o", "g")
-            pu.plot_points(ah, self.points_no, "X", "r")
-            p = self.get_centroid()
+            pu.plot_points(ah, points_yes, "o", "g")
+            pu.plot_points(ah, points_no, "X", "r")
             pu.plot_points(ah, p, "D", "b")
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
             ah.xaxis.set_minor_locator(
-                mpl.ticker.MultipleLocator(self._normalized_eps[0])
+                mpl.ticker.MultipleLocator(self._normalized_eps[0] * eps[0])
             )
             ah.yaxis.set_minor_locator(
-                mpl.ticker.MultipleLocator(self._normalized_eps[1])
+                mpl.ticker.MultipleLocator(self._normalized_eps[1] * eps[1])
             )
             ah.grid(True, which="minor")
 
             # Plot polytope half-planes
-            self._plot_polytope_2d(ah, self._polytope)
+            self._plot_polytope_2d(ah, domain, polytope)
 
             # Plot reduced polytope half-planes
             if self._reduced_polytope is not None:
-                self._plot_polytope_2d(ah, self._reduced_polytope, color="r")
+                self._plot_polytope_2d(ah, domain, reduced_polytope, color="r")
 
         # 3D plotting
         if self._n_dim >= 3:
@@ -889,34 +918,49 @@ class SafeConvexPolytope:
 
             # Plot the points
             if self._n_dim == 3:
-                pu.plot_points_3(ah, self.points_yes, "o", "g")
-                pu.plot_points_3(ah, self.points_no, "X", "r", alpha=0.2)
+                pu.plot_points_3(ah, points_yes, "o", "g")
+                pu.plot_points_3(ah, points_no, "X", "r", alpha=0.2)
             else:
-                pu.plot_points_3(ah, self.points_yes[0:3,:], "o", "g")
-                pu.plot_points_3(ah, self.points_no[0:3,:], "X", "r", alpha=0.2)
+                pu.plot_points_3(ah, points_yes[0:3, :], "o", "g")
+                pu.plot_points_3(ah, points_no[0:3, :], "X", "r", alpha=0.2)
 
-            # Plot the detailed polytope
-            if self._n_dim == 3:
-                if self._reduced_polytope is None:
-                    face_points = self._get_face_points(self._polytope)
-                    pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
-                    # Trasparency not working, probably due to matplotlib bug: https://github.com/matplotlib/matplotlib/issues/10237
-                else:
-                    # Plot the reduced polytope
-                    face_points = self._get_face_points(self._reduced_polytope)
-                    pu.plot_polygons_3(ah, face_points, colorcode="r")
+            # Get the object to plot
+            if self._reduced_polytope is not None:
+                temp_polytope = reduced_polytope
             else:
-                if self._reduced_polytope is None:
-                    face_points = self._slice_face_points(self._get_face_points(self._polytope), slice(0,3))
-                    pu.plot_polygons_3(ah, face_points, colorcode=color, alpha=0.3)
-                else:
-                    # Plot the reduced polytope
-                    face_points = self._slice_face_points(self._get_face_points(self._polytope), slice(0,3))
-                    pu.plot_polygons_3(ah, face_points, colorcode="r")
+                temp_polytope = polytope
+            face_points = self._get_face_points(temp_polytope)
+
+            # Set the colors and transparency
+            if self._reduced_polytope is None:
+                colorcode = color
+                alpha = 0.3
+                # Trasparency not working, probably due to matplotlib bug: https://github.com/matplotlib/matplotlib/issues/10237
+            else:
+                colorcode = "r"
+                alpha = None
+
+            # Slice extra dimensions if needed
+            if self._n_dim > 3:
+                face_points = self._slice_face_points(face_points, slice(0, 3))
+
+            # Plot the convex polytope
+            pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha = alpha)
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
             ah.set_zlim(z_min, z_max)
+            # Minor locators for 3D axes not implemented yet: https://stackoverflow.com/questions/3910517/mplot3d-how-do-i-display-minor-ticks
+            ah.xaxis.set_minor_locator(
+                mpl.ticker.MultipleLocator(self._normalized_eps[0] * eps[0])
+            )
+            ah.yaxis.set_minor_locator(
+                mpl.ticker.MultipleLocator(self._normalized_eps[1] * eps[1])
+            )
+            ah.zaxis.set_minor_locator(
+                mpl.ticker.MultipleLocator(self._normalized_eps[2] * eps[2])
+            )
+            ah.grid(True, which="minor")
 
         plt.draw()
         plt.pause(0.01)
@@ -932,6 +976,14 @@ def hypersphere(p):
     c = 4 * np.ones(p.shape)
     r = 6
     distance = np.linalg.norm(p - c)
+    # print('Evaluated point {} with distance {} as {}'.format(p, distance, distance<=r))
+    return distance <= r
+
+
+def hypercube(p):
+    c = 4 * np.ones(p.shape)
+    r = 6
+    distance = np.max(p - c)
     return distance <= r
 
 
@@ -948,23 +1000,34 @@ def hypersphere(p):
     is_flag=True,
     help="Wait for user input after each plot refresh",
 )
-def test_code(dimensions, plot, interactive):
+@click.option(
+    "-s",
+    "--shape",
+    type=click.Choice(["sphere", "cube"]),
+    default="sphere",
+    help="Select the indicator function (shape) to approximate.",
+)
+def test_code(dimensions, plot, interactive, shape):
 
     n_dim = dimensions
     print("Testing polytope code for {} dimensions".format(n_dim))
     flag_plot = plot
 
     # define the indicator function to approximate
-    ind_func = hypersphere
+    if shape == "sphere":
+        ind_func = hypersphere
+    elif shape == "cube":
+        ind_func = hypercube
+
     # define a domain as a n_dim x 2 array
     print("Creating problem domain and sampling initial points")
     domain = np.zeros((n_dim, 2))
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
-    domain[:, 0] = -3
+    domain[:, 0] = -5
     domain[:, 1] = 10
     # Set the desired precision
-    eps = 1 * np.ones(n_dim)
+    eps = 0.5 * np.ones(n_dim)
 
     # Initialize the polytope
     safe_poly = SafeConvexPolytope(ind_func, domain, eps)
