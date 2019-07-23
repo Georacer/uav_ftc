@@ -156,7 +156,7 @@ class SafeConvexPolytope:
     indicator = None
     equations = None
     eps = None  # a (n_dim, ) array with the desired final sampling resolution
-    angular_sample_no = 2 ** 4
+    angular_sample_no = 2 ** 5
     points_yes = None
     points_no = None
     enable_plotting = False
@@ -201,7 +201,7 @@ class SafeConvexPolytope:
         self._reset_polytope()
 
         self.axis_label_list = ["Variable {}".format(i) for i in range(self._n_dim)]
-        self.plotting_mask = [i<3 for i in range(self._n_dim)]
+        self.plotting_mask = [i < 3 for i in range(self._n_dim)]
 
     @staticmethod
     def _array_to_set(points):
@@ -773,14 +773,15 @@ class SafeConvexPolytope:
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
         # Contract no points and delete outside points
-        recentered_no_points = self.points_no - p
-        norms_no = np.linalg.norm(recentered_no_points, axis=0).reshape(1, -1)
-        factors_no = np.repeat((norms_no - eps_out) / norms_no, p.shape[0], axis=0)
-        # Dont' allow the contracted point to fly to the other side of p
-        factors_no = np.maximum(factors_no, np.zeros(factors_no.shape))
-        contracted_no_points = recentered_no_points * factors_no + p
-        points_to_keep_mask = self._polytope.contains(contracted_no_points)
-        self.points_no = self.points_no[:, points_to_keep_mask]
+        if len(self.points_no) > 0:
+            recentered_no_points = self.points_no - p
+            norms_no = np.linalg.norm(recentered_no_points, axis=0).reshape(1, -1)
+            factors_no = np.repeat((norms_no - eps_out) / norms_no, p.shape[0], axis=0)
+            # Dont' allow the contracted point to fly to the other side of p
+            factors_no = np.maximum(factors_no, np.zeros(factors_no.shape))
+            contracted_no_points = recentered_no_points * factors_no + p
+            points_to_keep_mask = self._polytope.contains(contracted_no_points)
+            self.points_no = self.points_no[:, points_to_keep_mask]
 
         # Contract yes points and delete outside points
         recentered_yes_points = self.points_yes - p
@@ -793,14 +794,17 @@ class SafeConvexPolytope:
         self.points_yes = self.points_yes[:, points_to_keep_mask]
 
         # Contract no points and delete outside points
-        recentered_no_points = self.points_no - p
-        norms_no = np.linalg.norm(recentered_no_points, axis=0).reshape(1, -1)
-        factors_no = np.repeat((norms_no + eps_in) / norms_no, p.shape[0], axis=0)
-        # Dont' allow the contracted point to fly to the other side of p
-        factors_no = np.maximum(factors_no, np.zeros(factors_no.shape))
-        contracted_no_points = recentered_no_points * factors_no + p
-        points_to_keep_mask = np.invert(self._polytope.contains(contracted_no_points))
-        self.points_no = self.points_no[:, points_to_keep_mask]
+        if len(self.points_no) > 0:
+            recentered_no_points = self.points_no - p
+            norms_no = np.linalg.norm(recentered_no_points, axis=0).reshape(1, -1)
+            factors_no = np.repeat((norms_no + eps_in) / norms_no, p.shape[0], axis=0)
+            # Dont' allow the contracted point to fly to the other side of p
+            factors_no = np.maximum(factors_no, np.zeros(factors_no.shape))
+            contracted_no_points = recentered_no_points * factors_no + p
+            points_to_keep_mask = np.invert(
+                self._polytope.contains(contracted_no_points)
+            )
+            self.points_no = self.points_no[:, points_to_keep_mask]
 
         self._set_yes = self._array_to_set(self.points_yes)
         self._set_no = self._array_to_set(self.points_no)
@@ -839,6 +843,12 @@ class SafeConvexPolytope:
                 self._decrease_eps()
                 return False
             else:
+                warn(
+                    """
+                Could not build safe polytope.
+                Resetting and resampling.
+                """
+                )
                 self._reset_polytope()
                 return False
         except QhullError as e:  # QHull could not build a hull out of the previous or current safe polytope
@@ -905,14 +915,14 @@ class SafeConvexPolytope:
         self.plot()
 
     @staticmethod
-    def _slice_face_points(face_points, slice):
+    def _slice_face_points(face_points, dim_slice):
         new_face_points = []
         for idx_outer in range(len(face_points)):
             point_list = face_points[idx_outer]
             new_point_list = []
             for idx_inner in range(len(point_list)):
                 point = point_list[idx_inner]
-                new_point_list.append(point[slice])
+                new_point_list.append(point[dim_slice])
             new_face_points.append(new_point_list)
         return new_face_points
 
@@ -956,7 +966,7 @@ class SafeConvexPolytope:
         ah.clear()
 
         # Use non-normalized coordinates
-        domain = self.domain
+        domain = self.domain[self.plotting_mask, :]
         eps = self.eps.reshape(self._n_dim, 1)
         polytope = self._polytope.scale(eps)
         if self._reduced_polytope is None:
@@ -966,6 +976,9 @@ class SafeConvexPolytope:
         points_yes = self.points_yes * eps
         points_no = self.points_no * eps
         p = self.get_centroid(self.points_yes) * eps
+
+        # Build the axis label list
+        label_list = list(it.compress(self.axis_label_list, self.plotting_mask))
 
         # 2D plotting
         if self._n_dim == 2:
@@ -985,8 +998,8 @@ class SafeConvexPolytope:
             ah.yaxis.set_minor_locator(
                 mpl.ticker.MultipleLocator(self._normalized_eps[1] * eps[1])
             )
-            ah.set_xlabel(self.axis_label_list[0])
-            ah.set_ylabel(self.axis_label_list[1])
+            ah.set_xlabel(label_list[0])
+            ah.set_ylabel(label_list[1])
             ah.grid(True, which="minor")
 
             # Plot polytope half-planes
@@ -1012,7 +1025,9 @@ class SafeConvexPolytope:
                 pu.plot_points_3(ah, points_no, "X", "r", alpha=0.2)
             else:
                 pu.plot_points_3(ah, points_yes[self.plotting_mask, :], "o", "g")
-                pu.plot_points_3(ah, points_no[self.plotting_mask, :], "X", "r", alpha=0.2)
+                pu.plot_points_3(
+                    ah, points_no[self.plotting_mask, :], "X", "r", alpha=0.2
+                )
 
             # Get the object to plot
             if self._reduced_polytope is not None:
@@ -1032,7 +1047,7 @@ class SafeConvexPolytope:
 
             # Slice extra dimensions if needed
             if self._n_dim > 3:
-                face_points = self._slice_face_points(face_points, slice(0, 3))
+                face_points = self._slice_face_points(face_points, self.plotting_mask)
 
             # Plot the convex polytope
             pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
@@ -1050,7 +1065,6 @@ class SafeConvexPolytope:
             ah.zaxis.set_minor_locator(
                 mpl.ticker.MultipleLocator(self._normalized_eps[2] * eps[2])
             )
-            label_list = list(it.compress(self.axis_label_list, self.plotting_mask))
             ah.set_xlabel(label_list[0])
             ah.set_ylabel(label_list[1])
             ah.set_zlabel(label_list[2])
@@ -1081,6 +1095,15 @@ def hypercube(p):
     return distance <= r
 
 
+def hypertriangle(p):
+    c = 0 * np.ones(p.shape)
+    r = 8
+    if np.any(p-c < 0):
+        return False
+    if np.sum(p, axis=0) > r:
+        return False
+    return True
+
 @click.command()
 @click.option(
     "-d", "--dimensions", default=2, type=int, help="Dimensions of the problem"
@@ -1097,7 +1120,7 @@ def hypercube(p):
 @click.option(
     "-s",
     "--shape",
-    type=click.Choice(["sphere", "cube"]),
+    type=click.Choice(["sphere", "cube", "triangle"]),
     default="sphere",
     help="Select the indicator function (shape) to approximate.",
 )
@@ -1112,6 +1135,8 @@ def test_code(dimensions, plot, interactive, shape):
         ind_func = hypersphere
     elif shape == "cube":
         ind_func = hypercube
+    elif shape == "triangle":
+        ind_func = hypertriangle
 
     # define a domain as a n_dim x 2 array
     print("Creating problem domain and sampling initial points")
@@ -1119,7 +1144,7 @@ def test_code(dimensions, plot, interactive, shape):
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
 
-    domain[:, 0] = -5
+    domain[:, 0] = -0
     domain[:, 1] = 10
 
     # domain[0, 0] = 0

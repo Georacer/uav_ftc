@@ -5,6 +5,7 @@ from numpy import cos, sin
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull
 import xarray as xr
+import itertools as it
 
 # import xyzpy as xyz
 import timeit
@@ -530,19 +531,19 @@ def test_code(plot, interactive):
     list_defaults = [phi_des, theta_des, Va_des, alpha_des, beta_des, r_des]
 
     # Set search degrees of freedom
-    fix_phi = True
-    fix_theta = True
+    fix_phi = False
+    fix_theta = False
     fix_Va = False
     fix_alpha = False
     fix_beta = False
-    fix_r = True
+    fix_r = False
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
     phi_domain = (np.deg2rad(-20), np.deg2rad(20))
-    theta_domain = (np.deg2rad(-10), np.deg2rad(10))
-    Va_domain = (10, 20)
-    alpha_domain = (np.deg2rad(-10), np.deg2rad(30))
+    theta_domain = (np.deg2rad(-45), np.deg2rad(45))
+    Va_domain = (5, 30)
+    alpha_domain = (np.deg2rad(-10), np.deg2rad(45))
     beta_domain = (np.deg2rad(-5), np.deg2rad(5))
     r_domain = [-0.5, 0.5]
     domain = np.array(
@@ -563,10 +564,10 @@ def test_code(plot, interactive):
     indicator = trimmer.get_indicator(list_defaults, list_fixed)
 
     # Select eps values
-    eps_phi = np.deg2rad(0.5)
-    eps_theta = np.deg2rad(0.5)
+    eps_phi = np.deg2rad(2)
+    eps_theta = np.deg2rad(2)
     eps_Va = 1
-    eps_alpha = np.deg2rad(1)
+    eps_alpha = np.deg2rad(2)
     eps_beta = np.deg2rad(1)
     eps_r = 0.1
     eps = np.array([eps_phi, eps_theta, eps_Va, eps_alpha, eps_beta, eps_r])
@@ -583,14 +584,19 @@ def test_code(plot, interactive):
     string_beta = 'Beta'
     string_r = 'r'
     string_list = [string_phi, string_theta, string_Va, string_alpha, string_beta, string_r]
-    safe_poly.axis_label_list = string_list
-    safe_poly.plotting_mask = np.invert(list_fixed) 
+    safe_poly.axis_label_list = list(it.compress(string_list, np.invert(list_fixed)))
+    # safe_poly.plotting_mask = [False, True, True, True]
 
     # User interface options
     if plot:
         safe_poly.enable_plotting = True
     if interactive:
         safe_poly.wait_for_user = True
+
+    Temporary indicator function benchmarking
+    profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[0],[15],[0],[0],[0]])), number=10)
+    print(profile)
+    return
 
     # Iteratively sample the polytope
     print("Progressive sampling of the polytope")
