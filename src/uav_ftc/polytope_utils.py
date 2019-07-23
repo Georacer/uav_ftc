@@ -177,6 +177,7 @@ class SafeConvexPolytope:
     _final_normalized_eps = 1
     _volume_approx_factor = 0.1
     _sampling_method = "radial"
+    _patch_polytope_holes = True
     _samples_taken = 0
 
     _axis_handle = None
@@ -199,7 +200,10 @@ class SafeConvexPolytope:
 
     @staticmethod
     def _array_to_set(points):
-        return set(map(tuple, list(points.transpose())))
+        if type(points) == set:
+            return points
+        else:
+            return set(map(tuple, list(points.transpose())))
 
     @staticmethod
     def _set_to_array(points_set):
@@ -228,9 +232,9 @@ class SafeConvexPolytope:
     # Check if a point is inside a rectilinear domain
     @staticmethod
     def _is_in_domain(point, domain):
-        if np.any(point<domain[:,[0]]):
+        if np.any(point < domain[:, [0]]):
             return False
-        if np.any(point > domain[:,[1]]):
+        if np.any(point > domain[:, [1]]):
             return False
         return True
 
@@ -307,6 +311,9 @@ class SafeConvexPolytope:
         self.points_yes = np.array([])
         self.points_no = np.array([])
 
+    # Add points to the class
+    # points is a point list
+    # NOT USED
     def add_points(self, points):
         new_points = self._filter_points(points)
         new_points_set = self._array_to_set(new_points)
@@ -335,10 +342,37 @@ class SafeConvexPolytope:
         self._set_yes -= points_set
         self._update_points()
 
+    def remove_yes_points(self, points):
+        points_set = self._array_to_set(points)
+        self._set_points -= points_set
+        self._set_yes -= points_set
+        self._update_points()
+
+    def remove_no_points(self, points):
+        points_set = self._array_to_set(points)
+        self._set_points -= points_set
+        self._set_no -= points_set
+        self._update_points()
+
     # Find which of the input points are not already part of the known points
     def _filter_points(self, points):
-        set_new_points = points - self._set_points
+        set_new_points = self._array_to_set(points) - self._set_points
         return np.array(set_new_points).transpose()
+
+    # Find the index of yes-point in the self.point_yes array
+    def _find_yes_point(self, point):
+        return self._find_point_in_list(point, self.points_yes)
+
+    # Find the index of no-point in the self.point_no array
+    def _find_no_point(self, point):
+        return self._find_point_in_list(point, self.points_no)
+
+    # Find the index of the point in the point list
+    # Returns a 1D numpy array with the indices where point is found
+    @staticmethod
+    def _find_point_in_list(point, point_list):
+        ans = np.where((point_list == point).all(axis=0))[0]
+        return ans
 
     @staticmethod
     def get_centroid(points):
@@ -401,6 +435,7 @@ class SafeConvexPolytope:
         # Build unit vectors
         eps = self._normalized_eps
         samples = np.random.randn(self._n_dim, self.angular_sample_no)
+        samples *= self._normalized_eps
         # samples = np.random.randn(self._n_dim, 1)
         samples /= np.linalg.norm(samples, axis=0)
 
@@ -629,10 +664,23 @@ class SafeConvexPolytope:
 
         # Find all the invalid points inside the polytope
         invalid_points = []
+        invalid_points_mask = np.zeros((self.points_no.shape[1]), bool)
+        idx = 0
         for coords in self.points_no.transpose():
             no_point = coords.reshape(self._n_dim, 1)
             if no_point in convex_polytope:
                 invalid_points.append(no_point)
+                invalid_points_mask[idx] = True
+            idx += 1
+
+        if self._patch_polytope_holes:
+            # Remove invalid points which are completely inside the convex shape and violate the no-holes assumption
+            print("Patching holes in the polytope")
+            invalid_points = self._filter_false_invalid_points(
+                invalid_points, invalid_points_mask
+            )
+            if self.enable_plotting:
+                self.plot()
 
         # Create one new equation for each one, separating them from the majority of set-yes
         new_e_set = []
@@ -642,7 +690,7 @@ class SafeConvexPolytope:
         new_e_array = np.array(new_e_set)
         if len(new_e_array) > 0:
             e_array = np.vstack((e_array, new_e_array))
-        
+
         # Add the domain constraints
         e_array = np.vstack((e_array, self._domain_polytope.get_equations()))
 
@@ -655,6 +703,30 @@ class SafeConvexPolytope:
             return True
         else:
             return False
+
+    # Takes a list of invalid points and removes them if they are holes in the polytope
+    # invalid_points is a list of points
+    # invalid_points_mask is a mask for self.points_no where invalid points reside
+    def _filter_false_invalid_points(self, invalid_points, invalid_points_mask):
+        valid_no_points = self.points_no[:, np.invert(invalid_points_mask)]
+        # For each invalid point
+        internal_no_points = []
+        no_points_to_remove = set()
+        for no_point in invalid_points:
+            # Find its distances from the valid_no_points
+            distances = np.abs(valid_no_points - no_point)
+            # If it's close to any valid no-point, then leave it
+            if np.any(np.all(distances <= self._normalized_eps, axis=0)):
+                internal_no_points.append(no_point)
+                # print("Point {} is valid".format(no_point))
+            else:
+                # If it's close to some valid no-point, then leave it
+                no_points_to_remove.add(tuple(no_point.reshape(-1)))
+                # print("Removing point {} ".format(no_point))
+
+        self.remove_no_points(no_points_to_remove)
+
+        return internal_no_points
 
     # Delete points which are more than eps away from boundaries
     def remove_distant_points(self):
@@ -807,7 +879,7 @@ class SafeConvexPolytope:
         self.sample(init=init, method=self._sampling_method)
 
         # Add boundary no-points if none were found
-        if len(self.points_no)==0:
+        if len(self.points_no) == 0:
             self._restrict_domain_boundary()
 
         if self.enable_plotting:
@@ -1035,8 +1107,15 @@ def test_code(dimensions, plot, interactive, shape):
     domain = np.zeros((n_dim, 2))
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
-    domain[:, 0] = -5
-    domain[:, 1] = 10
+
+    # domain[:, 0] = -5
+    # domain[:, 1] = 10
+
+    domain[0, 0] = 0
+    domain[0, 1] = 10
+    domain[1, 0] = 0
+    domain[1, 1] = 50
+
     # Set the desired precision
     eps = 1 * np.ones(n_dim)
 
