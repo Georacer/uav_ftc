@@ -46,7 +46,8 @@ def evaluate_hyperplane(points, equations):
 
 
 class Polytope:
-    _polytope_engine = None
+    _polytope_engine = 'cdd'
+    # _polytope_engine = None
 
     _equations = None
     _points = None
@@ -54,37 +55,46 @@ class Polytope:
     def __init__(self):
         pass
 
+    # Construct a new polytope from a point (generator) set
     def set_points(self, points):
+        if self._polytope_engine == 'cdd':
+            self._set_points_cdd(points)
+
+    # Construct a new polytope from an equation set
+    def set_equations(self, equations):
+        if self._polytope_engine == 'cdd':
+            self._set_equations_cdd(equations)
+
+    def _set_points_cdd(self, points):
         array = points.transpose()
         n_points = points.shape[1]
         array = np.concatenate((np.ones((n_points, 1)), array), axis=1)
         point_rows = list(array)
         point_matrix = cdd.Matrix(point_rows)
         point_matrix.rep_type = cdd.RepType.GENERATOR
-        self._polytope_engine = cdd.Polyhedron(point_matrix)
-        self._build_equations()
-        self._build_points()
+        cdd_poly = cdd.Polyhedron(point_matrix)
+        self._build_equations_from_cdd(cdd_poly)
+        self._build_points_from_cdd(cdd_poly)
 
-    # Construct a new polytope from an equation set
-    def set_equations(self, equations):
-        cdd_e_set = self._convert_equations_for_cdd(equations)
+    def _set_equations_cdd(self, equations):
+        cdd_e_set = self._convert_equations_to_cdd(equations)
         e_matrix = cdd.Matrix(cdd_e_set)
         e_matrix.rep_type = cdd.RepType.INEQUALITY
         e_matrix.canonicalize()
-        self._polytope_engine = cdd.Polyhedron(e_matrix)
-        self._build_equations()
-        self._build_points()
+        cdd_poly = cdd.Polyhedron(e_matrix)
+        self._build_equations_from_cdd(cdd_poly)
+        self._build_points_from_cdd(cdd_poly)
 
-    def _build_points(self):
+    def _build_points_from_cdd(self, cdd_poly):
         points = []
-        points_matrix = self._polytope_engine.get_generators()
+        points_matrix = cdd_poly.get_generators()
         points = np.array(points_matrix[:])
         points_mask = points[:, 0] == 1  # Only rows starting with 1 are points
         points = points[points_mask, 1:]
         self._points = points.T
 
-    def _build_equations(self):
-        e_matrix = self._polytope_engine.get_inequalities()
+    def _build_equations_from_cdd(self, cdd_poly):
+        e_matrix = cdd_poly.get_inequalities()
         try:
             self._equations = self._get_equations_from_cdd_matrix(e_matrix)
         except IndexError:
@@ -120,7 +130,7 @@ class Polytope:
         scaled_polytope.set_points(scaled_points)
         return scaled_polytope
 
-    def _convert_equations_for_cdd(self, e_array):
+    def _convert_equations_to_cdd(self, e_array):
         converted_set = []
         for equation in e_array:
             dim = len(equation)
@@ -129,7 +139,7 @@ class Polytope:
             converted_set.append(np.concatenate((-b, A)))
         return converted_set
 
-    def _convert_equations_for_user(self, cdd_e_list):
+    def _convert_equations_from_cdd(self, cdd_e_list):
         num_equations = len(cdd_e_list)
         if len(cdd_e_list) == 0:
             raise IndexError("Equation list is empty")
@@ -146,7 +156,7 @@ class Polytope:
 
     def _get_equations_from_cdd_matrix(self, matrix):
         cdd_e_set = matrix[:]
-        e_set = self._convert_equations_for_user(cdd_e_set)
+        e_set = self._convert_equations_from_cdd(cdd_e_set)
         return e_set
 
 
