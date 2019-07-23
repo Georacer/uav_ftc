@@ -5,6 +5,7 @@ from numpy import cos, sin
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull
 import xarray as xr
+
 # import xyzpy as xyz
 import timeit
 import matplotlib as mpl
@@ -207,8 +208,33 @@ class Trimmer:
     def indicator(self, point):
         phi, theta, Va, alpha, beta, r = tuple(point.reshape(-1))
         self.setup_trim_states(phi, theta, Va, alpha, beta, r)
-        _, _, success = self.find_trim_input(verbose=True)
-        return success
+        # inputs, cost, success = self.find_trim_input(verbose=True)
+        inputs, cost, success = self.find_trim_input()
+
+        optim_mask = success
+        cost_mask = cost < 50000
+        da_mask = (inputs.delta_a >= self.bound_deltaa[0]) * (
+            inputs.delta_a <= self.bound_deltaa[1]
+        )
+        de_mask = (inputs.delta_e >= self.bound_deltae[0]) * (
+            inputs.delta_e <= self.bound_deltae[1]
+        )
+        dt_mask = (inputs.delta_t >= self.bound_deltat[0]) * (
+            inputs.delta_t <= self.bound_deltat[1]
+        )
+        dr_mask = (inputs.delta_r >= self.bound_deltar[0]) * (
+            inputs.delta_r <= self.bound_deltar[1]
+        )
+        input_mask = da_mask * de_mask * dt_mask * dr_mask
+        overall_mask = optim_mask * cost_mask * input_mask
+        
+        if optim_mask and not cost_mask:
+            print('Rejected solution due to cost')
+
+        if optim_mask and not input_mask:
+            print('Rejected solution due to input constraint violation')
+
+        return overall_mask
 
     # Return a wrapped indicator function for use in SafeConvexPolytope operations
     def get_indicator(self, list_defaults, list_fixed):
@@ -508,7 +534,7 @@ def test_code(plot, interactive):
     fix_theta = True
     fix_Va = False
     fix_alpha = False
-    fix_beta = True
+    fix_beta = False
     fix_r = True
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
@@ -516,9 +542,9 @@ def test_code(plot, interactive):
     phi_domain = (np.deg2rad(-20), np.deg2rad(20))
     theta_domain = (np.deg2rad(-10), np.deg2rad(10))
     Va_domain = (10, 20)
-    alpha_domain = (np.deg2rad(-30), np.deg2rad(55))
+    alpha_domain = (np.deg2rad(-10), np.deg2rad(30))
     beta_domain = (np.deg2rad(-5), np.deg2rad(5))
-    r_domain = [-5, 5]
+    r_domain = [-0.5, 0.5]
     domain = np.array(
         [phi_domain, theta_domain, Va_domain, alpha_domain, beta_domain, r_domain]
     )
