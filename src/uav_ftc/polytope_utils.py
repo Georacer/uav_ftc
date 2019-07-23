@@ -181,6 +181,8 @@ class SafeConvexPolytope:
     _samples_taken = 0
 
     _axis_handle = None
+    axis_label_list = None
+    plotting_mask = None
 
     def __init__(self, ind_func, domain, eps=None):
         self.indicator = ind_func
@@ -197,6 +199,9 @@ class SafeConvexPolytope:
 
         # Initialize the polytope and the domain polytope
         self._reset_polytope()
+
+        self.axis_label_list = ["Variable {}".format(i) for i in range(self._n_dim)]
+        self.plotting_mask = [i<3 for i in range(self._n_dim)]
 
     @staticmethod
     def _array_to_set(points):
@@ -980,6 +985,8 @@ class SafeConvexPolytope:
             ah.yaxis.set_minor_locator(
                 mpl.ticker.MultipleLocator(self._normalized_eps[1] * eps[1])
             )
+            ah.set_xlabel(self.axis_label_list[0])
+            ah.set_ylabel(self.axis_label_list[1])
             ah.grid(True, which="minor")
 
             # Plot polytope half-planes
@@ -1004,8 +1011,8 @@ class SafeConvexPolytope:
                 pu.plot_points_3(ah, points_yes, "o", "g")
                 pu.plot_points_3(ah, points_no, "X", "r", alpha=0.2)
             else:
-                pu.plot_points_3(ah, points_yes[0:3, :], "o", "g")
-                pu.plot_points_3(ah, points_no[0:3, :], "X", "r", alpha=0.2)
+                pu.plot_points_3(ah, points_yes[self.plotting_mask, :], "o", "g")
+                pu.plot_points_3(ah, points_no[self.plotting_mask, :], "X", "r", alpha=0.2)
 
             # Get the object to plot
             if self._reduced_polytope is not None:
@@ -1043,6 +1050,10 @@ class SafeConvexPolytope:
             ah.zaxis.set_minor_locator(
                 mpl.ticker.MultipleLocator(self._normalized_eps[2] * eps[2])
             )
+            label_list = list(it.compress(self.axis_label_list, self.plotting_mask))
+            ah.set_xlabel(label_list[0])
+            ah.set_ylabel(label_list[1])
+            ah.set_zlabel(label_list[2])
             ah.grid(True, which="minor")
 
         plt.draw()
@@ -1108,13 +1119,13 @@ def test_code(dimensions, plot, interactive, shape):
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
 
-    # domain[:, 0] = -5
-    # domain[:, 1] = 10
+    domain[:, 0] = -5
+    domain[:, 1] = 10
 
-    domain[0, 0] = 0
-    domain[0, 1] = 10
-    domain[1, 0] = 0
-    domain[1, 1] = 50
+    # domain[0, 0] = 0
+    # domain[0, 1] = 10
+    # domain[1, 0] = 0
+    # domain[1, 1] = 50
 
     # Set the desired precision
     eps = 1 * np.ones(n_dim)

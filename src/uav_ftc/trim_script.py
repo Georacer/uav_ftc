@@ -228,11 +228,11 @@ class Trimmer:
         input_mask = da_mask * de_mask * dt_mask * dr_mask
         overall_mask = optim_mask * cost_mask * input_mask
         
-        if optim_mask and not cost_mask:
-            print('Rejected solution due to cost')
+        # if optim_mask and not cost_mask:
+            # print('Rejected solution due to cost')
 
-        if optim_mask and not input_mask:
-            print('Rejected solution due to input constraint violation')
+        # if optim_mask and not input_mask:
+            # print('Rejected solution due to input constraint violation')
 
         return overall_mask
 
@@ -574,6 +574,17 @@ def test_code(plot, interactive):
 
     # Initialize the polytope
     safe_poly = poly.SafeConvexPolytope(indicator, current_domain, current_eps)
+
+    # Pass the variable strings
+    string_phi = 'Phi'
+    string_theta = 'Theta'
+    string_Va = 'Va'
+    string_alpha = 'Alpha'
+    string_beta = 'Beta'
+    string_r = 'r'
+    string_list = [string_phi, string_theta, string_Va, string_alpha, string_beta, string_r]
+    safe_poly.axis_label_list = string_list
+    safe_poly.plotting_mask = np.invert(list_fixed) 
 
     # User interface options
     if plot:
