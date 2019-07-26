@@ -7,6 +7,7 @@
 # Vector: Mx1 array
 # Set of points: set of M-tuples
 # Equations: numpy NxM array with each row the equation coefficients [A b]
+# Hyperplane evaluation: performing Ax+b should yield < 0 inside the convex polytope
 
 import sys
 from warnings import warn
@@ -41,7 +42,7 @@ def evaluate_hyperplane(points, equations):
     b = np.dot(
         equations[:, [-1]], np.ones((1, points.shape[1]))
     )  # Faster than np.repeat, esp. for large sizes
-    distances = np.dot(A, points) - b
+    distances = np.dot(A, points) + b
     return distances
 
 
@@ -136,7 +137,7 @@ class Polytope:
             dim = len(equation)
             A = equation[0:-1].reshape(dim - 1)
             b = equation[-1].reshape(1)
-            converted_set.append(np.concatenate((-b, A)))
+            converted_set.append(np.concatenate((b, A)))
         return converted_set
 
     def _convert_equations_from_cdd(self, cdd_e_list):
@@ -150,7 +151,7 @@ class Polytope:
         for equation in cdd_e_list:
             A = np.array(equation[1:]).reshape(1, n_coeffs - 1)
             b = np.array(equation[0]).reshape(1, 1)
-            converted_array[idx, :] = np.concatenate((A, -b), axis=1)
+            converted_array[idx, :] = np.concatenate((A, b), axis=1)
             idx = idx + 1
         return converted_array
 
@@ -255,14 +256,14 @@ class SafeConvexPolytope:
 
     @staticmethod
     def _get_y(equation, x):
-        return (-equation[0] * x + equation[2]) / equation[1]
+        return (-equation[0] * x - equation[2]) / equation[1]
 
     @staticmethod
     def _get_z(equation, x, y):
         known_vec = np.array([x, y]).reshape(2, 1)
         equation_vec = equation.reshape(len(equation), 1)
         return (
-            equation_vec[-1] - np.dot(equation_vec[0:-2, :].transpose(), known_vec)
+            - equation_vec[-1] - np.dot(equation_vec[0:-2, :].transpose(), known_vec)
         ) / equation_vec[-2]
 
     # Normalize the domain over eps to achieve a hypersquare grid
@@ -460,13 +461,13 @@ class SafeConvexPolytope:
 
         # Transfer the polytope at the centroid
         all_equations = self._polytope.get_equations()
-        all_equations[:, [-1]] -= np.matmul(all_equations[:, :-1], p)
+        all_equations[:, [-1]] += np.matmul(all_equations[:, :-1], p)
 
         A = all_equations[:, :-1]
         b = np.repeat(all_equations[:, [-1]], samples.shape[1], axis=1)
 
         # For each unit vector find its projection onto the hyperplane sand keep the closest one
-        all_k = b / np.dot(A, samples)
+        all_k = -b / np.dot(A, samples)
         all_k[all_k < 0] = np.inf
         k_indices = np.argmin((all_k), axis=0)
         k = all_k[k_indices, range(len(k_indices))]  # .reshape(1, -1)
@@ -589,13 +590,13 @@ class SafeConvexPolytope:
 
     def _calc_optimal_offset(self, w):
         b_array = np.dot(w.transpose(), self.points_yes)
-        return np.min(b_array, axis=1)
+        return -np.min(b_array, axis=1)
 
     # Calculate optimal offset but have offset less than a predefined value
     def _calc_optimal_offset_constrained(self, w, bound):
         b_array = np.dot(w.transpose(), self.points_yes)
-        b_array = b_array[b_array > bound]
-        return np.min(b_array)
+        b_array = b_array[b_array < bound]
+        return -np.min(b_array)
 
     # Create a convex separating polytope
     def _convex_separator(self):
@@ -622,6 +623,8 @@ class SafeConvexPolytope:
             # find the optimal line separator from set_yes
             b = self._calc_optimal_offset(w)
             equation = np.vstack((w, b)).transpose().reshape((1, -1))
+            print("Found farthest point\n{} with distance\n{}".format(farthest_point, s[farthest_point_idx]))
+            print("Building separator\n{}".format(equation))
             # add it to the E-set
             e_set.append(list(equation.reshape(-1)))
             # Update distances of no-set
@@ -632,6 +635,7 @@ class SafeConvexPolytope:
             # for idx in range(s.shape[0]):
             #     s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
+            print("new s-list:\n{}".format(s))
 
         convex_polytope = Polytope()
         e_array = np.array(e_set)
