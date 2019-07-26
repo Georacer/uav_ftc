@@ -13,6 +13,7 @@ import sys
 from warnings import warn
 import itertools as it
 import time
+import fractions as fr
 
 import numpy as np
 import scipy as sp
@@ -22,6 +23,7 @@ from scipy.spatial.qhull import QhullError
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cdd
+import ppl
 import click
 
 import plot_utils as pu
@@ -47,24 +49,34 @@ def evaluate_hyperplane(points, equations):
 
 
 class Polytope:
-    _polytope_engine = 'cdd'
+    _polytope_engine = "cdd"
     # _polytope_engine = None
+    _decimal_places = 3
 
     _equations = None
     _points = None
 
-    def __init__(self):
-        pass
+    def __init__(self, polytope_engine="ppl", decimal_places=3):
+        self._polytope_engine = polytope_engine
+        self._decimal_places = decimal_places
 
     # Construct a new polytope from a point (generator) set
     def set_points(self, points):
-        if self._polytope_engine == 'cdd':
+        if self._polytope_engine == "cdd":
             self._set_points_cdd(points)
+        elif self._polytope_engine == "ppl":
+            self._set_points_ppl(points)
+        
+        self._points = points
 
     # Construct a new polytope from an equation set
     def set_equations(self, equations):
-        if self._polytope_engine == 'cdd':
+        if self._polytope_engine == "cdd":
             self._set_equations_cdd(equations)
+        elif self._polytope_engine == "ppl":
+            self._set_equations_ppl(equations)
+        
+        self._equations = equations
 
     def _set_points_cdd(self, points):
         array = points.transpose()
@@ -75,7 +87,6 @@ class Polytope:
         point_matrix.rep_type = cdd.RepType.GENERATOR
         cdd_poly = cdd.Polyhedron(point_matrix)
         self._build_equations_from_cdd(cdd_poly)
-        self._build_points_from_cdd(cdd_poly)
 
     def _set_equations_cdd(self, equations):
         cdd_e_set = self._convert_equations_to_cdd(equations)
@@ -83,8 +94,43 @@ class Polytope:
         e_matrix.rep_type = cdd.RepType.INEQUALITY
         e_matrix.canonicalize()
         cdd_poly = cdd.Polyhedron(e_matrix)
-        self._build_equations_from_cdd(cdd_poly)
         self._build_points_from_cdd(cdd_poly)
+
+    def _set_points_ppl(self, points):
+        # print("Setting polytope points")
+        # print(points)
+        gs = ppl.Generator_System()
+        for pointT in points.T:
+            # print(pointT)
+            # Flatten the point and cutoff its precision for rational arithmetic
+            point = pointT.reshape((-1)).round(self._decimal_places)
+            multiplier = 10**self._decimal_places
+
+            point_ppl_expression = ppl.Linear_Expression(point*multiplier, 0)
+            ppl_point = ppl.point(point_ppl_expression, multiplier)
+            # print(point_ppl_expression)
+            # print(ppl_point)
+            gs.insert(ppl_point)
+        ppl_poly = ppl.C_Polyhedron(gs)
+        self._build_equations_from_ppl(ppl_poly)
+        # print(gs)
+        # print(ppl_poly)
+        # print(ppl_poly.constraints())
+
+    def _set_equations_ppl(self, equations):
+        # print("Setting ppl equations")
+        cs = ppl.Constraint_System()
+        for equation in equations:
+            multiplier = 10**self._decimal_places
+            scaled_equation = equation.round(self._decimal_places)*multiplier
+
+            equation_ppl_expression = ppl.Linear_Expression(scaled_equation[:-1], scaled_equation[-1])
+            cs.insert(equation_ppl_expression >= 0)
+        ppl_poly = ppl.C_Polyhedron(cs)
+        # print(equations)
+        # print(cs)
+        # print(ppl_poly)
+        self._build_points_from_ppl(ppl_poly)
 
     def _build_points_from_cdd(self, cdd_poly):
         points = []
@@ -94,6 +140,21 @@ class Polytope:
         points = points[points_mask, 1:]
         self._points = points.T
 
+    def _build_points_from_ppl(self, ppl_poly):
+        print("Building points from polytope")
+        ppl_points = ppl_poly.minimized_generators()
+        # TODO: find solution when rays and lines are in generators
+        dim = ppl_poly.space_dimension()
+        points = np.zeros((dim, len(ppl_points)))
+        # print(ppl_poly)
+        # print(ppl_points)
+        for idx, point_ppl in enumerate(ppl_points):
+            coefficients = np.array(point_ppl.coefficients()).astype(float)
+            divisor = np.array(point_ppl.divisor()).astype(float)
+            points[:,idx] = coefficients/divisor
+        # print(points)
+        self._points = points
+
     def _build_equations_from_cdd(self, cdd_poly):
         e_matrix = cdd_poly.get_inequalities()
         try:
@@ -102,6 +163,16 @@ class Polytope:
             raise IndexError(
                 "Could not build cdd equations. e_matrix = {}".format(e_matrix)
             )
+
+    def _build_equations_from_ppl(self, ppl_poly):
+        # print("Building equations from polytope")
+        ppl_equations = ppl_poly.minimized_constraints()
+        dim = ppl_equations.space_dimension()
+        equations = np.zeros((len(ppl_equations), dim+1))
+        for idx, constraint in enumerate(ppl_equations):
+            equations[idx,:-1] = constraint.coefficients()
+            equations[idx, -1] = constraint.inhomogeneous_term()
+        self._equations = equations
 
     def get_equations(self):
         return np.copy(self._equations)
@@ -190,6 +261,7 @@ class SafeConvexPolytope:
     _sampling_method = "radial"
     _patch_polytope_holes = True
     _samples_taken = 0
+    _sample_decimal_places = 3
 
     _axis_handle = None
     axis_label_list = None
@@ -520,6 +592,7 @@ class SafeConvexPolytope:
     # Sample points around a polytope boundary
     def sample(self, init=False, method="rectilinear"):
         if init:  # First-pass sample of the grid
+            print("Initial rectilinear sampling")
             sampled_points = self._array_to_set(self._sample_rectilinear())
         else:
             if method == "rectilinear" or init:
@@ -595,13 +668,13 @@ class SafeConvexPolytope:
     # Calculate optimal offset but have offset less than a predefined value
     def _calc_optimal_offset_constrained(self, w, bound):
         b_array = np.dot(w.transpose(), self.points_yes)
-        b_array = b_array[b_array < bound]
+        b_array = b_array[b_array > bound]
         return -np.min(b_array)
 
     # Create a convex separating polytope
     def _convex_separator(self):
         # Set halfplane set (E-set) to empty
-        e_set = []
+        e_list = []
         # Set no-points dinstances to inf
         s = float("inf") * np.ones(len(self._set_no))
         # get centroid
@@ -623,10 +696,8 @@ class SafeConvexPolytope:
             # find the optimal line separator from set_yes
             b = self._calc_optimal_offset(w)
             equation = np.vstack((w, b)).transpose().reshape((1, -1))
-            print("Found farthest point\n{} with distance\n{}".format(farthest_point, s[farthest_point_idx]))
-            print("Building separator\n{}".format(equation))
             # add it to the E-set
-            e_set.append(list(equation.reshape(-1)))
+            e_list.append(list(equation.reshape(-1)))
             # Update distances of no-set
             current_distances = evaluate_hyperplane(self.points_no, equation)
             d_len = current_distances.shape[1]
@@ -635,10 +706,18 @@ class SafeConvexPolytope:
             # for idx in range(s.shape[0]):
             #     s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
-            print("new s-list:\n{}".format(s))
 
         convex_polytope = Polytope()
-        e_array = np.array(e_set)
+        e_array = np.array(e_list)
+        domain_equations = self._domain_polytope.get_equations()
+        # print("Resulting equations")
+        # print(e_array)
+        # print("Additional domain equation")
+        # print(domain_equations)
+
+        # Add the domain constraints to make sure polytope remains bounded
+        e_array = np.vstack((e_array, domain_equations))
+        # e_list += list(self._domain_polytopeget_equations())
         convex_polytope.set_equations(e_array)
         return convex_polytope
 
@@ -662,11 +741,15 @@ class SafeConvexPolytope:
         face_list = []
         all_points = polytope.get_points()
         all_equations = polytope.get_equations()
+        print("Getting face points")
+        print(all_points)
+        print(all_equations)
 
         for equation in all_equations:
             face_points = []
             for point in all_points.transpose():
-                if np.abs(evaluate_hyperplane(point, equation)) < 1e-5:
+                point_distance = np.abs(evaluate_hyperplane(point, equation))
+                if point_distance < 1e-5:
                     face_points.append(point)
             face_list.append(face_points)
         return face_list
@@ -674,10 +757,11 @@ class SafeConvexPolytope:
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
-        # print('Calculating existing polytope volume')
+        print('Calculating existing polytope volume')
         old_volume = self._get_polytope_volume()
 
         # Create a convex polytope around set_yes
+        print("Creating first-pass convex polytope")
         convex_polytope = self._convex_separator()
         e_array = convex_polytope.get_equations()
 
@@ -909,9 +993,11 @@ class SafeConvexPolytope:
 
         # Add boundary no-points if none were found
         if len(self.points_no) == 0:
+            print("No points_no exist in samples, adding boundaries...")
             self._restrict_domain_boundary()
 
         if self.enable_plotting:
+            print("Plotting new sampled points")
             self.plot()
 
         try:
@@ -930,12 +1016,15 @@ class SafeConvexPolytope:
 
     @staticmethod
     def _slice_face_points(face_points, dim_slice):
+        print("Slicing points")
+        print(face_points)
         new_face_points = []
         for idx_outer in range(len(face_points)):
             point_list = face_points[idx_outer]
             new_point_list = []
             for idx_inner in range(len(point_list)):
                 point = point_list[idx_inner]
+                print(point)
                 new_point_list.append(point[dim_slice])
             new_face_points.append(new_point_list)
         return new_face_points
@@ -989,7 +1078,8 @@ class SafeConvexPolytope:
             reduced_polytope = self._reduced_polytope.scale(eps)
         points_yes = self.points_yes * eps
         points_no = self.points_no * eps
-        p = self.get_centroid(self.points_yes) * eps
+        if len(self.points_yes) > 0: 
+            p = self.get_centroid(self.points_yes) * eps
 
         # Build the axis label list
         label_list = list(it.compress(self.axis_label_list, self.plotting_mask))
@@ -1003,7 +1093,8 @@ class SafeConvexPolytope:
 
             pu.plot_points(ah, points_yes, "o", "g")
             pu.plot_points(ah, points_no, "X", "r")
-            pu.plot_points(ah, p, "D", "b")
+            if len(self.points_yes) > 0: 
+                pu.plot_points(ah, p, "D", "b")
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
             ah.xaxis.set_minor_locator(
@@ -1061,9 +1152,11 @@ class SafeConvexPolytope:
 
             # Slice extra dimensions if needed
             if self._n_dim > 3:
+                print("Slicing coordinates to plot in 3D space")
                 face_points = self._slice_face_points(face_points, self.plotting_mask)
 
             # Plot the convex polytope
+            print(face_points)
             pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
 
             ah.set_xlim(x_min, x_max)
@@ -1112,11 +1205,12 @@ def hypercube(p):
 def hypertriangle(p):
     c = 0 * np.ones(p.shape)
     r = 8
-    if np.any(p-c < 0):
+    if np.any(p - c < 0):
         return False
     if np.sum(p, axis=0) > r:
         return False
     return True
+
 
 @click.command()
 @click.option(
@@ -1138,7 +1232,14 @@ def hypertriangle(p):
     default="sphere",
     help="Select the indicator function (shape) to approximate.",
 )
-def test_code(dimensions, plot, interactive, shape):
+@click.option(
+    "-e",
+    "--polytope-engine",
+    type=click.Choice(["cdd", "ppl"]),
+    default="cdd",
+    help="Select the polytope engine module",
+)
+def test_code(dimensions, plot, interactive, shape, polytope_engine):
 
     n_dim = dimensions
     print("Testing polytope code for {} dimensions".format(n_dim))
