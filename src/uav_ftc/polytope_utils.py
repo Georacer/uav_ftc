@@ -35,6 +35,7 @@ import plot_utils as pu
 
 def evaluate_hyperplane(points, equations):
     # Catch case of single-dimensional equation array
+    # print("Evaluating point\n{} on equation\n{}".format(points, equations))
     if len(equations.shape) == 1:
         equations = equations.reshape(1, -1)
     if len(points.shape) == 1:
@@ -68,6 +69,7 @@ class Polytope:
             self._set_points_ppl(points)
         
         self._points = points
+        # print("Set polytope points to:\n{}".format(points))
 
     # Construct a new polytope from an equation set
     def set_equations(self, equations):
@@ -77,6 +79,7 @@ class Polytope:
             self._set_equations_ppl(equations)
         
         self._equations = equations
+        # print("Set polytope equations to:\n{}".format(equations))
 
     def _set_points_cdd(self, points):
         array = points.transpose()
@@ -99,6 +102,7 @@ class Polytope:
     def _set_points_ppl(self, points):
         # print("Setting polytope points")
         # print(points)
+        # print("Truncated points:")
         gs = ppl.Generator_System()
         for pointT in points.T:
             # print(pointT)
@@ -116,15 +120,16 @@ class Polytope:
         # print(gs)
         # print(ppl_poly)
         # print(ppl_poly.constraints())
+        # print(ppl_poly.generators())
 
     def _set_equations_ppl(self, equations):
         # print("Setting ppl equations")
         cs = ppl.Constraint_System()
-        for equation in equations:
-            multiplier = 10**self._decimal_places
-            scaled_equation = equation.round(self._decimal_places)*multiplier
-
-            equation_ppl_expression = ppl.Linear_Expression(scaled_equation[:-1], scaled_equation[-1])
+        multiplier = 10**self._decimal_places
+        scaled_equations = equations.round(self._decimal_places)*multiplier
+        # print(scaled_equations)
+        for equation in scaled_equations:
+            equation_ppl_expression = ppl.Linear_Expression(equation[:-1], equation[-1])
             cs.insert(equation_ppl_expression >= 0)
         ppl_poly = ppl.C_Polyhedron(cs)
         # print(equations)
@@ -141,9 +146,8 @@ class Polytope:
         self._points = points.T
 
     def _build_points_from_ppl(self, ppl_poly):
-        print("Building points from polytope")
+        # print("Building points from polytope")
         ppl_points = ppl_poly.minimized_generators()
-        # TODO: find solution when rays and lines are in generators
         dim = ppl_poly.space_dimension()
         points = np.zeros((dim, len(ppl_points)))
         # print(ppl_poly)
@@ -170,8 +174,12 @@ class Polytope:
         dim = ppl_equations.space_dimension()
         equations = np.zeros((len(ppl_equations), dim+1))
         for idx, constraint in enumerate(ppl_equations):
-            equations[idx,:-1] = constraint.coefficients()
-            equations[idx, -1] = constraint.inhomogeneous_term()
+            A = np.array(constraint.coefficients()).astype(float)
+            b = np.array(constraint.inhomogeneous_term()).astype(float)
+            # print(A, b)
+            equations[idx,:-1] = A
+            equations[idx, -1] = b
+            # print(equations[idx,:])
         self._equations = equations
 
     def get_equations(self):
@@ -735,21 +743,32 @@ class SafeConvexPolytope:
         # hull = ConvexHull(points.T)
         return hull.volume
 
+    def _get_polytope_volume_approximate(self):
+        # Calculate the volume of the circumscribed axis-aligned rectangle
+        points = self._polytope.get_points()
+        mins = np.min(points, axis=1)
+        maxs = np.max(points, axis=1)
+        return reduce(np.multiply, maxs-mins)
+
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
     def _get_face_points(self, polytope):
         face_list = []
         all_points = polytope.get_points()
         all_equations = polytope.get_equations()
-        print("Getting face points")
-        print(all_points)
-        print(all_equations)
+        # print("Getting face points")
+        # print(all_points)
+        # print(all_equations)
+        multiplier = 10**(-3) # Same as significant decimal places of polyotpe
 
         for equation in all_equations:
+            equation_normalized = equation/np.linalg.norm(equation)
             face_points = []
+            # print("New face")
             for point in all_points.transpose():
-                point_distance = np.abs(evaluate_hyperplane(point, equation))
-                if point_distance < 1e-5:
+                point_distance = np.abs(evaluate_hyperplane(point, equation_normalized))
+                # print(point_distance)
+                if point_distance < multiplier:
                     face_points.append(point)
             face_list.append(face_points)
         return face_list
@@ -758,7 +777,7 @@ class SafeConvexPolytope:
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
         print('Calculating existing polytope volume')
-        old_volume = self._get_polytope_volume()
+        old_volume = self._get_polytope_volume_approximate()
 
         # Create a convex polytope around set_yes
         print("Creating first-pass convex polytope")
@@ -801,7 +820,7 @@ class SafeConvexPolytope:
         self._polytope.set_equations(e_array)
 
         # print('Calculating new polytope volume')
-        new_volume = self._get_polytope_volume()
+        new_volume = self._get_polytope_volume_approximate()
         if abs((new_volume - old_volume) / old_volume) < self._volume_approx_factor:
             return True
         else:
@@ -1016,8 +1035,8 @@ class SafeConvexPolytope:
 
     @staticmethod
     def _slice_face_points(face_points, dim_slice):
-        print("Slicing points")
-        print(face_points)
+        # print("Slicing points")
+        # print(face_points)
         new_face_points = []
         for idx_outer in range(len(face_points)):
             point_list = face_points[idx_outer]
@@ -1050,7 +1069,7 @@ class SafeConvexPolytope:
             pu.plot_line(ah, point_1, point_2, color)
 
     def plot(self, color="k"):
-
+        print("Plotting")
         if self._n_dim > 3:
             warn("Plotting a slice of polytope in 3D space", UserWarning)
 
@@ -1140,6 +1159,8 @@ class SafeConvexPolytope:
             else:
                 temp_polytope = polytope
             face_points = self._get_face_points(temp_polytope)
+            print("Face points size: {}".format(len(face_points)))
+            # print(face_points)
 
             # Set the colors and transparency
             if self._reduced_polytope is None:
@@ -1156,7 +1177,6 @@ class SafeConvexPolytope:
                 face_points = self._slice_face_points(face_points, self.plotting_mask)
 
             # Plot the convex polytope
-            print(face_points)
             pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
 
             ah.set_xlim(x_min, x_max)
@@ -1259,7 +1279,7 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine):
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
 
-    domain[:, 0] = -0
+    domain[:, 0] = -3
     domain[:, 1] = 10
 
     # domain[0, 0] = 0
