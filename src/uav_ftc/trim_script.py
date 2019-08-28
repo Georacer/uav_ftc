@@ -12,6 +12,7 @@ import timeit
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import click
+import nlopt
 
 import uav_model as mdl  # Import UAV model library
 import plot_utils as plu  # Import plotting utilities
@@ -20,6 +21,14 @@ import polytope_utils as poly  # Used for SafeConvexPoly class
 
 # Raise an error when invalid floating-point operations occur
 np.seterr(invalid="raise")
+
+
+class OptimResult:
+
+    def __init__(self, x_star, cost, success):
+        self.x = x_star
+        self.fun = cost
+        self.success = success
 
 
 class Trimmer:
@@ -48,6 +57,12 @@ class Trimmer:
 
     optim_bounds = None
 
+    # optim_library = 'scipy'
+    optim_library = 'nlopt'
+    optim_algorithm = None
+    nlopt_obj = None
+    optim_result = None
+
     def __init__(
         self,
         model=mdl.get_derivatives,
@@ -62,6 +77,43 @@ class Trimmer:
         self.ix = [3, 4, 6, 7, 8, 11]  # Indices of trim states
         self.idx = slice(2, 11)  # Indices of trim derivatives
         self.iu = []
+
+        # Setup optimization method
+        if self.optim_library == 'scipy':
+            print("Building scipy minimize for trim calculations")
+            self.optim_algorithm = self.scipy_minimize
+        elif self.optim_library == 'nlopt':
+            print("Building nlopt for trim calculations")
+            # self.nlopt_obj = nlopt.opt(nlopt.LN_COBYLA, 4)
+            # self.nlopt_obj = nlopt.opt(nlopt.LN_BOBYQA, 4)
+            self.nlopt_obj = nlopt.opt(nlopt.LN_PRAXIS, 4)
+            # self.nlopt_obj = nlopt.opt(nlopt.LN_NELDERMEAD, 4)
+            # self.nlopt_obj = nlopt.opt(nlopt.LN_SBPLX, 4)
+            self.nlopt_obj.set_min_objective(self.nlopt_objective)
+
+            self.nlopt_obj.set_lower_bounds([-np.inf, -np.inf, 0, -np.inf])
+            self.nlopt_obj.set_upper_bounds([ np.inf,  np.inf, 1,  np.inf])
+            self.nlopt_obj.set_xtol_abs(4*[0.01])
+
+            self.optim_algorithm = self.nlopt_optimize
+            print("Using nlopt version {}.{}".format(nlopt.version_major(), nlopt.version_minor()))
+        else:
+            raise ValueError('Undefined minimization algorithm')
+
+    def nlopt_objective(self, x, grad):
+        self.optim_result = x
+        return self.cost_function_input_wrapper(x)
+
+    def nlopt_optimize(self, x):
+        try:
+            trim_input = self.nlopt_obj.optimize(x.reshape(-1))
+        except nlopt.RoundoffLimited:
+            print("Roundoff error occurred. Stopping optimization...")
+            trim_input = self.optim_result
+        cost = self.nlopt_obj.last_optimum_value()
+        success = self.nlopt_obj.last_optimize_result > 0
+        # print(trim_input, cost, success)
+        return OptimResult(trim_input, cost, success)
 
     def set_init_values(self, x0=None, u0=None, dx0=None):
         if x0 is not None:
@@ -259,6 +311,17 @@ class Trimmer:
 
         return indicator_wrapper
 
+    def scipy_minimize(self, init_vector):
+        res = minimize(
+            self.cost_function_input_wrapper,
+            init_vector,
+            #   method='SLSQP', options={'disp': True},
+            method="L-BFGS-B",
+            #    method='TNC'
+            #   bounds=self.optim_bounds,
+        )
+        return res
+
     def find_trim_input(self, verbose=False):
         # Find a trim input wich satisfies the trim state
         # Returns: The optimal trim input
@@ -275,14 +338,9 @@ class Trimmer:
             self.bound_deltat,
             self.bound_deltar,
         )
-        res = minimize(
-            self.cost_function_input_wrapper,
-            init_vector,
-            #   method='SLSQP', options={'disp': True},
-            method="L-BFGS-B",
-            #    method='TNC'
-            #   bounds=self.optim_bounds,
-        )
+
+        res = self.optim_algorithm(init_vector)
+
         if res.success:
             optim_result_s = "SUCCESS"
         else:
@@ -531,12 +589,12 @@ def test_code(plot, interactive):
     list_defaults = [phi_des, theta_des, Va_des, alpha_des, beta_des, r_des]
 
     # Set search degrees of freedom
-    fix_phi = False
+    fix_phi = True
     fix_theta = False
     fix_Va = False
     fix_alpha = False
-    fix_beta = False
-    fix_r = False
+    fix_beta = True
+    fix_r = True
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
@@ -593,10 +651,11 @@ def test_code(plot, interactive):
     if interactive:
         safe_poly.wait_for_user = True
 
-    Temporary indicator function benchmarking
-    profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[0],[15],[0],[0],[0]])), number=10)
-    print(profile)
-    return
+    # # Temporary indicator function benchmarking
+    # # profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[0],[15],[0],[0],[0]])), number=10)
+    # profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[15]])), number=10)
+    # print(profile)
+    # return
 
     # Iteratively sample the polytope
     print("Progressive sampling of the polytope")

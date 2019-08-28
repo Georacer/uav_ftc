@@ -1159,7 +1159,7 @@ class SafeConvexPolytope:
             else:
                 temp_polytope = polytope
             face_points = self._get_face_points(temp_polytope)
-            print("Face points size: {}".format(len(face_points)))
+            # print("Face points size: {}".format(len(face_points)))
             # print(face_points)
 
             # Set the colors and transparency
