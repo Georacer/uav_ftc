@@ -8,15 +8,20 @@ import xarray as xr
 import itertools as it
 
 # import xyzpy as xyz
+import os
+import time
 import timeit
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import click
 import nlopt
+import imp
 
 import uav_model as mdl  # Import UAV model library
 import plot_utils as plu  # Import plotting utilities
 import polytope_utils as poly  # Used for SafeConvexPoly class
+# tcpp = imp.load_source('trimmer.py', '/home/george/ros_workspaces/uav_ftc/src/last_letter/last_letter_lib/src/', 'trimmer.py')
+tcpp = imp.load_source('trimmer', '/home/george/ros_workspaces/uav_ftc/src/last_letter/last_letter_lib/src/trimmer.py')
 
 
 # Raise an error when invalid floating-point operations occur
@@ -60,8 +65,10 @@ class Trimmer:
     # optim_library = 'scipy'
     optim_library = 'nlopt'
     optim_algorithm = None
+    optim_cost_threshold = None
     nlopt_obj = None
     optim_result = None
+    optim_time_accumulator = 0 # Store the total time spend finding trim points
 
     def __init__(
         self,
@@ -69,6 +76,7 @@ class Trimmer:
         x0=mdl.aircraft_state(),
         u0=mdl.Inputs(),
         dx0=mdl.aircraft_state(),
+        optim_lib = 'nlopt'
     ):
         self.model = model
         self.set_init_values(x0, u0, dx0)
@@ -79,9 +87,11 @@ class Trimmer:
         self.iu = []
 
         # Setup optimization method
+        self.optim_library = optim_lib
         if self.optim_library == 'scipy':
             print("Building scipy minimize for trim calculations")
             self.optim_algorithm = self.scipy_minimize
+            self.optim_cost_threshold = 50000
         elif self.optim_library == 'nlopt':
             print("Building nlopt for trim calculations")
             # self.nlopt_obj = nlopt.opt(nlopt.LN_COBYLA, 4)
@@ -90,6 +100,7 @@ class Trimmer:
             # self.nlopt_obj = nlopt.opt(nlopt.LN_NELDERMEAD, 4)
             # self.nlopt_obj = nlopt.opt(nlopt.LN_SBPLX, 4)
             self.nlopt_obj.set_min_objective(self.nlopt_objective)
+            self.optim_cost_threshold = 50000
 
             self.nlopt_obj.set_lower_bounds([-np.inf, -np.inf, 0, -np.inf])
             self.nlopt_obj.set_upper_bounds([ np.inf,  np.inf, 1,  np.inf])
@@ -97,6 +108,11 @@ class Trimmer:
 
             self.optim_algorithm = self.nlopt_optimize
             print("Using nlopt version {}.{}".format(nlopt.version_major(), nlopt.version_minor()))
+        elif self.optim_library == 'nlopt_cpp':
+            print("Building nlopt_cpp for trim calculations")
+            self.nlopt_cpp_trimmer = tcpp.Trimmer('skywalker_2013')
+            self.optim_algorithm = self.nlopt_cpp_optimize
+            self.optim_cost_threshold = 500
         else:
             raise ValueError('Undefined minimization algorithm')
 
@@ -114,6 +130,18 @@ class Trimmer:
         success = self.nlopt_obj.last_optimize_result > 0
         # print(trim_input, cost, success)
         return OptimResult(trim_input, cost, success)
+
+    def nlopt_cpp_optimize(self, u0):
+        # Disreagard initializing input since it cannot be set in trimmer_cpp
+        trim_state = np.array([self.x_des.att.x,
+                               self.x_des.att.y,
+                               self.x_des.airdata.x,
+                               self.x_des.airdata.y,
+                               self.x_des.airdata.z,
+                               self.x_des.ang_vel.z])
+        trim_ctrls = self.nlopt_cpp_trimmer.find_trim_input(trim_state)
+        success = trim_ctrls[5]>0.1
+        return OptimResult(trim_ctrls[0:4], trim_ctrls[4], success)
 
     def set_init_values(self, x0=None, u0=None, dx0=None):
         if x0 is not None:
@@ -265,7 +293,8 @@ class Trimmer:
         inputs, cost, success = self.find_trim_input()
 
         optim_mask = success
-        cost_mask = cost < 50000
+        cost_mask = cost < self.optim_cost_threshold
+
         da_mask = (inputs.delta_a >= self.bound_deltaa[0]) * (
             inputs.delta_a <= self.bound_deltaa[1]
         )
@@ -338,8 +367,12 @@ class Trimmer:
             self.bound_deltat,
             self.bound_deltar,
         )
-
+        
+        # Perform the optimization step and time execution
+        t_start = time.time()
         res = self.optim_algorithm(init_vector)
+        t_end = time.time()
+        self.optim_time_accumulator = self.optim_time_accumulator + (t_end-t_start)
 
         if res.success:
             optim_result_s = "SUCCESS"
@@ -514,7 +547,7 @@ def build_feasible_fe(fe):
     # ds_f: a xarray.DataSet
     ds_f = fe.copy(deep=True)
     optim_mask = ds_f.success == 1
-    cost_mask = ds_f.cost < 50000
+    cost_mask = ds_f.cost < self.optim_cost_threshold
     dt_mask = (ds_f.delta_t.data >= fe.trimmer.bound_deltat[0]) * (
         ds_f.delta_t.data <= fe.trimmer.bound_deltat[1]
     )
@@ -569,8 +602,15 @@ def build_convex_hull(ds):
     is_flag=True,
     help="Wait for user input after each plot refresh",
 )
-def test_code(plot, interactive):
-    trimmer = Trimmer()
+@click.option(
+    "-o",
+    "--optimizer",
+    type=click.Choice(["scipy", "nlopt", "nlopt_cpp"]),
+    default="nlopt",
+    help="Select optimizer backend."
+)
+def test_code(plot, interactive, optimizer):
+    trimmer = Trimmer(optim_lib=optimizer)
 
     # Trajectory Trimming
     # Va_des = 15
@@ -589,7 +629,16 @@ def test_code(plot, interactive):
     list_defaults = [phi_des, theta_des, Va_des, alpha_des, beta_des, r_des]
 
     # Set search degrees of freedom
-    fix_phi = True
+    # # Theta, Va, alpha
+    # fix_phi = True
+    # fix_theta = False
+    # fix_Va = False
+    # fix_alpha = False
+    # fix_beta = True
+    # fix_r = True
+
+    # More dimensions
+    fix_phi = False
     fix_theta = False
     fix_Va = False
     fix_alpha = False
@@ -666,6 +715,7 @@ def test_code(plot, interactive):
 
     print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
     print("Total number of samples taken: {}".format(safe_poly._samples_taken))
+    print("Total number of optimization time required : {}".format(trimmer.optim_time_accumulator))
 
     # Approximate the safe convex polytope with k vertices
     print("Performing clustering")

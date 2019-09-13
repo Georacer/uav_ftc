@@ -2,6 +2,7 @@
 import numpy as np
 from numpy import sin, cos, tan
 from typing import Any
+import time
 
 # %%
 
@@ -440,6 +441,15 @@ if __name__ == "__main__":
     derivatives = get_derivatives(current_state, inputs)
     print(derivatives)
     print('Successfully ran')
+
+    print('Test model execution time:')
+
+    t_start = time.time()
+    iterations = 10000
+    for _ in range(iterations):
+        derivatives = get_derivatives(current_state, inputs)
+    t_end = time.time()
+    print("Time required for {} model iterations: {}.".format(iterations, t_end-t_start))
 
 
 # %%
