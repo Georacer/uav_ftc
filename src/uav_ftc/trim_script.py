@@ -721,6 +721,17 @@ def test_code(plot, interactive, optimizer):
     t_end = time.time()
     print("Total script time: {}".format(t_end - t_start))
 
+    # Print human-readable polytope equations
+    unscaled_polytope = safe_poly._reduced_polytope.scale(safe_poly.eps.reshape(safe_poly._n_dim, 1))
+    print("Polytope equations:")
+    print("Variables:")
+    print("Polytope equations:")
+    print("Variables:")
+    header = safe_poly.axis_label_list
+    header.append(str(0))
+    print(' '.join('{:>15s}'.format(v) for v in header))
+    print(unscaled_polytope.get_equations_normalized(1))
+
     if plot:
         print("Plotting")
         safe_poly.plot()

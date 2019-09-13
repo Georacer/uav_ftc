@@ -185,6 +185,13 @@ class Polytope:
     def get_equations(self):
         return np.copy(self._equations)
 
+    # Return an equation array with equation coefficient normalized by a variable
+    def get_equations_normalized(self, var_idx):
+        eqn_array = self.get_equations()
+        if var_idx>len(eqn_array.shape):
+            raise ValueError("Requested a dimension index which is out of bounds")
+        return eqn_array / eqn_array[:,[var_idx]].repeat(eqn_array.shape[1], 1)
+
     def get_points(self):
         return np.copy(self._points)
 
@@ -1320,6 +1327,14 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine):
     # Approximate the safe convex polytope with k vertices
     print("Performing clustering")
     safe_poly.cluster(2 ** n_dim)
+
+    unscaled_polytope = safe_poly._reduced_polytope.scale(safe_poly.eps.reshape(safe_poly._n_dim, 1))
+    print("Polytope equations:")
+    print("Variables:")
+    header = safe_poly.axis_label_list
+    header.append(str(0))
+    print(' '.join('{:>15s}'.format(v) for v in header))
+    print(unscaled_polytope.get_equations_normalized(1))
 
     if flag_plot:
         print("Plotting")
