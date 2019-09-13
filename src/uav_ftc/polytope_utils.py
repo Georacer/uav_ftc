@@ -1043,7 +1043,6 @@ class SafeConvexPolytope:
             new_point_list = []
             for idx_inner in range(len(point_list)):
                 point = point_list[idx_inner]
-                print(point)
                 new_point_list.append(point[dim_slice])
             new_face_points.append(new_point_list)
         return new_face_points

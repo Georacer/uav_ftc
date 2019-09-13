@@ -10,7 +10,6 @@ import itertools as it
 # import xyzpy as xyz
 import os
 import time
-import timeit
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import click
@@ -112,7 +111,7 @@ class Trimmer:
             print("Building nlopt_cpp for trim calculations")
             self.nlopt_cpp_trimmer = tcpp.Trimmer('skywalker_2013')
             self.optim_algorithm = self.nlopt_cpp_optimize
-            self.optim_cost_threshold = 500
+            self.optim_cost_threshold = 10000
         else:
             raise ValueError('Undefined minimization algorithm')
 
@@ -629,7 +628,7 @@ def test_code(plot, interactive, optimizer):
     list_defaults = [phi_des, theta_des, Va_des, alpha_des, beta_des, r_des]
 
     # Set search degrees of freedom
-    # # Theta, Va, alpha
+    # Theta, Va, alpha
     # fix_phi = True
     # fix_theta = False
     # fix_Va = False
@@ -642,15 +641,16 @@ def test_code(plot, interactive, optimizer):
     fix_theta = False
     fix_Va = False
     fix_alpha = False
-    fix_beta = True
+    fix_beta = False
     fix_r = True
+
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
     phi_domain = (np.deg2rad(-20), np.deg2rad(20))
     theta_domain = (np.deg2rad(-45), np.deg2rad(45))
     Va_domain = (5, 30)
-    alpha_domain = (np.deg2rad(-10), np.deg2rad(45))
+    alpha_domain = (np.deg2rad(-10), np.deg2rad(35))
     beta_domain = (np.deg2rad(-5), np.deg2rad(5))
     r_domain = [-0.5, 0.5]
     domain = np.array(
@@ -672,13 +672,16 @@ def test_code(plot, interactive, optimizer):
 
     # Select eps values
     eps_phi = np.deg2rad(2)
-    eps_theta = np.deg2rad(2)
-    eps_Va = 1
-    eps_alpha = np.deg2rad(2)
+    eps_theta = np.deg2rad(3)
+    eps_Va = 2
+    eps_alpha = np.deg2rad(3)
     eps_beta = np.deg2rad(1)
     eps_r = 0.1
     eps = np.array([eps_phi, eps_theta, eps_Va, eps_alpha, eps_beta, eps_r])
     current_eps = eps[np.invert(list_fixed)]
+
+    # Initialize starting time
+    t_start = time.time()
 
     # Initialize the polytope
     safe_poly = poly.SafeConvexPolytope(indicator, current_domain, current_eps)
@@ -700,12 +703,6 @@ def test_code(plot, interactive, optimizer):
     if interactive:
         safe_poly.wait_for_user = True
 
-    # # Temporary indicator function benchmarking
-    # # profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[0],[15],[0],[0],[0]])), number=10)
-    # profile = timeit.timeit(lambda: safe_poly.indicator(np.array([[0],[15]])), number=10)
-    # print(profile)
-    # return
-
     # Iteratively sample the polytope
     print("Progressive sampling of the polytope")
     algorithm_end = False
@@ -715,16 +712,20 @@ def test_code(plot, interactive, optimizer):
 
     print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
     print("Total number of samples taken: {}".format(safe_poly._samples_taken))
-    print("Total number of optimization time required : {}".format(trimmer.optim_time_accumulator))
+    print("Total optimization time required: {}".format(trimmer.optim_time_accumulator))
 
     # Approximate the safe convex polytope with k vertices
     print("Performing clustering")
     safe_poly.cluster(2 ** n_dim)
 
+    t_end = time.time()
+    print("Total script time: {}".format(t_end - t_start))
+
     if plot:
         print("Plotting")
         safe_poly.plot()
         plt.show()
+
 
     # # Static Flight envelope construction
     # domain = {
