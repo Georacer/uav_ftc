@@ -192,10 +192,10 @@ class Trimmer:
 
         # Calculate derived quantities
         gamma = theta - alpha
-        try:
-            R = Va / r * cos(gamma) * cos(phi) * cos(theta)
-        except ZeroDivisionError:
-            R = np.inf
+        # try:
+        #     R = Va / r * cos(gamma) * cos(phi) * cos(theta)
+        # except ZeroDivisionError:
+        #     R = np.inf
 
         self.x_dot_des = mdl.aircraft_state()
         self.x_dot_des.pos.z = -Va * sin(gamma)
@@ -573,7 +573,7 @@ def build_feasible_fe(fe):
     return ds_f
 
 
-def build_convex_hull(ds):
+def build_hull(ds):
     # Build the convex hull of the flight envelope datapoints
     # fe: a xarray.DataSet
 
@@ -629,30 +629,39 @@ def test_code(plot, interactive, optimizer):
 
     # Set search degrees of freedom
     # Theta, Va, alpha
-    # fix_phi = True
-    # fix_theta = False
-    # fix_Va = False
-    # fix_alpha = False
-    # fix_beta = True
-    # fix_r = True
-
-    # More dimensions
-    fix_phi = False
+    fix_phi = True
     fix_theta = False
     fix_Va = False
     fix_alpha = False
-    fix_beta = False
+    fix_beta = True
     fix_r = True
+
+    # More dimensions
+    # fix_phi = False
+    # fix_theta = False
+    # fix_Va = False
+    # fix_alpha = False
+    # fix_beta = False
+    # fix_r = False
 
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
-    phi_domain = (np.deg2rad(-20), np.deg2rad(20))
-    theta_domain = (np.deg2rad(-45), np.deg2rad(45))
+    phi_domain = (np.deg2rad(-30), np.deg2rad(30))
+    theta_domain = (np.deg2rad(-25), np.deg2rad(25))
     Va_domain = (5, 30)
     alpha_domain = (np.deg2rad(-10), np.deg2rad(35))
     beta_domain = (np.deg2rad(-5), np.deg2rad(5))
     r_domain = [-0.5, 0.5]
+
+    # Domain as small as possible, known working
+    # phi_domain = (np.deg2rad(-20), np.deg2rad(20))
+    # theta_domain = (np.deg2rad(-25), np.deg2rad(25))
+    # Va_domain = (5, 30)
+    # alpha_domain = (np.deg2rad(-10), np.deg2rad(20))
+    # beta_domain = (np.deg2rad(-5), np.deg2rad(5))
+    # r_domain = [-0.5, 0.5]
+
     domain = np.array(
         [phi_domain, theta_domain, Va_domain, alpha_domain, beta_domain, r_domain]
     )
@@ -671,12 +680,12 @@ def test_code(plot, interactive, optimizer):
     indicator = trimmer.get_indicator(list_defaults, list_fixed)
 
     # Select eps values
-    eps_phi = np.deg2rad(2)
+    eps_phi = np.deg2rad(3)
     eps_theta = np.deg2rad(3)
     eps_Va = 2
     eps_alpha = np.deg2rad(3)
-    eps_beta = np.deg2rad(1)
-    eps_r = 0.1
+    eps_beta = np.deg2rad(2)
+    eps_r = 0.2
     eps = np.array([eps_phi, eps_theta, eps_Va, eps_alpha, eps_beta, eps_r])
     current_eps = eps[np.invert(list_fixed)]
 
@@ -716,21 +725,46 @@ def test_code(plot, interactive, optimizer):
 
     # Approximate the safe convex polytope with k vertices
     print("Performing clustering")
-    safe_poly.cluster(2 ** n_dim)
+    # cluster_num = 2 ** n_dim
+    # cluster_num = 2 * (n_dim-3)
+    if n_dim == 2:
+        cluster_num = 4
+    elif n_dim == 3:
+        cluster_num = 8
+    elif n_dim == 4:
+        clister_num = 8
+    elif n_dim == 5:
+        clister_num = 8
+    elif n_dim == 6:
+        clister_num = 8
+
+    safe_poly.cluster(cluster_num)
 
     t_end = time.time()
     print("Total script time: {}".format(t_end - t_start))
 
     # Print human-readable polytope equations
     unscaled_polytope = safe_poly._reduced_polytope.scale(safe_poly.eps.reshape(safe_poly._n_dim, 1))
-    print("Polytope equations:")
-    print("Variables:")
-    print("Polytope equations:")
-    print("Variables:")
+    eqns = unscaled_polytope.get_equations()
+    divisor = max(np.abs(eqns).min(), 1)
+    eqns = eqns/divisor
+    centroid = safe_poly.get_centroid(unscaled_polytope.get_points())
+
+    print("Polytope equations ({}):".format(eqns.shape[0]))
     header = safe_poly.axis_label_list
-    header.append(str(0))
-    print(' '.join('{:>15s}'.format(v) for v in header))
-    print(unscaled_polytope.get_equations_normalized(1))
+    header.append('Offset')
+    print(''.join('{:>15s}'.format(v) for v in header))
+    for eqn in eqns:
+        sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0,0]
+        line_string = ''
+        for elem in eqn:
+            line_string += '{:>15.1f}'.format(sign*elem)
+        line_string += '{:>5s}'.format('<0')
+        # if sign < 0:
+        #     line_string += '{:>5s}'.format('<0')
+        # else:
+        #     line_string += '{:>5s}'.format('>0')
+        print(line_string)
 
     if plot:
         print("Plotting")

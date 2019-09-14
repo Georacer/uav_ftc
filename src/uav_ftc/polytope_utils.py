@@ -50,8 +50,8 @@ def evaluate_hyperplane(points, equations):
 
 
 class Polytope:
-    _polytope_engine = "cdd"
-    # _polytope_engine = None
+    _polytope_engine = "ppl"
+    _polytope_object = None
     _decimal_places = 3
 
     _equations = None
@@ -63,6 +63,7 @@ class Polytope:
 
     # Construct a new polytope from a point (generator) set
     def set_points(self, points):
+        self._equations = None
         if self._polytope_engine == "cdd":
             self._set_points_cdd(points)
         elif self._polytope_engine == "ppl":
@@ -73,6 +74,7 @@ class Polytope:
 
     # Construct a new polytope from an equation set
     def set_equations(self, equations):
+        self._points = None
         if self._polytope_engine == "cdd":
             self._set_equations_cdd(equations)
         elif self._polytope_engine == "ppl":
@@ -88,16 +90,14 @@ class Polytope:
         point_rows = list(array)
         point_matrix = cdd.Matrix(point_rows)
         point_matrix.rep_type = cdd.RepType.GENERATOR
-        cdd_poly = cdd.Polyhedron(point_matrix)
-        self._build_equations_from_cdd(cdd_poly)
+        self._polytope_object = cdd.Polyhedron(point_matrix)
 
     def _set_equations_cdd(self, equations):
         cdd_e_set = self._convert_equations_to_cdd(equations)
         e_matrix = cdd.Matrix(cdd_e_set)
         e_matrix.rep_type = cdd.RepType.INEQUALITY
         e_matrix.canonicalize()
-        cdd_poly = cdd.Polyhedron(e_matrix)
-        self._build_points_from_cdd(cdd_poly)
+        self._polytope_object = cdd.Polyhedron(e_matrix)
 
     def _set_points_ppl(self, points):
         # print("Setting polytope points")
@@ -115,27 +115,17 @@ class Polytope:
             # print(point_ppl_expression)
             # print(ppl_point)
             gs.insert(ppl_point)
-        ppl_poly = ppl.C_Polyhedron(gs)
-        self._build_equations_from_ppl(ppl_poly)
-        # print(gs)
-        # print(ppl_poly)
-        # print(ppl_poly.constraints())
-        # print(ppl_poly.generators())
+        self._polytope_object = ppl.C_Polyhedron(gs)
 
     def _set_equations_ppl(self, equations):
         # print("Setting ppl equations")
         cs = ppl.Constraint_System()
         multiplier = 10**self._decimal_places
         scaled_equations = equations.round(self._decimal_places)*multiplier
-        # print(scaled_equations)
         for equation in scaled_equations:
             equation_ppl_expression = ppl.Linear_Expression(equation[:-1], equation[-1])
             cs.insert(equation_ppl_expression >= 0)
-        ppl_poly = ppl.C_Polyhedron(cs)
-        # print(equations)
-        # print(cs)
-        # print(ppl_poly)
-        self._build_points_from_ppl(ppl_poly)
+        self._polytope_object = ppl.C_Polyhedron(cs)
 
     def _build_points_from_cdd(self, cdd_poly):
         points = []
@@ -148,8 +138,10 @@ class Polytope:
     def _build_points_from_ppl(self, ppl_poly):
         # print("Building points from polytope")
         ppl_points = ppl_poly.minimized_generators()
+        # print("Got points from polytope engine")
         dim = ppl_poly.space_dimension()
         points = np.zeros((dim, len(ppl_points)))
+        # print("Generating {} points.".format(points.shape))
         # print(ppl_poly)
         # print(ppl_points)
         for idx, point_ppl in enumerate(ppl_points):
@@ -158,6 +150,17 @@ class Polytope:
             points[:,idx] = coefficients/divisor
         # print(points)
         self._points = points
+
+    def _build_points_unminimized_ppl(self, ppl_poly):
+        # print('Building unminimized polyhedron generators')
+        ppl_points_unmin = ppl_poly.generators()
+        dim = ppl_poly.space_dimension()
+        points = np.zeros((dim, len(ppl_points_unmin)))
+        for idx, point_ppl in enumerate(ppl_points_unmin):
+            coefficients = np.array(point_ppl.coefficients()).astype(float)
+            divisor = np.array(point_ppl.divisor()).astype(float)
+            points[:,idx] = coefficients/divisor
+        return points
 
     def _build_equations_from_cdd(self, cdd_poly):
         e_matrix = cdd_poly.get_inequalities()
@@ -183,6 +186,11 @@ class Polytope:
         self._equations = equations
 
     def get_equations(self):
+        if self._equations is None:
+            if self._polytope_engine == 'ppl':
+                self._build_equations_from_ppl(self._polytope_object)
+            elif self._polytope_engine == 'cdd':
+                self._build_equations_from_cdd(self._polytope_object)
         return np.copy(self._equations)
 
     # Return an equation array with equation coefficient normalized by a variable
@@ -193,6 +201,11 @@ class Polytope:
         return eqn_array / eqn_array[:,[var_idx]].repeat(eqn_array.shape[1], 1)
 
     def get_points(self):
+        if self._points is None:
+            if self._polytope_engine == 'ppl':
+                self._build_points_from_ppl(self._polytope_object)
+            elif self._polytope_engine == 'cdd':
+                self._build_points_from_cdd(self._polytope_object)
         return np.copy(self._points)
 
     def __contains__(self, point):
@@ -692,6 +705,7 @@ class SafeConvexPolytope:
         e_list = []
         # Set no-points dinstances to inf
         s = float("inf") * np.ones(len(self._set_no))
+        # print('Initialized no-point costs in a {} array'.format(s.shape))
         # get centroid
         p = self.get_centroid(self.points_yes)
         if np.any(np.isnan(p)):
@@ -702,7 +716,11 @@ class SafeConvexPolytope:
             )
 
         # While not all no-points have been separated
+        # idx = 0
         while np.max(s) > 0:
+            # if idx % 1000 == 0:
+                # print('Checked {} points...'.format(idx))
+            # idx += 1
             # choose the farthest no-point
             farthest_point_idx = np.argmax(s)
             farthest_point = self.points_no[:, [farthest_point_idx]]
@@ -722,8 +740,11 @@ class SafeConvexPolytope:
             #     s[idx] = min(s[idx], current_distances[0, idx])
             s[farthest_point_idx] = 0
 
+        # print('Finished creating separating hyperplanes')
+        # print('Building polytope')
         convex_polytope = Polytope()
         e_array = np.array(e_list)
+
         domain_equations = self._domain_polytope.get_equations()
         # print("Resulting equations")
         # print(e_array)
@@ -734,6 +755,7 @@ class SafeConvexPolytope:
         e_array = np.vstack((e_array, domain_equations))
         # e_list += list(self._domain_polytopeget_equations())
         convex_polytope.set_equations(e_array)
+        # print('Done finding convex separator')
         return convex_polytope
 
     # Return a hyperplane separating no_point from the centroid of set_yes
@@ -752,9 +774,18 @@ class SafeConvexPolytope:
 
     def _get_polytope_volume_approximate(self):
         # Calculate the volume of the circumscribed axis-aligned rectangle
-        points = self._polytope.get_points()
+        points = self._polytope._build_points_unminimized_ppl(self._polytope._polytope_object)
         mins = np.min(points, axis=1)
         maxs = np.max(points, axis=1)
+        return reduce(np.multiply, maxs-mins)
+
+    # Estimate the polytope volume based on which yes-points have been found inside
+    def _get_polytope_volume_approximate_2(self):
+        # print('Approximating polytope volume')
+        internal_yes_points = self.points_yes[:,self._polytope.contains(self.points_yes)]
+        # print('Found {} internal yes points'.format(internal_yes_points.shape))
+        mins = np.min(internal_yes_points, axis=1)
+        maxs = np.max(internal_yes_points, axis=1)
         return reduce(np.multiply, maxs-mins)
 
     # Return a list containing one MxN array for each face of the polytope
@@ -783,12 +814,13 @@ class SafeConvexPolytope:
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
-        print('Calculating existing polytope volume')
-        old_volume = self._get_polytope_volume_approximate()
+        # print('Calculating existing polytope volume')
+        old_volume = self._get_polytope_volume_approximate_2()
 
         # Create a convex polytope around set_yes
         print("Creating first-pass convex polytope")
         convex_polytope = self._convex_separator()
+        # print("Got preliminary convex polytope")
         e_array = convex_polytope.get_equations()
 
         # Find all the invalid points inside the polytope
@@ -827,7 +859,9 @@ class SafeConvexPolytope:
         self._polytope.set_equations(e_array)
 
         # print('Calculating new polytope volume')
-        new_volume = self._get_polytope_volume_approximate()
+        # print('Calculating new polytope volume')
+        new_volume = self._get_polytope_volume_approximate_2()
+        # print('Done building safe polytope')
         if abs((new_volume - old_volume) / old_volume) < self._volume_approx_factor:
             return True
         else:
