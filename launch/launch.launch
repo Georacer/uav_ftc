@@ -1,7 +1,7 @@
+<launch>
 <!-- Top-Level launch file for bundled launching /-->
 <!-- Launcher for the uav_ftc package -->
 
-<launch>
     <!-- Available arguments -->
     <arg name="manualMode" default="false"/>
     <arg name="autoMode" default="true"/>
@@ -10,6 +10,7 @@
     <!-- <arg name="groundCam" default="false"/> -->
     <arg name="scenario" default="none"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
+    <arg name="ftc" default="false"/>
 
     <!-- External optional arguments -->
     <arg name="home" default="nan"/>
@@ -55,6 +56,7 @@
         <arg name="manualMode" value="$(arg manualMode)"/>
         <arg name="autoMode" value="$(arg autoMode)"/>
         <arg name="uav_name" value="$(arg uav_name)"/>
+        <arg name="ftc" value="$(arg ftc)"/>
     </include>
 
     <!-- Launch the scenario player -->

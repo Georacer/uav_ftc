@@ -15,16 +15,20 @@
         "gamma": -0.20
     },
     "point_4": {
+        "time": 12,
+        "gamma": 0.0
+    },
+    "point_5": {
         "time": 15,
         "gamma": 0,
         "turn_radius": 150
     },
-    "point_5": {
-        "time": 20,
+    "point_6": {
+        "time": 18,
         "turn_radius": -150
     },
-    "point_6": {
-        "time": 25,
+    "point_7": {
+        "time": 23,
         "turn_radius": Infinity
     }
 }
