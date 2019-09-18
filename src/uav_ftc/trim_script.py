@@ -111,7 +111,7 @@ class Trimmer:
             print("Building nlopt_cpp for trim calculations")
             self.nlopt_cpp_trimmer = tcpp.Trimmer('skywalker_2013')
             self.optim_algorithm = self.nlopt_cpp_optimize
-            self.optim_cost_threshold = 10000
+            self.optim_cost_threshold = 1000
         else:
             raise ValueError('Undefined minimization algorithm')
 
@@ -192,10 +192,10 @@ class Trimmer:
 
         # Calculate derived quantities
         gamma = theta - alpha
-        # try:
-        #     R = Va / r * cos(gamma) * cos(phi) * cos(theta)
-        # except ZeroDivisionError:
-        #     R = np.inf
+        try:
+            R = Va / r * cos(gamma) * cos(phi) * cos(theta)
+        except ZeroDivisionError:
+            R = np.inf
 
         self.x_dot_des = mdl.aircraft_state()
         self.x_dot_des.pos.z = -Va * sin(gamma)
@@ -591,6 +591,15 @@ def build_hull(ds):
     # resulting in numerical issues
 
 
+def print_c_arrays(eqn_array):
+    string = ''
+    for i, eqn in enumerate(eqn_array):
+        string += 'const double {}a{}[{}] = {{'.format(' '*(2-len(str(i))), i, eqn_array.shape[1]-1)
+        string += ', '.join('{:>10.1f}'.format(c) for c in eqn)
+        string += '};\n'
+    return string
+
+
 @click.command()
 @click.option(
     "-p", "--plot", is_flag=True, help="Enable plotting. Only for 2D and 3D problems."
@@ -608,7 +617,13 @@ def build_hull(ds):
     default="nlopt",
     help="Select optimizer backend."
 )
-def test_code(plot, interactive, optimizer):
+@click.option(
+    "-e",
+    "--export",
+    is_flag=True,
+    help="Export relevant data in .csv files"
+)
+def test_code(plot, interactive, optimizer, export):
     trimmer = Trimmer(optim_lib=optimizer)
 
     # Trajectory Trimming
@@ -647,10 +662,10 @@ def test_code(plot, interactive, optimizer):
     list_fixed = [fix_phi, fix_theta, fix_Va, fix_alpha, fix_beta, fix_r]
 
     # Provide domain bounds
-    phi_domain = (np.deg2rad(-30), np.deg2rad(30))
-    theta_domain = (np.deg2rad(-25), np.deg2rad(25))
+    phi_domain = (np.deg2rad(-45), np.deg2rad(45))
+    theta_domain = (np.deg2rad(-25), np.deg2rad(60))
     Va_domain = (5, 30)
-    alpha_domain = (np.deg2rad(-10), np.deg2rad(35))
+    alpha_domain = (np.deg2rad(-10), np.deg2rad(25))
     beta_domain = (np.deg2rad(-5), np.deg2rad(5))
     r_domain = [-0.5, 0.5]
 
@@ -732,11 +747,11 @@ def test_code(plot, interactive, optimizer):
     elif n_dim == 3:
         cluster_num = 8
     elif n_dim == 4:
-        clister_num = 8
+        cluster_num = 8
     elif n_dim == 5:
-        clister_num = 8
+        cluster_num = 8
     elif n_dim == 6:
-        clister_num = 8
+        cluster_num = 9
 
     safe_poly.cluster(cluster_num)
 
@@ -748,29 +763,54 @@ def test_code(plot, interactive, optimizer):
     eqns = unscaled_polytope.get_equations()
     divisor = max(np.abs(eqns).min(), 1)
     eqns = eqns/divisor
+    # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
     centroid = safe_poly.get_centroid(unscaled_polytope.get_points())
+    for i, eqn in enumerate(eqns):
+        sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0,0]
+        eqns[i, :] = sign*eqn
 
     print("Polytope equations ({}):".format(eqns.shape[0]))
-    header = safe_poly.axis_label_list
+    header = list(safe_poly.axis_label_list)
     header.append('Offset')
     print(''.join('{:>15s}'.format(v) for v in header))
     for eqn in eqns:
-        sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0,0]
         line_string = ''
         for elem in eqn:
-            line_string += '{:>15.1f}'.format(sign*elem)
+            line_string += '{:>15.1f}'.format(elem)
         line_string += '{:>5s}'.format('<0')
-        # if sign < 0:
-        #     line_string += '{:>5s}'.format('<0')
-        # else:
-        #     line_string += '{:>5s}'.format('>0')
         print(line_string)
+
+    print('C-type definition:')
+    print(print_c_arrays(eqns))
 
     if plot:
         print("Plotting")
         safe_poly.plot()
         plt.show()
 
+
+    if export:
+        
+        unscaled_yes_points = safe_poly.points_yes*safe_poly.eps.reshape(safe_poly._n_dim, 1)
+        unscaled_no_points = safe_poly.points_no*safe_poly.eps.reshape(safe_poly._n_dim, 1)
+        unscaled_polytope = safe_poly._polytope.scale(safe_poly.eps.reshape(safe_poly._n_dim, 1))
+        eqns = unscaled_polytope.get_equations()
+        divisor = max(np.abs(eqns).min(), 1)
+        eqns = eqns/divisor
+        # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
+        centroid = safe_poly.get_centroid(unscaled_polytope.get_points())
+        for i, eqn in enumerate(eqns):
+            sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0,0]
+            eqns[i, :] = sign*eqn
+        vertices = unscaled_polytope.get_points()
+        print(vertices)
+
+        output_path = '/home/george/ros_workspaces/uav_ftc/src/uav_ftc/logs/flight_envelope_va_gamma'
+        header_txt = ','.join(safe_poly.axis_label_list)
+        np.savetxt('{}/points_yes.csv'.format(output_path), unscaled_yes_points.transpose(), fmt='%.3g', delimiter=',', header=header_txt, comments='')
+        np.savetxt('{}/points_no.csv'.format(output_path), unscaled_no_points.transpose(), fmt='%.3g', delimiter=',', header=header_txt, comments='')
+        np.savetxt('{}/separators.csv'.format(output_path), eqns, fmt='%15.1f', delimiter=',', header=(header_txt+',Offset'), comments='')
+        np.savetxt('{}/vertices.csv'.format(output_path), vertices.transpose(), fmt='%15.1f', delimiter=',', header=header_txt, comments='')
 
     # # Static Flight envelope construction
     # domain = {

@@ -27,6 +27,7 @@ import ppl
 import click
 
 import plot_utils as pu
+mpl.rcParams['pdf.fonttype'] = 42
 
 # Get the distance of a point from a hypersurface
 # Essentially this is an evaluation of the point for the hypersurface expression
@@ -292,6 +293,8 @@ class SafeConvexPolytope:
     _sample_decimal_places = 3
 
     _axis_handle = None
+    _plot_index = 0
+    save_figures = False
     axis_label_list = None
     plotting_mask = None
 
@@ -917,7 +920,7 @@ class SafeConvexPolytope:
         # get centroid
         p = self.get_centroid(self.points_yes)
         # Set contraction distance
-        eps_out = 1 * np.max(self._normalized_eps)
+        eps_out = 1.5 * np.max(self._normalized_eps)
         eps_in = 1 * np.max(self._normalized_eps)
 
         # Contract yes points and delete outside points
@@ -944,9 +947,11 @@ class SafeConvexPolytope:
         # Contract yes points and delete outside points
         recentered_yes_points = self.points_yes - p
         norms_yes = np.linalg.norm(recentered_yes_points, axis=0).reshape(1, -1)
-        factors_yes = np.repeat((norms_yes + eps_in) / norms_yes, p.shape[0], axis=0)
+        # print((eps_in, norms_yes))
+        factors_yes = np.repeat((norms_yes + eps_in) / (norms_yes + 0.01), p.shape[0], axis=0)
         # Dont' allow the contracted point to fly to the other side of p
         factors_yes = np.maximum(factors_yes, np.zeros(factors_yes.shape))
+        # print((factors_yes, recentered_yes_points))
         contracted_yes_points = recentered_yes_points * factors_yes + p
         points_to_keep_mask = np.invert(self._polytope.contains(contracted_yes_points))
         self.points_yes = self.points_yes[:, points_to_keep_mask]
@@ -1238,6 +1243,9 @@ class SafeConvexPolytope:
             ah.grid(True, which="minor")
 
         plt.draw()
+        if self.save_figures:
+            self._figure_handle.savefig('figure{:02d}.pdf'.format(self._plot_index), bbox_inches='tight')
+            self._plot_index += 1
         plt.pause(0.01)
         if self.wait_for_user:
             plt.waitforbuttonpress(timeout=-1)
@@ -1296,10 +1304,16 @@ def hypertriangle(p):
     "-e",
     "--polytope-engine",
     type=click.Choice(["cdd", "ppl"]),
-    default="cdd",
+    default="ppl",
     help="Select the polytope engine module",
 )
-def test_code(dimensions, plot, interactive, shape, polytope_engine):
+@click.option(
+    "-w",
+    "--write-figures",
+    is_flag=True,
+    help="Save each plotted figure"
+)
+def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figures):
 
     n_dim = dimensions
     print("Testing polytope code for {} dimensions".format(n_dim))
@@ -1347,6 +1361,8 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine):
         safe_poly.enable_plotting = True
     if interactive:
         safe_poly.wait_for_user = True
+    if write_figures:
+        safe_poly.save_figures = True
 
     # Iteratively sample the polytope
     print("Progressive sampling of the polytope")
