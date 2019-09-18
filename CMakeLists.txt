@@ -16,9 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
 	message_generation
-  mathutils
-  uav_utils
   last_letter_msgs
+	last_letter_lib
 )
 
 find_package(Eigen3 REQUIRED)
@@ -116,7 +115,7 @@ catkin_python_setup()
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES uav_ftc
- CATKIN_DEPENDS roscpp std_msgs mathutils uav_utils# message_runtime
+ CATKIN_DEPENDS roscpp std_msgs last_letter_lib# message_runtime
  DEPENDS EIGEN3
 )
 
@@ -130,6 +129,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
+	${last_letter_lib_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -153,6 +153,30 @@ add_library(rate_controller_solver
 )
 target_include_directories(rate_controller_solver PUBLIC
   mpc_models/rate_controller/rate_controller_mpc_solver/
+  externals/qpoases
+  externals/qpoases/INCLUDE
+  externals/qpoases/SRC
+)
+
+# The rate controller solver library, with full state constraints, nominal
+add_library(rate_controller_solver_2
+  externals/qpoases/SRC/Bounds.cpp
+  externals/qpoases/SRC/Constraints.cpp
+  externals/qpoases/SRC/CyclingManager.cpp
+  externals/qpoases/SRC/Indexlist.cpp
+  externals/qpoases/SRC/MessageHandling.cpp
+  externals/qpoases/SRC/QProblem.cpp
+  externals/qpoases/SRC/QProblemB.cpp
+  externals/qpoases/SRC/SubjectTo.cpp
+  externals/qpoases/SRC/Utils.cpp
+  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
+  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_qpoases_interface.cpp
+  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_integrator.c
+  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_solver.c
+  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_auxiliary_functions.c
+)
+target_include_directories(rate_controller_solver_2 PUBLIC
+  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/
   externals/qpoases
   externals/qpoases/INCLUDE
   externals/qpoases/SRC
@@ -182,6 +206,30 @@ target_include_directories(trajectory_controller_solver PUBLIC
   externals/qpoases/SRC
 )
 
+# The trajectory controller solver 2 library, with Va, theta constraints
+add_library(trajectory_controller_solver_2
+  externals/qpoases/SRC/Bounds.cpp
+  externals/qpoases/SRC/Constraints.cpp
+  externals/qpoases/SRC/CyclingManager.cpp
+  externals/qpoases/SRC/Indexlist.cpp
+  externals/qpoases/SRC/MessageHandling.cpp
+  externals/qpoases/SRC/QProblem.cpp
+  externals/qpoases/SRC/QProblemB.cpp
+  externals/qpoases/SRC/SubjectTo.cpp
+  externals/qpoases/SRC/Utils.cpp
+  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
+  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_qpoases_interface.cpp
+  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_integrator.c
+  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_solver.c
+  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_auxiliary_functions.c
+)
+target_include_directories(trajectory_controller_solver_2 PUBLIC
+  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/
+  externals/qpoases
+  externals/qpoases/INCLUDE
+  externals/qpoases/SRC
+)
+
 # The rate controller wrapper
 add_library(rate_controller_wrapper
   src/mpc_wrapper.cpp
@@ -190,12 +238,28 @@ target_link_libraries(rate_controller_wrapper
   rate_controller_solver
 )
 
+# The rate controller 2 wrapper, with full state constraints, no fault
+add_library(rate_controller_wrapper_2
+  src/mpc_wrapper.cpp
+)
+target_link_libraries(rate_controller_wrapper_2
+  rate_controller_solver_2
+)
+
 # The trajectory controller wrapper
 add_library(trajectory_controller_wrapper
   src/mpc_wrapper.cpp
 )
 target_link_libraries(trajectory_controller_wrapper
   trajectory_controller_solver
+)
+
+# The trajectory controller 2 wrapper
+add_library(trajectory_controller_wrapper_2
+  src/mpc_wrapper.cpp
+)
+target_link_libraries(trajectory_controller_wrapper_2
+  trajectory_controller_solver_2
 )
 
 ## Add cmake target dependencies of the library
@@ -215,6 +279,16 @@ target_link_libraries(rate_controller
   rate_controller_wrapper
 )
 
+# The rate controller_2, with full state constraints, no faults
+add_executable(rate_controller_2
+  src/rate_controller_2.cpp
+)
+add_dependencies(rate_controller_2 ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(rate_controller_2
+  ${catkin_LIBRARIES}
+  rate_controller_wrapper_2
+)
+
 # The trajectory controller
 add_executable(trajectory_controller
   src/trajectory_controller.cpp
@@ -223,6 +297,16 @@ add_dependencies(trajectory_controller ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(trajectory_controller
   ${catkin_LIBRARIES}
   trajectory_controller_wrapper
+)
+
+# The trajectory controller 2
+add_executable(trajectory_controller_2
+  src/trajectory_controller_2.cpp
+)
+add_dependencies(trajectory_controller_2 ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(trajectory_controller_2
+  ${catkin_LIBRARIES}
+  trajectory_controller_wrapper_2
 )
 
 # Node reading from joystick and generating reference commands

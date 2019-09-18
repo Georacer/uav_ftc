@@ -55,18 +55,21 @@
   <build_depend>last_letter_msgs</build_depend>
   <build_depend>mathutils</build_depend>
   <build_depend>uav_utils</build_depend>
+  <build_depend>last_letter_lib</build_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>last_letter_msgs</build_export_depend>
   <build_export_depend>mathutils</build_export_depend>
   <build_export_depend>uav_utils</build_export_depend>
+  <build_export_depend>last_letter_lib</build_export_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>last_letter_msgs</exec_depend>
   <exec_depend>mathutils</exec_depend>
   <exec_depend>uav_utils</exec_depend>
+  <exec_depend>last_letter_lib</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

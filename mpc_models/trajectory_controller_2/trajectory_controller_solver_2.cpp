@@ -22,10 +22,18 @@ int main()
   ///////////////////
   // System variables
   ///////////////////
-  DifferentialState Va, alpha, beta, phi, theta;
-  IntermediateState psi_dot, gamma;
+  DifferentialState Va, alpha, beta, phi, theta;//, dummy;
+  // IntermediateState psi_dot, gamma;
+  IntermediateState psi_dot, gamma, envcost;
   // AlgebraicState psi_dot, gamma; // Simulation cannot handle DAEs
-  Control p, q, r, deltat;
+  Control p, q, r, deltat;//, slack;
+
+  // Specify constraint coefficients
+  // Manually entered
+  const double  a0[3] = {      12.0,        1.0,        -16}; // Va top
+  const double  a1[3] = {       0.0,       -1.0,        5.0}; // Va bot
+  const double  a2[3] = {      -1.0,        0.0,       -0.4}; // theta min
+  const double  a3[3] = {       1.0,        0.0,       -1.0}; // theta max
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
@@ -94,6 +102,8 @@ int main()
   // gamma = theta - alpha; Holds only for beta==0
   gamma = (ca*cb)*sth - (sph*sb + cph*sa*cb)*cth; // Stevens-Lewis 3.4-2
 
+  envcost = a0[0]*theta +  a0[1]*Va +  a0[2];
+
   // System dynamics
   DifferentialEquation f;
   f << dot(Va) == Fprop * ca * cb / m - FD / m + g1;
@@ -103,6 +113,8 @@ int main()
   f << dot(theta) == q * cph - r * sph;
   // f << 0 == -psi_dot + (q*sph + r*cph)/cth;
   // f << 0 == -gamma + theta - alpha;
+  // f << dot(dummy) == slack;
+  // f << dot(dummy) == -0.1*dummy + slack;
 
   ////////
   // Costs
@@ -113,8 +125,12 @@ int main()
     << gamma // Prescribed flight path angle
     << psi_dot // Prescribed turn rate
     << alpha << beta // Minimize alpha and beta
+    // << alpha << dummy // Minimize alpha and beta
     << p << q << r // Prescribed angular rates
-    << deltat; // Minimize throttle
+    << deltat // Minimize throttle
+    << envcost;
+    // << slack; // Minimize slack variable
+    // << dummy; // Minimize integral of slack variable
 
   // End cost vector, cannot depend on controls, only on state
   hN << Va // Presribed airspeed 
@@ -125,15 +141,21 @@ int main()
   // Running cost weight matrix
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
-  Q(0, 0) = 10; // Va
+  // 10, 1 works
+  Q(0, 0) = 10; // Va 
   Q(1, 1) = 1000; // Flight path angle
   Q(2, 2) = 1000; // turn rate
   Q(3, 3) = 0.01;  // alpha
   Q(4, 4) = 10;  // beta
+  Q(4, 4) = 1;  // dummy
   Q(5, 5) = 0.5;   // p
   Q(6, 6) = 5;   // q
   Q(7, 7) = 10;   // r
-  Q(8, 8) = 1;   // throttle
+  Q(8, 8) = 1;   // trottle
+  Q(9, 9) = 10;   // envcost
+  // Q(9, 9) = 1000;   // slack
+  // Q(9, 9) = 10;   // slack
+  // Q(9, 9) = 0.01;   // dummy
 
   // End cost weight matrix
   DMatrix QN(hN.getDim(), hN.getDim());
@@ -161,12 +183,22 @@ int main()
   ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
   ocp.subjectTo(-10.0*M_PI/180.0 <= beta <= 10.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
   ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
-  ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
+  ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 60.0*M_PI/180.0); // Constraining theta to help with solution feasibility
+
+  // Flight envelope constraints
+  // ocp.subjectTo( a0[0]*theta +  a0[1]*Va +  a0[2] - slack <= 0 );
+  // ocp.subjectTo( 0.0 <= slack) ;
+  // ocp.subjectTo( -10 <= slack) ;
+  // ocp.subjectTo( a1[0]*theta +  a1[1]*Va +  a1[2] <= 0 );
+  // ocp.subjectTo( a2[0]*theta +  a2[1]*Va +  a2[2] <= 0 );
+  // ocp.subjectTo( a3[0]*theta +  a3[1]*Va +  a3[2] <= 0 );
 
   // Other feasibility constraints
   // ocp.subjectTo(0 <= phi*psi_dot); // Force a positive-G maneuvera the end of the horizon
+
   // Set Number of Online Data
   // ocp.setNOD(3); // No online data for this model
+
   if (!CODE_GEN)
   {
     // Set a reference for the analysis
@@ -326,7 +358,7 @@ int main()
     mpc.set(GENERATE_SIMULINK_INTERFACE, NO);
 
     // Finally, export everything.
-    if (mpc.exportCode("trajectory_controller_mpc_solver") != SUCCESSFUL_RETURN)
+    if (mpc.exportCode("trajectory_controller_mpc_solver_2") != SUCCESSFUL_RETURN)
       exit(EXIT_FAILURE);
     mpc.printDimensionsQP();
   }
