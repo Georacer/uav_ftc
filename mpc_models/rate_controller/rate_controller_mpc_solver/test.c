@@ -68,6 +68,9 @@ int main()
 	/* Initialize the states and controls. */
 	for (i = 0; i < NX * (N + 1); ++i)
 		acadoVariables.x[i] = 0.0;
+	for (i=1; i < NX * (N + 1); i+=NX)
+		acadoVariables.x[i] = -0.3684;
+
 	for (i = 0; i < NU * N; ++i)
 		acadoVariables.u[i] = 0.0;
 
@@ -81,7 +84,10 @@ int main()
 	{
 		acadoVariables.od[i * 3] = 15;
 		acadoVariables.od[i * 3 + 1] = 0.034;
-		acadoVariables.od[i * 3 + 1] = 0;
+		acadoVariables.od[i * 3 + 2] = 0;
+		// acadoVariables.od[i * 3] = 5.1;
+		// acadoVariables.od[i * 3 + 1] = 0.2457;
+		// acadoVariables.od[i * 3 + 1] = 0;
 	}
 
 	/* Initialize the measurements/reference. */
@@ -89,6 +95,10 @@ int main()
 		acadoVariables.y[i] = 0.0;
 	for (i = 0; i < NYN; ++i)
 		acadoVariables.yN[i] = 0.0;
+
+	// Initialize nodes by propagating the first state instance by the given inputs and online data
+	// printf("Propagating state with Forward Simulation\n");
+	acado_initializeNodesByForwardSimulation();
 
 	/* MPC: initialize the current state feedback. */
 #if ACADO_INITIAL_STATE_FIXED
@@ -152,7 +162,7 @@ int main()
 
 	/* Eye-candy. */
 
-	if (!VERBOSE)
+	if (VERBOSE)
 		printf("\n\n Average time of one real-time iteration:   %.3g microseconds\n\n", 1e6 * te / NUM_STEPS);
 
 	acado_printDifferentialVariables();
