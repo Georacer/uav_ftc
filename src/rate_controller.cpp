@@ -9,6 +9,16 @@
  */
 #include "rate_controller.hpp"
 
+#include <cstdlib>
+#include <math.h>
+#include <math_utils.hpp>
+#include <uav_utils.hpp>
+
+#include <geometry_msgs/Vector3.h>
+#include <last_letter_msgs/SimPWM.h>
+
+using Eigen::Vector3d;
+
 /**
  * @brief Construct a new Rate Controller:: Rate Controller object
  * 
@@ -79,10 +89,15 @@ void RateController::step()
     }
     
     // Convert airdata triplet
-    geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
-    airdata_(0) = airdataVec.x;
-    airdata_(1) = airdataVec.y;
-    airdata_(2) = airdataVec.z;
+    Vector3d tempVect = getAirData(Vector3d(states_.velocity.linear.x,
+                                            states_.velocity.linear.y,
+                                            states_.velocity.linear.z));
+    airdata_ = tempVect.cast<float>();
+    // geometry_msgs::Vector3 airdataVec = getAirData(states_.velocity.linear);
+    // airdata_(0) = airdataVec.x;
+    // airdata_(1) = airdataVec.y;
+    // airdata_(2) = airdataVec.z;
+
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata_(0) < 1)
     {
@@ -158,9 +173,12 @@ void RateController::writeOutput()
     geometry_msgs::Vector3Stamped channels;
     // MPC controls are in radians, must convert them to -1,1 range
     double deltaa_max, deltae_max, deltar_max;
-    ros::param::getCached("airfoil1/deltaa_max_nominal", deltaa_max);
-    ros::param::getCached("airfoil1/deltae_max_nominal", deltae_max);
-    ros::param::getCached("airfoil1/deltar_max_nominal", deltar_max);
+    // ros::param::getCached("airfoil1/deltaa_max_nominal", deltaa_max);
+    // ros::param::getCached("airfoil1/deltae_max_nominal", deltae_max);
+    // ros::param::getCached("airfoil1/deltar_max_nominal", deltar_max);
+    ros::param::getCached("airfoil1/deltaa_max", deltaa_max);
+    ros::param::getCached("airfoil1/deltae_max", deltae_max);
+    ros::param::getCached("airfoil1/deltar_max", deltar_max);
     channels.vector.x = constrain(predicted_controls_(0) / deltaa_max, -1.0, 1.0); // Pass aileron input
     channels.vector.y = constrain(predicted_controls_(1) / deltae_max, -1.0, 1.0); // Pass elevator input
     channels.vector.z = constrain(predicted_controls_(2) / deltar_max, -1.0, 1.0);   // Pass rudder input

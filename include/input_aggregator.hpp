@@ -2,7 +2,6 @@
 
 #include <geometry_msgs/Vector3Stamped.h>
 
-#include <uav_utils/uav_utils.hpp>
 #include <last_letter_msgs/SimPWM.h>
 #include <last_letter_msgs/SimStates.h>
 

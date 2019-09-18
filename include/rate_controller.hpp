@@ -1,16 +1,10 @@
 #include <ros/ros.h>
 #include "mpc_wrapper.hpp"
 
-#include <cstdlib>
-#include <math.h>
-#include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Eigen>
 
-#include <mathutils/mathutils.hpp>
-#include <uav_utils/uav_utils.hpp>
 #include <last_letter_msgs/SimStates.h>
-#include <last_letter_msgs/SimPWM.h>
 
 class RateController
 {

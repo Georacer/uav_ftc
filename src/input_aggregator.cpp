@@ -9,6 +9,8 @@
  */
 #include <input_aggregator.hpp>
 
+#include <uav_utils.hpp>
+
 /**
  * @brief Construct a new Input Aggregator:: Input Aggregator object
  * 

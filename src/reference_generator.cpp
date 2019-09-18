@@ -9,6 +9,10 @@
  */
 #include <reference_generator.hpp>
 
+#include <math_utils.hpp>
+
+#include <geometry_msgs/Vector3Stamped.h>
+
 /**
  * @brief Construct a new Reference Generator:: Reference Generator object
  * Is tasked with generating reference commands from user inputs

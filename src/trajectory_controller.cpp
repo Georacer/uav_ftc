@@ -9,6 +9,18 @@
  */
 #include "trajectory_controller.hpp"
 
+#include <cstdlib>
+#include <math.h>
+
+#include <math_utils.hpp>
+#include <uav_utils.hpp>
+
+#include <geometry_msgs/Vector3.h>
+#include <last_letter_msgs/SimPWM.h>
+
+using Eigen::Vector3d;
+using Eigen::Vector3f;
+
 /**
  * @brief Construct a new Trajectory Controller:: Rate Controller object
  * 
@@ -86,11 +98,12 @@ void TrajectoryController::step()
         return;
     }
     
-    // Convert airdata triplet
-    geometry_msgs::Vector3 airdataVec = getAirData(simStates_.velocity.linear);
-    airdata_(0) = airdataVec.x;
-    airdata_(1) = airdataVec.y;
-    airdata_(2) = airdataVec.z;
+    // // Convert airdata triplet
+    // Already doing that in state callback
+    // airdata_ = getAirdata(Vector3d(simStates_.velocity.linear.x,
+    //                                simStates_.velocity.linear.y,
+    //                                simStates_.velocity.linear.z));
+
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata_(0) < 1)
     {
@@ -115,7 +128,7 @@ void TrajectoryController::step()
 
     // Shift the solver state by one and re-initialize
     mpcController_.shift(); // Shifting seems to destabilize solution
-    // acado_initializeNodesByForwardSimulation();
+    acado_initializeNodesByForwardSimulation();
     mpcController_.prepare();
 
     // Fill control commands and publish them
@@ -137,14 +150,29 @@ void TrajectoryController::getStates(last_letter_msgs::SimStates inpStates)
     // Copy over all aircraft state
     simStates_ = inpStates;
 
+    // Extract airdata
+    Vector3d tempVect = getAirData(Vector3d(simStates_.velocity.linear.x,
+                                            simStates_.velocity.linear.y,
+                                            simStates_.velocity.linear.z));
+    airdata_ = tempVect.cast<float>();
+
     // Isolate relevant states
-    geometry_msgs::Vector3 airdata = getAirData(inpStates.velocity.linear);
-    states_(0) = airdata.x;
-    states_(1) = airdata.y;
-    states_(2) = airdata.z;
-    geometry_msgs::Vector3 euler = quat2euler(inpStates.pose.orientation);
-    states_(3) = euler.x;
-    states_(4) = euler.y;
+    states_(0) = airdata_.x();
+    states_(1) = airdata_.y();
+    states_(2) = airdata_.z();
+
+    Eigen::Quaterniond tempQuat(inpStates.pose.orientation.w,
+                                inpStates.pose.orientation.x,
+                                inpStates.pose.orientation.y,
+                                inpStates.pose.orientation.z);
+    Vector3d euler = quat2euler(tempQuat);
+    states_(3) = euler.x();
+    states_(4) = euler.y();
+
+    double q = simStates_.velocity.angular.y;
+    double r = simStates_.velocity.angular.z;
+    double psi_dot = (q*sin(euler.x()) + r*cos(euler.x()))/cos(euler.y());
+    // std::cout req/act: " <<  reference_(2) << "/\t" << psi_dot << std::endl;
 
     statesReceivedStatus_ = true;
 }

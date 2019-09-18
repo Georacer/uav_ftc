@@ -1,9 +1,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Joy.h>
-#include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Eigen>
 
-#include <mathutils/mathutils.hpp>
 
 class ReferenceGenerator
 {
