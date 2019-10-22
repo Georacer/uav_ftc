@@ -28,13 +28,13 @@ void convertRosQuaternion(const Eigen::Quaterniond quatEigen, geometry_msgs::Qua
 class SubHandlerLL : public SubHandler
 {
     public:
-    Vector3d wind_body, vel_body_inertial, vel_body_relative;
-    Quaterniond rotation_be;
+    ros::Subscriber sub_state, sub_state_dot, sub_environment, sub_wrench, sub_input, sub_output;
 
     SubHandlerLL(ros::NodeHandle n);
 
     private:
-    ros::Subscriber sub_state, sub_state_dot, sub_environment, sub_wrench, sub_input, sub_output;
+    Vector3d wind_body, vel_body_inertial, vel_body_relative;
+    Quaterniond rotation_be;
 
     void cb_state(last_letter_msgs::SimStates msg);
     void cb_state_dot(last_letter_msgs::SimStates msg);
@@ -44,7 +44,7 @@ class SubHandlerLL : public SubHandler
     void cb_output(last_letter_msgs::SimPWM msg);
 };
 
-SubHandlerLL::SubHandlerLL(ros::NodeHandle n)
+SubHandlerLL::SubHandlerLL(ros::NodeHandle n) : SubHandler()
 {
     // Variable initialization
     wind_body = Vector3d::Zero();
@@ -53,11 +53,14 @@ SubHandlerLL::SubHandlerLL(ros::NodeHandle n)
     rotation_be = Quaterniond::Identity();
 
 	sub_state = n.subscribe("states",1,&SubHandlerLL::cb_state, this); // State subscriber
+    ROS_INFO("Subscribed to state %s", sub_state.getTopic().c_str());
 	sub_state_dot = n.subscribe("statesDot",1,&SubHandlerLL::cb_state_dot, this); // State derivatives subscriber
 	sub_environment = n.subscribe("environment",1,&SubHandlerLL::cb_environment, this); // Environment subscriber
 	sub_wrench = n.subscribe("wrenches",1,&SubHandlerLL::cb_wrench, this); // Input wrenches subscriber
 	sub_input = n.subscribe("rawPWM",1,&SubHandlerLL::cb_input, this); // Input subscriber
 	sub_output = n.subscribe("ctrlPWM",1,&SubHandlerLL::cb_output, this); // Output subscriber
+
+    ROS_INFO("Built SubHandlerLL");
 }
 
 void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)

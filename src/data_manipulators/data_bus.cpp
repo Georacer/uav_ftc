@@ -7,14 +7,20 @@ DataBus::DataBus(ros::NodeHandle n, uint data_source)
 {
     if (data_source == DATA_SOURCE_LL)
     {
-        sub_handler_ = SubHandlerLL(n);
+        sub_handler_ = new SubHandlerLL(n);
     }
     data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 1000);
 }
 
+DataBus::~DataBus()
+{
+    delete sub_handler_;
+}
+
 void DataBus::publish_data()
 {
-    bus_data_ = sub_handler_.bus_data;
+    bus_data_ = sub_handler_->bus_data;
+    bus_data_.header.stamp = ros::Time::now();
     data_pub_.publish(bus_data_);
 }
 
@@ -30,6 +36,7 @@ void DataBus::run()
 	while (ros::ok())
 	{
 		ros::spinOnce();
+        publish_data();
 		spinner.sleep();
     }
 }

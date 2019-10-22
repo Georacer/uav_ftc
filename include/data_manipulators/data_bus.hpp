@@ -13,7 +13,7 @@ class SubHandler
     public:
     uav_ftc::BusData bus_data;
 
-    uav_ftc::BusData get_data();
+    uav_ftc::BusData get_data() {};
     SubHandler() {};
 
 };
@@ -25,13 +25,14 @@ class DataBus
     double pub_rate_;
     ros::Publisher data_pub_;
     uav_ftc::BusData bus_data_; // Contains aggregated output data
-    SubHandler sub_handler_;
+    SubHandler * sub_handler_;
 
     public:
 
     // Methods
 
     DataBus(ros::NodeHandle h, uint data_source); // Constructor
+    ~DataBus();
     void publish_data(); // Data publisher
     void set_pub_rate(double rate);
     void run(); // Spin constantly
