@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  geometry_msgs
 	message_generation
   last_letter_msgs
 	last_letter_lib
@@ -56,12 +57,10 @@ catkin_python_setup()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-  # FILES
-  # refRates.msg
-  # refAirdata.msg
-  # refManeuver.msg
-# )
+add_message_files(
+  FILES
+  BusData.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -77,11 +76,12 @@ catkin_python_setup()
 #   Action2.action
 # )
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+# Generate added messages and services with any dependencies listed here
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -113,9 +113,9 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
- INCLUDE_DIRS include
+ INCLUDE_DIRS include include/data_manipulators
 #  LIBRARIES uav_ftc
- CATKIN_DEPENDS roscpp std_msgs last_letter_lib# message_runtime
+ CATKIN_DEPENDS roscpp std_msgs geometry_msgs last_letter_lib message_runtime
  DEPENDS EIGEN3
 )
 
@@ -127,6 +127,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   include
+  include/data_manipulators
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
 	${last_letter_lib_INCLUDE_DIRS}
@@ -325,6 +326,16 @@ add_executable(input_aggregator
 )
 add_dependencies(input_aggregator ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(input_aggregator
+  ${catkin_LIBRARIES}
+  ${catkin_INCLUDE_DIRS}
+)
+
+# Node reading from sensors and building the BusData message
+add_executable(data_bus
+  src/data_manipulators/data_bus.cpp
+)
+add_dependencies(data_bus ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(data_bus
   ${catkin_LIBRARIES}
   ${catkin_INCLUDE_DIRS}
 )
