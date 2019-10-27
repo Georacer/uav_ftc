@@ -1,0 +1,18 @@
+<launch>
+    <!-- Available arguments -->
+    <arg name="manualMode" default="false"/>
+    <arg name="autoMode" default="true"/>
+    <arg name="uav_name" default="skywalker_2013"/>
+    <arg name="log" default="false"/>
+    <!-- <arg name="groundCam" default="false"/> -->
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="true"/>
+
+    <!-- Launch the scenario player -->
+    <group ns="$(arg uav_name)">
+        <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+            <param name="data_source" value="1"/>
+        </node>
+    </group>
+
+</launch>

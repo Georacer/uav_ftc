@@ -81,7 +81,6 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     rotation_be.z() = msg.pose.orientation.z;
     rotation_be.w() = msg.pose.orientation.w;
     bus_data.velocity_angular = msg.velocity.angular; // Body frame
-    vel_body_inertial = Vector3d(msg.velocity.linear.x, msg.velocity.linear.y, msg.velocity.linear.z); // Body frame
     bus_data.rps_motor = msg.rotorspeed[0]; // Currently only for first motor
 
     temp_vect_eig = rotation_be * wind_body;
@@ -91,18 +90,19 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     // temp_vect_ros.z = temp_vect_eig.z();
     // bus_data.wind =  temp_vect_ros; // NED frame
 
-    vel_body_inertial = rotation_be.conjugate() * Vector3d(msg.geoid.velocity.x, msg.geoid.velocity.y, msg.geoid.velocity.z);
+    vel_body_inertial = Vector3d(msg.velocity.linear.x, msg.velocity.linear.y, msg.velocity.linear.z); // Body frame
     vel_body_relative = vel_body_inertial - wind_body;
     Vector3d airdata = getAirData(vel_body_relative);
     bus_data.airspeed = airdata.x();
+    bus_data.qbar = 0.5*bus_data.rho*airdata.x()*airdata.x();
     bus_data.angle_of_attack = airdata.y();
     bus_data.angle_of_sideslip = airdata.z();
 }
 
 void SubHandlerLL::cb_state_dot(last_letter_msgs::SimStates msg)
 {
-    bus_data.velocity_angular = msg.velocity.angular; // Body frame
-    bus_data.acceleration_angular = msg.velocity.linear; // Body frame
+    bus_data.acceleration_angular = msg.velocity.angular; // Body frame
+    bus_data.acceleration_linear = msg.velocity.linear; // Body frame
 }
 
 void SubHandlerLL::cb_environment(last_letter_msgs::Environment msg)
