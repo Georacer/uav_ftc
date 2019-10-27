@@ -11,8 +11,10 @@ using std::sqrt;
 using Eigen::Matrix;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
+using Eigen::VectorXd;
 
-class UavEkfModel {
+class UavEkfModel 
+{
 
     public: 
     // states: u_r, v_r, w_r, windN, windE, windD
@@ -20,7 +22,12 @@ class UavEkfModel {
     // measurements: Earth-frame inertial velocities, qbar, alpha, beta
     Matrix<double,9,1> u; // last applied model inputs (accells, rates, angles)
 
-    UavEkfModel() {}
+    UavEkfModel() {};
+
+    void set_inputs(VectorXd p_u)
+    {
+        u = p_u;
+    }
 
     Matrix<double,6,1> get_state_derivatives(Matrix<double,6,1> x_curr)
     {
@@ -188,4 +195,82 @@ class UavEkfModel {
         double hk6 = asin(v/Vat);
         return hk6;
     }
+};
+
+class Ekf 
+{
+    public:
+    VectorXd x; // Filter state
+    VectorXd x_prev; // State storage
+    VectorXd x_dot; // Filter state derivative
+    VectorXd h; // Filter output
+    VectorXd e; // Filter measurement error
+    MatrixXd K; // Optimal gain
+    MatrixXd P; // Error covariance matrix
+    VectorXd x_err; // State error variance
+    MatrixXd F; // State transition matrix
+    MatrixXd Q; // Process noise
+    MatrixXd R; // Measurement noise
+
+    double dt; // sampling time
+    UavEkfModel model; // Process model
+
+    Ekf(VectorXd x0, MatrixXd P0, MatrixXd p_Q, MatrixXd p_R, double p_dt)
+    {
+        x = x0;
+        P = P0;
+        Q = p_Q;
+        R = p_R;
+        dt = p_dt;
+        model = UavEkfModel();
+        K.resizeLike(P0);
+        K.setZero();
+    }
+
+    VectorXd iterate(VectorXd u, VectorXd y, MatrixXd D)
+    // Filter iteration
+    {
+        time_update(u);
+        // Propagate filter state
+        if (D.size()>0)
+        // If a new measurement is available, do a measurement update
+        {
+            measurement_update(y, D);
+        }
+        return x;
+    }
+
+    private:
+
+    void time_update(VectorXd u)
+    // Perform one update of the model
+    {
+        model.set_inputs(u);
+        x_dot = model.get_state_derivatives(x);
+        F = model.get_state_matrix(x);
+        x_prev = x;
+        x = x + x_dot*dt;
+        MatrixXd Pd = F*P + P*F.transpose() + Q;
+        P = P + Pd*dt;
+        x_err = P.diagonal();
+    }
+
+    void measurement_update(VectorXd y, MatrixXd D)
+    {
+        // Calculate estimated output
+        MatrixXd H = model.get_h_matrix(x_prev);
+        h = D*model.get_h_estimate(x_prev);
+        // Calculate innovation covariance
+        MatrixXd C = D*H;
+        MatrixXd S = C*P*C.transpose() + R;
+        // Calculate optimal gain
+        K = P*C.transpose()*S.inverse();
+        // Update a-posteriori state estimate
+        // Calculate update error
+        e = y - h;
+        x = x + K*e;
+        // Update a-posteriori covariance estimate
+        P = (MatrixXd::Identity(K.rows(), C.cols()) - K*C)*P + K*R*K.transpose();
+    }
+
 };
