@@ -7,6 +7,8 @@
 #include "last_letter_msgs/SimPWM.h"
 #include "last_letter_msgs/Environment.h"
 
+#include "../ekf.cpp"
+
 using Eigen::Vector3d;
 using Eigen::Quaterniond;
 
