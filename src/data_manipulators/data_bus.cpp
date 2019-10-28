@@ -26,53 +26,27 @@ void convertEigenQuaternion(const geometry_msgs::Quaternion quatRos, Eigen::Quat
 #include "data_from_last_letter.cpp"
 
 
-void SubHandler::ekf_build_measurement_matrix()
+///////////////////////////////
+// SubHandler Class definitions
+///////////////////////////////
+SubHandler::SubHandler()
 {
-    double got_gps = 0, got_airdata = 0;
-    if (flag_got_gps)
-    {
-        got_gps = 1;
-        flag_got_gps = false;
-    }
-    if (flag_got_airdata)
-    {
-        got_airdata = 1;
-        flag_got_airdata = false;
-    }
+    flag_got_gps = false;
+    flag_got_airdata = false;
+};
 
-    ekf_D_.diagonal() << got_gps, got_gps, got_gps, got_airdata, got_airdata, got_airdata;
-}
 
-void SubHandler::ekf_build_measurements()
-{
-    // measurements: Earth-frame inertial velocities, qbar, alpha, beta
-    // Collect available measurements
-    ekf_y_ << bus_data.inertial_velocity.x, bus_data.inertial_velocity.y, bus_data.inertial_velocity.z,
-              bus_data.qbar, bus_data.angle_of_attack, bus_data.angle_of_sideslip;
-
-    ekf_y_ = ekf_D_ * ekf_y_; // use this to zero-out old data, to conform with MATLAB code
-}
-
-void SubHandler::ekf_build_inputs()
-{
-    // inputs: body accells, body rates, euler angles
-    Eigen::Quaterniond temp_quat;
-    convertEigenQuaternion(bus_data.orientation, temp_quat);
-    Vector3d eul_angles = quat2euler(temp_quat);
-
-    ekf_u_ << bus_data.acceleration_linear.x, bus_data.acceleration_linear.y, bus_data.acceleration_linear.z, 
-              bus_data.velocity_angular.x, bus_data.velocity_angular.y, bus_data.velocity_angular.z, 
-              eul_angles.x(), eul_angles.y(), eul_angles.z(); 
-}
-
+////////////////////////////
+// DataBus Class definitions
+////////////////////////////
 DataBus::DataBus(ros::NodeHandle n, uint data_source)
 {
     if (data_source == DATA_SOURCE_LL)
     {
         sub_handler_ = new SubHandlerLL(n);
     }
-    data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 1000);
-    ekf_pub_ = n.advertise<uav_ftc::BusData>("ekf", 1000);
+    data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 100);
+    ekf_pub_ = n.advertise<uav_ftc::BusData>("ekf", 100);
     ekf_init_();
 }
 
@@ -109,20 +83,51 @@ void DataBus::ekf_init_()
     ekf_ = new Ekf(x0, P0, Q, R, dt);
 }
 
-void DataBus::publish_data()
+void DataBus::ekf_build_measurement_matrix()
 {
-    bus_data_ = sub_handler_->bus_data;
-    bus_data_.header.stamp = ros::Time::now();
-    data_pub_.publish(bus_data_);
-    ekf_pub_.publish(ekf_data_);
+    double got_gps = 0, got_airdata = 0;
+    if (sub_handler_->flag_got_gps)
+    {
+        got_gps = 1;
+        sub_handler_->flag_got_gps = false;
+    }
+    if (sub_handler_->flag_got_airdata)
+    {
+        got_airdata = 1;
+        sub_handler_->flag_got_airdata = false;
+    }
+
+    ekf_D_.diagonal() << got_gps, got_gps, got_gps, got_airdata, got_airdata, got_airdata;
+}
+
+void DataBus::ekf_build_measurements()
+{
+    // measurements: Earth-frame inertial velocities, qbar, alpha, beta
+    // Collect available measurements
+    ekf_y_ << bus_data_.inertial_velocity.x, bus_data_.inertial_velocity.y, bus_data_.inertial_velocity.z,
+              bus_data_.qbar, bus_data_.angle_of_attack, bus_data_.angle_of_sideslip;
+
+    ekf_y_ = ekf_D_ * ekf_y_; // use this to zero-out old data, to conform with MATLAB code
+}
+
+void DataBus::ekf_build_inputs()
+{
+    // inputs: body accells, body rates, euler angles
+    Eigen::Quaterniond temp_quat;
+    convertEigenQuaternion(bus_data_.orientation, temp_quat);
+    Vector3d eul_angles = quat2euler(temp_quat);
+
+    ekf_u_ << bus_data_.acceleration_linear.x, bus_data_.acceleration_linear.y, bus_data_.acceleration_linear.z, 
+              bus_data_.velocity_angular.x, bus_data_.velocity_angular.y, bus_data_.velocity_angular.z, 
+              eul_angles.x(), eul_angles.y(), eul_angles.z(); 
 }
 
 void DataBus::ekf_step()
 {
-    sub_handler_->ekf_build_measurement_matrix();
-    sub_handler_->ekf_build_measurements();
-    sub_handler_->ekf_build_inputs();
-    ekf_->iterate(sub_handler_->ekf_u_, sub_handler_->ekf_y_, sub_handler_->ekf_D_);
+    ekf_build_measurement_matrix();
+    ekf_build_measurements();
+    ekf_build_inputs();
+    ekf_->iterate(ekf_u_, ekf_y_, ekf_D_);
 
     double WN, WE, WD;
     Eigen::Vector3d airdata = getAirData(ekf_->x.segment<3>(0));
@@ -138,6 +143,18 @@ void DataBus::ekf_step()
     ekf_data_.wind.z = WD;
 }
 
+void DataBus::get_data()
+{
+    bus_data_ = sub_handler_->bus_data;
+}
+
+void DataBus::publish_data()
+{
+    bus_data_.header.stamp = ros::Time::now();
+    data_pub_.publish(bus_data_);
+    ekf_pub_.publish(ekf_data_);
+}
+
 void DataBus::set_pub_rate(double rate)
 {
     pub_rate_ = rate;
@@ -151,6 +168,7 @@ void DataBus::run()
 	while (ros::ok())
 	{
 		ros::spinOnce();
+        get_data();
         ekf_step();
         publish_data();
 		spinner.sleep();
