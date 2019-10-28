@@ -211,6 +211,7 @@ class Ekf
     MatrixXd F; // State transition matrix
     MatrixXd Q; // Process noise
     MatrixXd R; // Measurement noise
+    MatrixXd D; // Measurement availability matrix
 
     double dt; // sampling time
     UavEkfModel model; // Process model
@@ -225,6 +226,13 @@ class Ekf
         model = UavEkfModel();
         K.resizeLike(P0);
         K.setZero();
+
+        D = Eigen::MatrixXd::Identity(R.rows(), R.cols()); // Not actually used
+    }
+
+    void set_dt(double p_dt)
+    {
+        dt = p_dt;
     }
 
     VectorXd iterate(VectorXd u, VectorXd y, MatrixXd D)

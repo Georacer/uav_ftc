@@ -7,25 +7,9 @@
 #include "last_letter_msgs/SimPWM.h"
 #include "last_letter_msgs/Environment.h"
 
-#include "../ekf.cpp"
-
 using Eigen::Vector3d;
 using Eigen::Quaterniond;
 
-void convertRosVector3(const Eigen::Vector3d vector3Eigen, geometry_msgs::Vector3 &vector3Ros)
-{
-    vector3Ros.x = vector3Eigen.x();
-    vector3Ros.y = vector3Eigen.y();
-    vector3Ros.z = vector3Eigen.z();
-}
-
-void convertRosQuaternion(const Eigen::Quaterniond quatEigen, geometry_msgs::Quaternion &quatRos)
-{
-    quatRos.x = quatEigen.x();
-    quatRos.y = quatEigen.y();
-    quatRos.z = quatEigen.z();
-    quatRos.w = quatEigen.w();
-}
 
 class SubHandlerLL : public SubHandler
 {
@@ -99,6 +83,9 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     bus_data.qbar = 0.5*bus_data.rho*airdata.x()*airdata.x();
     bus_data.angle_of_attack = airdata.y();
     bus_data.angle_of_sideslip = airdata.z();
+
+    flag_got_gps = true;
+    flag_got_airdata = true;
 }
 
 void SubHandlerLL::cb_state_dot(last_letter_msgs::SimStates msg)
