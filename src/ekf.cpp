@@ -40,15 +40,11 @@ class UavEkfModel
         Vector3d accel = u.segment<3>(0);
         Vector3d rates = u.segment<3>(3);
         Vector3d vel = x_curr.segment<3>(0);
-        // Vector3d eul_angles = u.segment<3>(6);
 
         MatrixXd x_dot = Matrix<double,6,1>::Zero();
 
         Vector3d vel_dot = accel - rates.cross(vel); // Stevens-Lewis 2016 eq.1.7-21
         x_dot.block<3,1>(0,0) = vel_dot;
-        // x_dot(0) = udot(accel(0), eul_angles(1), x_curr(1), x_curr(2), rates(2), rates(1)); // u_r_dot
-        // x_dot(1) = vdot(accel(1), eul_angles(0), eul_angles(1), x_curr(0), x_curr(2), rates(0), rates(2)); // v_r_dot
-        // x_dot(2) = wdot(accel(2), eul_angles(0), eul_angles(1), x_curr(0), x_curr(1), rates(0), rates(1)); // w_r_dot
 
         return x_dot;
     }
@@ -72,10 +68,7 @@ class UavEkfModel
     {
         // Construct matrix of partial measurement / state
         MatrixXd H = Matrix<double,6,6>::Zero();
-        // Vector3d eul_angles = u.segment<3>(6);
 
-        // auto temp_dpn = derivative_partial_numerical(h1, x_curr, eul_angles);
-        // std::cout << temp_dpn << std::endl;
         H.row(0) = derivative_partial_numerical(h1, x_curr, eul_angles);
         H.row(1) = derivative_partial_numerical(h2, x_curr, eul_angles);
         H.row(2) = derivative_partial_numerical(h3, x_curr, eul_angles);
@@ -89,34 +82,26 @@ class UavEkfModel
     Matrix<double,6,1> get_h_estimate(Matrix<double,6,1> x_curr)
     {
         Matrix<double,6,1> h = Matrix<double,6,1>::Zero();
-        // Vector3d eul_angles = u.segment<3>(6);
 
-        h(0) = h1(x_curr, eul_angles);
-        h(1) = h2(x_curr, eul_angles);
-        h(2) = h3(x_curr, eul_angles);
-        h(3) = h4(x_curr);
-        h(4) = h5(x_curr);
-        h(5) = h6(x_curr);
+        Vector3d vel_rel = x_curr.segment<3>(0);
+        Vector3d vel_wind = x_curr.segment<3>(3);
+        Vector3d vel_inertial = rotation_quat*vel_rel + vel_wind;
+        Vector3d airdata = getAirData(vel_rel);
+
+        h.block<3,1>(0,0) = vel_inertial;
+        h.block<3,1>(3,0) = airdata;
+
+        // h(0) = h1(x_curr, eul_angles);
+        // h(1) = h2(x_curr, eul_angles);
+        // h(2) = h3(x_curr, eul_angles);
+        // h(3) = h4(x_curr); // Airspeed calculation
+        // h(4) = h5(x_curr); // aoa calculation
+        // h(5) = h6(x_curr); // aos calculation
 
         return h;
     }
 
     private:
-
-    double udot(double yaccelX, double theta, double v, double w, double r, double q)
-    {
-        return yaccelX + r*v - q*w;
-    }
-
-    double vdot(double yaccelY, double phi, double theta, double u, double w, double p, double r)
-    {
-        return yaccelY + p*w - r*u;
-    }
-
-    double wdot(double yaccelZ, double phi, double theta, double u, double v, double p, double q)
-    {
-        return yaccelZ + q*u - p*v;
-    }
 
     static double h1(Matrix<double,6,1> x, Vector3d eul_angles)
     {
@@ -253,8 +238,8 @@ class Ekf
     VectorXd iterate(VectorXd u, VectorXd y, MatrixXd D)
     // Filter iteration
     {
-        std::cout << "u: " << u.transpose() << std::endl;
-        std::cout << "y: " << y.transpose() << std::endl;
+        // std::cout << "u: " << u.transpose() << std::endl;
+        // std::cout << "y: " << y.transpose() << std::endl;
         // If u_r is less than 1 then it is likely that the airplane is stationary
         // or falling backwards. Having zero airspeed will crash the EKF due to
         // zero division and rank-reduced matrix inversion.
@@ -263,16 +248,15 @@ class Ekf
         {
             x(0) = 1;
         }
-        // std::cout << "pre-tu:" << x.transpose() << std::endl;
         time_update(u);
-        // std::cout << "pre-mu " << x.transpose() << std::endl;
+        // std::cout << "post-tu\n" << x.transpose() << std::endl;
         // Propagate filter state
         if (D.trace()>0)
         // If a new measurement is available, do a measurement update
         {
             measurement_update(y, D);
         }
-        std::cout << x.transpose() << std::endl;
+        // std::cout << "post-mu\n" << x.transpose() << std::endl;
         return x;
     }
 

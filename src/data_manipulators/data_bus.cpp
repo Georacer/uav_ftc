@@ -77,7 +77,7 @@ void DataBus::ekf_init_()
 
     double pn_vel_rel, pn_vel_wind; // Setup process noises
     pn_vel_rel = std::pow(0.5*0.015*9.81, 2);
-    pn_vel_wind = std::pow(0.08, 2);
+    pn_vel_wind = std::pow(0.01, 2);
     Q.setZero();
     Q.diagonal() << pn_vel_rel, pn_vel_rel, pn_vel_rel, pn_vel_wind, pn_vel_wind, pn_vel_wind;
 
