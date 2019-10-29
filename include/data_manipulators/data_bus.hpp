@@ -33,7 +33,7 @@ class DataBus
     SubHandler * sub_handler_;
 
     Ekf * ekf_;
-    Eigen::Matrix<double, 6, 1> ekf_u_;
+    Eigen::Matrix<double, 10, 1> ekf_u_;
     Eigen::Matrix<double, 6, 1> ekf_y_;
     Eigen::Matrix<double, 6, 6> ekf_D_;
     uav_ftc::BusData ekf_data_;
@@ -51,7 +51,7 @@ class DataBus
     void ekf_build_inputs();
     void ekf_step(); // iterate the EKF
 
-    void get_data();
+    void get_handler_data();
     void publish_data(); // Data publisher
     void set_pub_rate(double rate);
     void run(); // Spin constantly

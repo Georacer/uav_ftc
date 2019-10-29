@@ -58,7 +58,6 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     temp_vect_ros.y = msg.geoid.longitude;
     temp_vect_ros.z = msg.geoid.altitude;
     bus_data.coordinates = temp_vect_ros;
-    bus_data.inertial_velocity = msg.geoid.velocity;// NED frame
     bus_data.position = msg.pose.position; // NED frame
     bus_data.orientation = msg.pose.orientation; 
     // Copy over orientation internaly
@@ -90,6 +89,9 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
 
 void SubHandlerLL::cb_state_dot(last_letter_msgs::SimStates msg)
 {
+    bus_data.inertial_velocity.x = msg.pose.position.x;// NED frame
+    bus_data.inertial_velocity.y = msg.pose.position.y;// NED frame
+    bus_data.inertial_velocity.z = msg.pose.position.z;// NED frame
     bus_data.acceleration_angular = msg.velocity.angular; // Body frame
     bus_data.acceleration_linear = msg.velocity.linear; // Body frame
 }

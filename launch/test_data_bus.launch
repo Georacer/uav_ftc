@@ -14,5 +14,10 @@
             <param name="data_source" value="1"/>
         </node>
     </group>
+    <node name="EKF_plotter"
+          pkg="rqt_plot"
+          type="rqt_plot"
+          args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
+    />
 
 </launch>

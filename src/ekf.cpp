@@ -12,6 +12,7 @@ using Eigen::Matrix;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
+using Eigen::Quaterniond;
 
 class UavEkfModel 
 {
@@ -20,25 +21,34 @@ class UavEkfModel
     // states: u_r, v_r, w_r, windN, windE, windD
     // inputs: body accells, body rates, euler angles
     // measurements: Earth-frame inertial velocities, qbar, alpha, beta
-    Matrix<double,9,1> u; // last applied model inputs (accells, rates, angles)
+    Matrix<double,10,1> u; // last applied model inputs (accells, rates, orientation quaterion)
+    Quaterniond rotation_quat;
+    Vector3d eul_angles;
 
     UavEkfModel() {};
 
     void set_inputs(VectorXd p_u)
     {
         u = p_u;
+        // Update euler angles
+        rotation_quat.coeffs() = u.segment<4>(6);
+        eul_angles = quat2euler(rotation_quat);
     }
 
     Matrix<double,6,1> get_state_derivatives(Matrix<double,6,1> x_curr)
     {
         Vector3d accel = u.segment<3>(0);
         Vector3d rates = u.segment<3>(3);
-        Vector3d eul_angles = u.segment<3>(6);
+        Vector3d vel = x_curr.segment<3>(0);
+        // Vector3d eul_angles = u.segment<3>(6);
 
         MatrixXd x_dot = Matrix<double,6,1>::Zero();
-        x_dot(0) = udot(accel(0), eul_angles(1), x_curr(1), x_curr(2), rates(2), rates(1)); // u_r_dot
-        x_dot(1) = vdot(accel(1), eul_angles(0), eul_angles(1), x_curr(0), x_curr(2), rates(0), rates(2)); // v_r_dot
-        x_dot(2) = wdot(accel(2), eul_angles(0), eul_angles(1), x_curr(0), x_curr(1), rates(0), rates(1)); // w_r_dot
+
+        Vector3d vel_dot = accel - rates.cross(vel); // Stevens-Lewis 2016 eq.1.7-21
+        x_dot.block<3,1>(0,0) = vel_dot;
+        // x_dot(0) = udot(accel(0), eul_angles(1), x_curr(1), x_curr(2), rates(2), rates(1)); // u_r_dot
+        // x_dot(1) = vdot(accel(1), eul_angles(0), eul_angles(1), x_curr(0), x_curr(2), rates(0), rates(2)); // v_r_dot
+        // x_dot(2) = wdot(accel(2), eul_angles(0), eul_angles(1), x_curr(0), x_curr(1), rates(0), rates(1)); // w_r_dot
 
         return x_dot;
     }
@@ -54,14 +64,18 @@ class UavEkfModel
         F(2,0) = -F(0,2); // partial w/u
         F(1,2) = rates(0); // partial v/w
         F(2,1) = -F(1,2); // partial w/v
+
+        return F;
     }
 
     Matrix<double,6,6> get_h_matrix(Matrix<double,6,1> x_curr)
     {
         // Construct matrix of partial measurement / state
         MatrixXd H = Matrix<double,6,6>::Zero();
-        Vector3d eul_angles = u.segment<3>(6);
+        // Vector3d eul_angles = u.segment<3>(6);
 
+        // auto temp_dpn = derivative_partial_numerical(h1, x_curr, eul_angles);
+        // std::cout << temp_dpn << std::endl;
         H.row(0) = derivative_partial_numerical(h1, x_curr, eul_angles);
         H.row(1) = derivative_partial_numerical(h2, x_curr, eul_angles);
         H.row(2) = derivative_partial_numerical(h3, x_curr, eul_angles);
@@ -75,14 +89,14 @@ class UavEkfModel
     Matrix<double,6,1> get_h_estimate(Matrix<double,6,1> x_curr)
     {
         Matrix<double,6,1> h = Matrix<double,6,1>::Zero();
-        Vector3d eul_angles = u.segment<3>(6);
+        // Vector3d eul_angles = u.segment<3>(6);
 
-        h(1) = h1(x_curr, eul_angles);
-        h(2) = h2(x_curr, eul_angles);
-        h(3) = h3(x_curr, eul_angles);
-        h(4) = h4(x_curr);
-        h(5) = h5(x_curr);
-        h(6) = h6(x_curr);
+        h(0) = h1(x_curr, eul_angles);
+        h(1) = h2(x_curr, eul_angles);
+        h(2) = h3(x_curr, eul_angles);
+        h(3) = h4(x_curr);
+        h(4) = h5(x_curr);
+        h(5) = h6(x_curr);
 
         return h;
     }
@@ -167,6 +181,7 @@ class UavEkfModel
 
     static double h4(Matrix<double,6,1> x)
     {
+        // WARNING: This returns zero and zero derivative at 0 airspeed
         double u = x(0);
         double v = x(1);
         double w = x(2);
@@ -190,7 +205,7 @@ class UavEkfModel
         double u = x(0);
         double v = x(1);
         double w = x(2);
-        double Vat = sqrt(u*u+v*v+w+w);
+        double Vat = sqrt(u*u + v*v + w*w);
         
         double hk6 = asin(v/Vat);
         return hk6;
@@ -238,13 +253,26 @@ class Ekf
     VectorXd iterate(VectorXd u, VectorXd y, MatrixXd D)
     // Filter iteration
     {
+        std::cout << "u: " << u.transpose() << std::endl;
+        std::cout << "y: " << y.transpose() << std::endl;
+        // If u_r is less than 1 then it is likely that the airplane is stationary
+        // or falling backwards. Having zero airspeed will crash the EKF due to
+        // zero division and rank-reduced matrix inversion.
+        // Thus, a small airspeed is always enforced, breaking generality
+        if (x(0)<1)
+        {
+            x(0) = 1;
+        }
+        // std::cout << "pre-tu:" << x.transpose() << std::endl;
         time_update(u);
+        // std::cout << "pre-mu " << x.transpose() << std::endl;
         // Propagate filter state
-        if (D.size()>0)
+        if (D.trace()>0)
         // If a new measurement is available, do a measurement update
         {
             measurement_update(y, D);
         }
+        std::cout << x.transpose() << std::endl;
         return x;
     }
 
@@ -266,19 +294,25 @@ class Ekf
     void measurement_update(VectorXd y, MatrixXd D)
     {
         // Calculate estimated output
+        // std::cout << "passed D:\n" << D << std::endl;
         MatrixXd H = model.get_h_matrix(x_prev);
+        // std::cout << "H matrix:\n" << H << std::endl;
         h = D*model.get_h_estimate(x_prev);
+        // std::cout << "h estimate:\n" << h << std::endl;
         // Calculate innovation covariance
         MatrixXd C = D*H;
         MatrixXd S = C*P*C.transpose() + R;
+        // std::cout << "S matrix:\n" << S << std::endl;
         // Calculate optimal gain
         K = P*C.transpose()*S.inverse();
+        // std::cout << "K matrix:\n" << K << std::endl;
         // Update a-posteriori state estimate
         // Calculate update error
         e = y - h;
         x = x + K*e;
         // Update a-posteriori covariance estimate
         P = (MatrixXd::Identity(K.rows(), C.cols()) - K*C)*P + K*R*K.transpose();
+        // std::cout << "P matrix:\n" << P << std::endl;
     }
 
 };

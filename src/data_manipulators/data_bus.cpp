@@ -7,6 +7,13 @@ void convertRosVector3(const Eigen::Vector3d vector3Eigen, geometry_msgs::Vector
     vector3Ros.z = vector3Eigen.z();
 }
 
+void convertEigenVector3(const geometry_msgs::Vector3 vector3Ros, Eigen::Vector3d &vector3Eigen)
+{
+    vector3Eigen.x() = vector3Ros.x;
+    vector3Eigen.y() = vector3Ros.y;
+    vector3Eigen.z() = vector3Ros.z;
+}
+
 void convertRosQuaternion(const Eigen::Quaterniond quatEigen, geometry_msgs::Quaternion &quatRos)
 {
     quatRos.x = quatEigen.x();
@@ -58,15 +65,20 @@ DataBus::~DataBus()
 
 void DataBus::ekf_init_()
 {
+    ekf_D_.setZero();
+
     Eigen::VectorXd x0(6);
-    x0 << bus_data_.airspeed, 0.0, 0.0, bus_data_.wind.x, bus_data_.wind.y, bus_data_.wind.z; // Initialize EKF state
+    x0.setZero(); // Initialize EKF state
+    x0(0) = bus_data_.airspeed;
 
     Eigen::MatrixXd P0(6,6), Q(6,6), R(6,6);
+    P0.setZero();
     P0.diagonal() << 16, 16, 16, 4, 4, 4; // Initialize P0 with the square if state std_devs
 
     double pn_vel_rel, pn_vel_wind; // Setup process noises
     pn_vel_rel = std::pow(0.5*0.015*9.81, 2);
-    pn_vel_wind = std::pow(0.8, 2);
+    pn_vel_wind = std::pow(0.08, 2);
+    Q.setZero();
     Q.diagonal() << pn_vel_rel, pn_vel_rel, pn_vel_rel, pn_vel_wind, pn_vel_wind, pn_vel_wind;
 
     double mn_vel_gps_hor, mn_vel_gps_vert, mn_qbar, mn_alpha, mn_beta;
@@ -76,6 +88,7 @@ void DataBus::ekf_init_()
     mn_qbar = 30.198;
     mn_alpha = 0.0028;
     mn_beta = 0.0035;
+    R.setZero();
     R.diagonal() << pow(mn_vel_gps_hor, 2), pow(mn_vel_gps_hor, 2), pow(mn_vel_gps_vert, 2),
         pow(mn_qbar, 2), pow(mn_alpha, 2), pow(mn_beta, 2);
 
@@ -108,6 +121,8 @@ void DataBus::ekf_build_measurements()
               bus_data_.qbar, bus_data_.angle_of_attack, bus_data_.angle_of_sideslip;
 
     ekf_y_ = ekf_D_ * ekf_y_; // use this to zero-out old data, to conform with MATLAB code
+
+    // std::cout << ekf_y_.transpose() << std::endl;
 }
 
 void DataBus::ekf_build_inputs()
@@ -115,11 +130,16 @@ void DataBus::ekf_build_inputs()
     // inputs: body accells, body rates, euler angles
     Eigen::Quaterniond temp_quat;
     convertEigenQuaternion(bus_data_.orientation, temp_quat);
-    Vector3d eul_angles = quat2euler(temp_quat);
+    // Vector3d eul_angles = quat2euler(temp_quat);
 
-    ekf_u_ << bus_data_.acceleration_linear.x, bus_data_.acceleration_linear.y, bus_data_.acceleration_linear.z, 
-              bus_data_.velocity_angular.x, bus_data_.velocity_angular.y, bus_data_.velocity_angular.z, 
-              eul_angles.x(), eul_angles.y(), eul_angles.z(); 
+    // std::cout << eul_angles.transpose() << std::endl;
+    Eigen::Vector3d acc_vect, omega_vect, velocity_vect;
+    convertEigenVector3(bus_data_.acceleration_linear, acc_vect);
+    convertEigenVector3(bus_data_.velocity_angular, omega_vect);
+    convertEigenVector3(bus_data_.inertial_velocity, velocity_vect);
+    Eigen::Vector3d acc_linear = acc_vect + omega_vect.cross(velocity_vect);
+
+    ekf_u_ << acc_linear, omega_vect, temp_quat.coeffs();
 }
 
 void DataBus::ekf_step()
@@ -143,15 +163,17 @@ void DataBus::ekf_step()
     ekf_data_.wind.z = WD;
 }
 
-void DataBus::get_data()
+void DataBus::get_handler_data()
 {
     bus_data_ = sub_handler_->bus_data;
 }
 
 void DataBus::publish_data()
 {
-    bus_data_.header.stamp = ros::Time::now();
+    ros::Time timestamp = ros::Time::now();
+    bus_data_.header.stamp = timestamp;
     data_pub_.publish(bus_data_);
+    ekf_data_.header.stamp = timestamp;
     ekf_pub_.publish(ekf_data_);
 }
 
@@ -165,13 +187,20 @@ void DataBus::run()
 {
 	ros::Rate spinner(pub_rate_);
 
+    // uint counter = 0;
 	while (ros::ok())
 	{
 		ros::spinOnce();
-        get_data();
+        get_handler_data();
         ekf_step();
         publish_data();
 		spinner.sleep();
+
+        // counter++;
+        // if (counter>inf)
+        // {
+        //     break;
+        // }
     }
 }
 
