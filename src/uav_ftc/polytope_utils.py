@@ -289,6 +289,7 @@ class SafeConvexPolytope:
     _volume_approx_factor = 0.1
     _sampling_method = "radial"
     _patch_polytope_holes = True
+    _delete_old_points = False
     _samples_taken = 0
     _sample_decimal_places = 3
 
@@ -558,7 +559,11 @@ class SafeConvexPolytope:
         # samples = np.random.randn(self._n_dim, 1)
         samples /= np.linalg.norm(samples, axis=0)
 
-        p = self.get_centroid(self.points_yes)
+        if not self._delete_old_points:
+            p = self.get_centroid(self.points_yes)
+        else:
+            p = self.get_centroid(self._polytope._points)
+
         if np.any(np.isnan(p)):
             raise RuntimeError("points_yes set is empty")
 
@@ -989,6 +994,10 @@ class SafeConvexPolytope:
         # if not self._initialized:
         #     # Restrict the domain boundaries at the current resolution
         #     self._restrict_domain_boundary()
+
+        # Delete points from previous step, if requested
+        if self._delete_old_points:
+            self.clear_points()
 
         try:
             convergence = self.improve_polytope(not self._initialized)
