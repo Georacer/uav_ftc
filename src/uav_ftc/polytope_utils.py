@@ -792,9 +792,12 @@ class SafeConvexPolytope:
         # print('Approximating polytope volume')
         internal_yes_points = self.points_yes[:,self._polytope.contains(self.points_yes)]
         # print('Found {} internal yes points'.format(internal_yes_points.shape))
-        mins = np.min(internal_yes_points, axis=1)
-        maxs = np.max(internal_yes_points, axis=1)
-        return reduce(np.multiply, maxs-mins)
+        if internal_yes_points.size == 0:
+            raise QhullError()
+        else:
+            mins = np.min(internal_yes_points, axis=1)
+            maxs = np.max(internal_yes_points, axis=1)
+            return reduce(np.multiply, maxs-mins)
 
     # Return a list containing one MxN array for each face of the polytope
     # where M is the domain dimension and N is the number of points on each face, which may vary
