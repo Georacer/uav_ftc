@@ -68,10 +68,10 @@ class Trimmer:
     # Indicator function for use with polytope discovery module
     def indicator(self, point):
         # point is a 3x1 numpy array with trim Va, gamma, psi_dot values
-        R = point[0,0]*np.cos(point[1,0])/point[2,0]  # R = Va/R*cos(gamma)
-        trajectory = np.array((point[0,0], point[1,0], R))
+        R = point[0, 0] * np.cos(point[1, 0]) / point[2, 0]  # R = Va/R*cos(gamma)
+        trajectory = np.array((point[0, 0], point[1, 0], R))
         trim_values, cost, success = self.find_trim_input(trajectory)
-        
+
         # Extract the control input values
         delta_a = trim_values[3]
         delta_e = trim_values[4]
@@ -81,18 +81,10 @@ class Trimmer:
         optim_mask = success
         cost_mask = cost < self.optim_cost_threshold
 
-        da_mask = (delta_a >= self.bound_deltaa[0]) * (
-            delta_a <= self.bound_deltaa[1]
-        )
-        de_mask = (delta_e >= self.bound_deltae[0]) * (
-            delta_e <= self.bound_deltae[1]
-        )
-        dt_mask = (delta_t >= self.bound_deltat[0]) * (
-            delta_t <= self.bound_deltat[1]
-        )
-        dr_mask = (delta_r >= self.bound_deltar[0]) * (
-            delta_r <= self.bound_deltar[1]
-        )
+        da_mask = (delta_a >= self.bound_deltaa[0]) * (delta_a <= self.bound_deltaa[1])
+        de_mask = (delta_e >= self.bound_deltae[0]) * (delta_e <= self.bound_deltae[1])
+        dt_mask = (delta_t >= self.bound_deltat[0]) * (delta_t <= self.bound_deltat[1])
+        dr_mask = (delta_r >= self.bound_deltar[0]) * (delta_r <= self.bound_deltar[1])
         input_mask = da_mask * de_mask * dt_mask * dr_mask
         overall_mask = optim_mask * cost_mask * input_mask
 
@@ -172,8 +164,8 @@ class FlightEnvelope:
     _Va_min = 5.0
     _Va_max = 25.0
     _gamma_min_deg = -30.0  # degrees
-    _gamma_max_deg =  30.0  # degrees
-    _R_min = 100.0 # meters
+    _gamma_max_deg = 30.0  # degrees
+    _R_min = 100.0  # meters
     # flags for fixing parameters
     _fix_Va = False
     _fix_gamma = False
@@ -190,7 +182,6 @@ class FlightEnvelope:
     _domain_psi_dot = None
     _current_domain = None
     _indicator = None
-
 
     def __init__(self, uav_name):
         self.initialize(uav_name)
@@ -237,21 +228,21 @@ class FlightEnvelope:
 
     def initialize(self, uav_name):
         # Build parameter default values
-        default_psi_dot = self._default_Va/self._default_R
+        default_psi_dot = self._default_Va / self._default_R
         self._list_defaults = [self._default_Va, self._default_gamma, default_psi_dot]
 
         # Build variable domains
         self.set_domain_Va((self._Va_min, self._Va_max))
-        self.set_domain_gamma((np.deg2rad(self._gamma_min_deg), np.deg2rad(self._gamma_max_deg)))
-        psi_dot_max = self._Va_max/self._R_min
+        self.set_domain_gamma(
+            (np.deg2rad(self._gamma_min_deg), np.deg2rad(self._gamma_max_deg))
+        )
+        psi_dot_max = self._Va_max / self._R_min
         self._set_domain_psi_dot((-psi_dot_max, psi_dot_max))
 
         # Set search degrees of freedom
         self._list_fixed = [self._fix_Va, self._fix_gamma, self._fix_R]
 
-        domain = np.array(
-            [self._domain_Va, self._domain_gamma, self._domain_psi_dot]
-        )
+        domain = np.array([self._domain_Va, self._domain_gamma, self._domain_psi_dot])
         self._current_domain = domain[np.invert(self._list_fixed)]
 
         # Select eps values
@@ -261,14 +252,18 @@ class FlightEnvelope:
         # Create indicator function
         self._trimmer = Trimmer(uav_name)
         self._trimmer.optim_time_accumulator = 0
-        self._indicator = self._trimmer.get_indicator(self._list_defaults, self._list_fixed)
+        self._indicator = self._trimmer.get_indicator(
+            self._list_defaults, self._list_fixed
+        )
 
         self._flag_setup = True
 
     def find_flight_envelope(self):
 
         if not self._flag_setup:
-            raise RuntimeError('You must initalize the FlightEnvelope before extracting it')
+            raise RuntimeError(
+                "You must initalize the FlightEnvelope before extracting it"
+            )
 
         n_dim = len(self._current_domain)
 
@@ -276,18 +271,18 @@ class FlightEnvelope:
         t_start = time.time()
 
         # Initialize the polytope
-        safe_poly = poly.SafeConvexPolytope(self._indicator, self._current_domain, self._current_eps)
+        safe_poly = poly.SafeConvexPolytope(
+            self._indicator, self._current_domain, self._current_eps
+        )
 
         # Pass the variable strings
         string_Va = "Va"
         string_gamma = "Gamma"
         string_psi_dot = "psi_dot"
-        string_list = [
-            string_Va,
-            string_gamma,
-            string_psi_dot
-        ]
-        safe_poly.axis_label_list = list(it.compress(string_list, np.invert(self._list_fixed)))
+        string_list = [string_Va, string_gamma, string_psi_dot]
+        safe_poly.axis_label_list = list(
+            it.compress(string_list, np.invert(self._list_fixed))
+        )
         # safe_poly.plotting_mask = [False, True, True, True]
 
         # User interface options
@@ -296,7 +291,7 @@ class FlightEnvelope:
         if self.flag_interactive:
             safe_poly.wait_for_user = True
 
-        print('Starting Flight Envelope detection')
+        print("Starting Flight Envelope detection")
         # Iteratively sample the polytope
         algorithm_end = False
         while not algorithm_end:
@@ -304,7 +299,11 @@ class FlightEnvelope:
 
         print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
         print("Total number of samples taken: {}".format(safe_poly._samples_taken))
-        print("Total optimization time required: {}".format(self._trimmer.optim_time_accumulator))
+        print(
+            "Total optimization time required: {}".format(
+                self._trimmer.optim_time_accumulator
+            )
+        )
 
         t_end = time.time()
         print("Total script time: {}".format(t_end - t_start))
@@ -326,10 +325,15 @@ class FlightEnvelope:
     is_flag=True,
     help="Wait for user input after each plot refresh",
 )
-@click.option("-e", "--export", is_flag=True, help="Export relevant data in .csv files")
-def test_code(plot, interactive, export):
+@click.option(
+    "-e",
+    "--export-path",
+    default=None,
+    help="Path to export relevant data in .csv files",
+)
+def test_code(plot, interactive, export_path):
 
-    uav_name = 'skywalker_2013_mod'
+    uav_name = "skywalker_2013_mod"
     flight_envelope = FlightEnvelope(uav_name)
 
     flight_envelope.flag_plot = plot
@@ -360,16 +364,15 @@ def test_code(plot, interactive, export):
     # if plot:
     #     safe_poly.plot()
     #     plt.show()
-        
+
     safe_poly.display_constraints()
 
     print("C-type definition:")
     print(safe_poly.print_c_arrays())
 
-    if export:
-
-        output_path = "/home/george/ros_workspaces/uav_ftc/src/uav_ftc/logs/flight_envelope_va_gamma"
-        safe_poly.export_csv(output_path)
+    # Export polytope search results
+    if export_path is not None:
+        safe_poly.export_csv(export_path)
 
 
 if __name__ == "__main__":
