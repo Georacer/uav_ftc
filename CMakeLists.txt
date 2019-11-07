@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
 	message_generation
   last_letter_msgs
 	last_letter_lib
+  dynamic_reconfigure
 )
 
 find_package(Eigen3 REQUIRED)
@@ -97,11 +98,10 @@ generate_messages(
 ##   * uncomment the "generate_dynamic_reconfigure_options" section below
 ##     and list every .cfg file to be processed
 
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+# Generate dynamic reconfigure parameters in the 'cfg' folder
+generate_dynamic_reconfigure_options(
+  cfg/flight_envelope.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
