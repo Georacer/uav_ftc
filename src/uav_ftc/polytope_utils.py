@@ -1265,6 +1265,110 @@ class SafeConvexPolytope:
         # Return the axis handle for later use
         return ah
 
+    def display_constraints(self, reduced=True):
+        # Print human-readable polytope equations
+        # reduced: Print equations for the reduced polytope
+        if reduced:
+            if(self._reduced_polytope is None):
+                raise RuntimeError('Reduced polytope requested but not built yet')
+            else:
+                polytope = self._reduced_polytope
+        else:
+            polytope = self._polytope
+
+
+        unscaled_polytope = polytope.scale(
+            self.eps.reshape(self._n_dim, 1)
+        )
+        eqns = unscaled_polytope.get_equations()
+        divisor = max(np.abs(eqns).min(), 1)
+        eqns = eqns / divisor
+        # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
+        centroid = self.get_centroid(unscaled_polytope.get_points())
+        for i, eqn in enumerate(eqns):
+            sign = -np.sign(evaluate_hyperplane(centroid, eqn))[0, 0]
+            eqns[i, :] = sign * eqn
+
+        print("Polytope equations ({}):".format(eqns.shape[0]))
+        header = list(self.axis_label_list)
+        header.append("Offset")
+        print("".join("{:>15s}".format(v) for v in header))
+        for eqn in eqns:
+            line_string = ""
+            for elem in eqn:
+                line_string += "{:>15.1f}".format(elem)
+            line_string += "{:>5s}".format("<0")
+            print(line_string)
+
+    def export_csv(self, output_path):
+        # Write four separate csvs at the specified path:
+        # yes-points coordinates, no-points coordinates, polytope separators coefficients, polytope vertices coordinates
+        unscaled_yes_points = self.points_yes * self.eps.reshape(
+            self._n_dim, 1
+        )
+        unscaled_no_points = self.points_no * self.eps.reshape(
+            self._n_dim, 1
+        )
+        unscaled_polytope = self._polytope.scale(
+            self.eps.reshape(self._n_dim, 1)
+        )
+        eqns = unscaled_polytope.get_equations()
+        divisor = max(np.abs(eqns).min(), 1)
+        eqns = eqns / divisor
+        # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
+        centroid = self.get_centroid(unscaled_polytope.get_points())
+        for i, eqn in enumerate(eqns):
+            sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0, 0]
+            eqns[i, :] = sign * eqn
+        vertices = unscaled_polytope.get_points()
+        print(vertices)
+
+        header_txt = ",".join(self.axis_label_list)
+        np.savetxt(
+            "{}/points_yes.csv".format(output_path),
+            unscaled_yes_points.transpose(),
+            fmt="%.3g",
+            delimiter=",",
+            header=header_txt,
+            comments="",
+        )
+        np.savetxt(
+            "{}/points_no.csv".format(output_path),
+            unscaled_no_points.transpose(),
+            fmt="%.3g",
+            delimiter=",",
+            header=header_txt,
+            comments="",
+        )
+        np.savetxt(
+            "{}/separators.csv".format(output_path),
+            eqns,
+            fmt="%15.1f",
+            delimiter=",",
+            header=(header_txt + ",Offset"),
+            comments="",
+        )
+        np.savetxt(
+            "{}/vertices.csv".format(output_path),
+            vertices.transpose(),
+            fmt="%15.1f",
+            delimiter=",",
+            header=header_txt,
+            comments="",
+        )
+
+    def print_c_arrays(self):
+        unscaled_polytope = self._reduced_polytope.scale(self.eps.reshape(self._n_dim, 1))
+        eqns = unscaled_polytope.get_equations()
+        string = ''
+        string += 'const uint constraint_num = {};\n'.format(eqns.shape[0])
+        for i, eqn in enumerate(eqns):
+            string += 'const double {}a{}[{}] = {{'.format(' '*(2-len(str(i))), i, eqns.shape[1]-1)
+            string += ', '.join('{:>10.1f}'.format(c) for c in eqn)
+            string += '};\n'
+        return string
+
+
 
 # Answer if p is inside the hypersphere c, r
 def hypersphere(p):
