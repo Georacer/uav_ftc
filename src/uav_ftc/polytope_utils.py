@@ -27,6 +27,8 @@ import ppl
 import click
 
 import plot_utils as pu
+from ellipsoid_fit_python import ellipsoid_fit as el_fit
+
 mpl.rcParams['pdf.fonttype'] = 42
 
 # Get the distance of a point from a hypersurface
@@ -292,6 +294,12 @@ class SafeConvexPolytope:
     _delete_old_points = False
     _samples_taken = 0
     _sample_decimal_places = 3
+
+    # Fitted ellipsoid data
+    _el_center = None
+    _el_evecs = None
+    _el_radii = None
+    _el_v = None
 
     _axis_handle = None
     _plot_index = 0
@@ -987,6 +995,21 @@ class SafeConvexPolytope:
         self._reduced_polytope = Polytope()
         self._reduced_polytope.set_points(centroids.transpose())
 
+    def ellipsoid_fit(self):
+        if self._n_dim != 3:
+            raise RuntimeError('Ellispoid fitting is only available for 3 dimensions')
+
+        unscaled_polytope = self._polytope.scale(
+            self.eps.reshape(self._n_dim, 1)
+        )
+        points = unscaled_polytope.get_points()
+        center, evecs, radii, v = el_fit.ellipsoid_fit(points.T)
+        self._el_center = center
+        self._el_radii = radii
+        self._el_evecs = evecs
+        self._el_v = v
+        return (center, evecs, radii, v)
+
     def _decrease_eps(self):
         self._normalized_eps = np.maximum(
             self._normalized_eps / 2, np.ones(self._normalized_eps.shape)
@@ -1264,6 +1287,13 @@ class SafeConvexPolytope:
 
         # Return the axis handle for later use
         return ah
+
+    def plot_ellipsoid(self):
+        print(self._el_center)
+        print(self._el_radii)
+        print(self._el_evecs)
+        print(self._el_v)
+        el_fit.ellipsoid_plot(self._el_center, self._el_radii, self._el_evecs, self._axis_handle)
 
     def display_constraints(self, reduced=True):
         # Print human-readable polytope equations
