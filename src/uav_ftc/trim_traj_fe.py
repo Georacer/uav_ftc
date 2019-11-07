@@ -41,14 +41,6 @@ class Trimmer:
 
     des_trajectory = None  # A len-3 list with desired Va, Gamma, R
 
-    # bound_phi = (np.deg2rad(-5), np.deg2rad(5))  # Allow only upright flight
-    # bound_theta = (np.deg2rad(-5), np.deg2rad(5))
-    # bound_Va = (13, 15)
-    # bound_alpha = (np.deg2rad(0), np.deg2rad(2))
-    # bound_beta = (np.deg2rad(0), np.deg2rad(0))
-    # bound_p = (0, 0)
-    # bound_q = (0, 0)
-    # bound_r = (0, 0)
     bound_deltaa = (-1, 1)
     bound_deltae = (-1, 1)
     bound_deltat = (0, 1)
@@ -58,15 +50,15 @@ class Trimmer:
     optim_cost_threshold = None
     optim_time_accumulator = 0  # Store the total time spend finding trim points
 
-    def __init__(self):
+    def __init__(self, uav_name):
 
         # Set default values
 
         # Setup optimization method
         print("Building nlopt_cpp for trim calculations")
-        self.nlopt_cpp_trimmer = tcpp.TrimmerState("skywalker_2013_mod")
+        self.nlopt_cpp_trimmer = tcpp.TrimmerState(uav_name)
         self.optim_algorithm = self.nlopt_cpp_optimize
-        self.optim_cost_threshold = 1
+        self.optim_cost_threshold = 10
 
     def nlopt_cpp_optimize(self, trajectory):
         trim_values = self.nlopt_cpp_trimmer.find_trim_values(trajectory)
@@ -165,32 +157,163 @@ class Trimmer:
         return (res.x, res.fun, res.success)
 
 
-# def find_nav_trim(points_vector):
-#     return np.apply_along_axis(state_to_nav_vec, 1, points_vector)
+class FlightEnvelope:
+    flag_plot = False
+    flag_interactive = False
+
+    _trimmer = None
+    _flag_setup = False
+    # Default parameter values, in case they get fixed
+    _default_Va = 10.0
+    _default_gamma = 0.0
+    _default_R = np.infty
+    _list_defaults = None
+    # default parameter domain
+    _Va_min = 5.0
+    _Va_max = 25.0
+    _gamma_min_deg = -30.0  # degrees
+    _gamma_max_deg =  30.0  # degrees
+    _R_min = 100.0 # meters
+    # flags for fixing parameters
+    _fix_Va = False
+    _fix_gamma = False
+    _fix_R = False
+    _list_fixed = None
+    # Variable search resolution
+    _eps_Va = 2
+    _eps_gamma = np.deg2rad(5)
+    _eps_psi_dot = 0.05
+    _current_domain = None
+
+    _domain_Va = None
+    _domain_gamma = None
+    _domain_psi_dot = None
+    _current_domain = None
+    _indicator = None
 
 
-# def state_to_nav(Va, alpha, beta, phi, theta, r):
-#     # Convert from aircraft trim state to navigation triplet Va, R, gamma
-#     R_max = 1000
+    def __init__(self, uav_name):
+        self.initialize(uav_name)
 
-#     gamma = theta - alpha  # Disregards wind
-#     R = Va / r * cos(gamma) * cos(phi) * cos(theta)  # Disregards wind
-#     if np.isinf(R):
-#         R = R_max
+    def set_Va(self, Va):
+        self._default_Va = Va
+        self._flag_setup = False
 
-#     return Va, gamma, R
+    def set_gamma(self, gamma):
+        self._default_gamma = gamma
+        self._flag_setup = False
 
+    def set_R(self, R):
+        self._default_R = R
+        self._flag_setup = False
 
-# def state_to_nav_vec(states):
-#     return state_to_nav(*tuple(states))
+    def set_domain_Va(self, tuple_Va):
+        self._domain_Va = tuple_Va
+        self._flag_setup = False
 
-def print_c_arrays(eqn_array):
-    string = ''
-    for i, eqn in enumerate(eqn_array):
-        string += 'const double {}a{}[{}] = {{'.format(' '*(2-len(str(i))), i, eqn_array.shape[1]-1)
-        string += ', '.join('{:>10.1f}'.format(c) for c in eqn)
-        string += '};\n'
-    return string
+    def set_domain_gamma(self, tuple_gamma):
+        self._domain_gamma = tuple_gamma
+        self._flag_setup = False
+
+    def _set_domain_psi_dot(self, tuple_psi_dot):
+        self._domain_psi_dot = tuple_psi_dot
+        self._flag_setup = False
+
+    def set_R_min(self, R_min):
+        self._R_min = R_min
+        self._flag_setup = False
+
+    def fix_Va(self, value=True):
+        self._fix_Va = value
+        self._flag_setup = False
+
+    def fix_gamma(self, value=True):
+        self._fix_gamma = value
+        self._flag_setup = False
+
+    def fix_R(self, value=True):
+        self._fix_R = value
+        self._flag_setup = False
+
+    def initialize(self, uav_name):
+        # Build parameter default values
+        default_psi_dot = self._default_Va/self._default_R
+        self._list_defaults = [self._default_Va, self._default_gamma, default_psi_dot]
+
+        # Build variable domains
+        self.set_domain_Va((self._Va_min, self._Va_max))
+        self.set_domain_gamma((np.deg2rad(self._gamma_min_deg), np.deg2rad(self._gamma_max_deg)))
+        psi_dot_max = self._Va_max/self._R_min
+        self._set_domain_psi_dot((-psi_dot_max, psi_dot_max))
+
+        # Set search degrees of freedom
+        self._list_fixed = [self._fix_Va, self._fix_gamma, self._fix_R]
+
+        domain = np.array(
+            [self._domain_Va, self._domain_gamma, self._domain_psi_dot]
+        )
+        self._current_domain = domain[np.invert(self._list_fixed)]
+
+        # Select eps values
+        eps = np.array([self._eps_Va, self._eps_gamma, self._eps_psi_dot])
+        self._current_eps = eps[np.invert(self._list_fixed)]
+
+        # Create indicator function
+        self._trimmer = Trimmer(uav_name)
+        self._trimmer.optim_time_accumulator = 0
+        self._indicator = self._trimmer.get_indicator(self._list_defaults, self._list_fixed)
+
+        self._flag_setup = True
+
+    def find_flight_envelope(self):
+
+        if not self._flag_setup:
+            raise RuntimeError('You must initalize the FlightEnvelope before extracting it')
+
+        n_dim = len(self._current_domain)
+
+        # Initialize starting time
+        t_start = time.time()
+
+        # Initialize the polytope
+        safe_poly = poly.SafeConvexPolytope(self._indicator, self._current_domain, self._current_eps)
+
+        # Pass the variable strings
+        string_Va = "Va"
+        string_gamma = "Gamma"
+        string_psi_dot = "psi_dot"
+        string_list = [
+            string_Va,
+            string_gamma,
+            string_psi_dot
+        ]
+        safe_poly.axis_label_list = list(it.compress(string_list, np.invert(self._list_fixed)))
+        # safe_poly.plotting_mask = [False, True, True, True]
+
+        # User interface options
+        if self.flag_plot:
+            safe_poly.enable_plotting = True
+        if self.flag_interactive:
+            safe_poly.wait_for_user = True
+
+        print('Starting Flight Envelope detection')
+        # Iteratively sample the polytope
+        algorithm_end = False
+        while not algorithm_end:
+            algorithm_end = safe_poly.step()
+
+        print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
+        print("Total number of samples taken: {}".format(safe_poly._samples_taken))
+        print("Total optimization time required: {}".format(self._trimmer.optim_time_accumulator))
+
+        t_end = time.time()
+        print("Total script time: {}".format(t_end - t_start))
+
+        if self.flag_plot:
+            safe_poly.plot()
+            plt.waitforbuttonpress(timeout=-1)
+
+        return safe_poly
 
 
 @click.command()
@@ -205,194 +328,49 @@ def print_c_arrays(eqn_array):
 )
 @click.option("-e", "--export", is_flag=True, help="Export relevant data in .csv files")
 def test_code(plot, interactive, export):
-    trimmer = Trimmer()
 
-    # Trajectory Trimming
-    # Va_des = 15
-    # gamma_des = np.deg2rad(0)
-    # R_des = 100
-    # trimmer.setup_trim_trajectory(Va_des, gamma_des, R_des)
-    # (trim_state, trim_inputs) = trimmer.find_trim_state()
+    uav_name = 'skywalker_2013_mod'
+    flight_envelope = FlightEnvelope(uav_name)
 
-    # Provide default values
-    Va_des = 10
-    gamma_des = np.deg2rad(0)
-    psi_dot_des = np.infty
-    list_defaults = [Va_des, gamma_des, psi_dot_des]
+    flight_envelope.flag_plot = plot
+    flight_envelope.flag_interactive = interactive
+    flight_envelope.set_domain_Va((5, 25))
+    flight_envelope.set_domain_gamma((-30, 30))
+    flight_envelope.set_R_min(100)
+    flight_envelope.initialize(uav_name)
 
-    # Set search degrees of freedom
-    fix_Va = False
-    fix_gamma = False
-    fix_R = False
+    safe_poly = flight_envelope.find_flight_envelope()
 
-    list_fixed = [fix_Va, fix_gamma, fix_R]
-
-    # Provide domain bounds
-    Va_min = 5.0
-    Va_max = 25.0
-    gamma_min = -30  # degrees
-    gamma_max =  30  # degrees
-    R_min = 100 # meters
-
-    psi_dot_max = Va_max/R_min
-
-    Va_domain = (Va_min, Va_max)
-    gamma_domain = (np.deg2rad(gamma_min), np.deg2rad(gamma_max))
-    psi_dot_domain = (-psi_dot_max, psi_dot_max)
-
-    domain = np.array(
-        [Va_domain, gamma_domain, psi_dot_domain]
-    )
-    current_domain = domain[np.invert(list_fixed)]
-    n_dim = len(current_domain)
-
-    # Create indicator function
-    indicator = trimmer.get_indicator(list_defaults, list_fixed)
-
-    # Select eps values
-    eps_Va = 2
-    eps_gamma = np.deg2rad(5)
-    eps_psi_dot = 0.05
-    eps = np.array([eps_Va, eps_gamma, eps_psi_dot])
-    current_eps = eps[np.invert(list_fixed)]
-
-    # Initialize starting time
-    t_start = time.time()
-
-    # Initialize the polytope
-    safe_poly = poly.SafeConvexPolytope(indicator, current_domain, current_eps)
-
-    # Pass the variable strings
-    string_Va = "Va"
-    string_gamma = "Gamma"
-    string_R = "R"
-    string_list = [
-        string_Va,
-        string_gamma,
-        string_R
-    ]
-    safe_poly.axis_label_list = list(it.compress(string_list, np.invert(list_fixed)))
-    # safe_poly.plotting_mask = [False, True, True, True]
-
-    # User interface options
+    # Approximate by ellipsoid
+    safe_poly.ellipsoid_fit()
     if plot:
-        safe_poly.enable_plotting = True
-    if interactive:
-        safe_poly.wait_for_user = True
-
-    # Iteratively sample the polytope
-    print("Progressive sampling of the polytope")
-    algorithm_end = False
-    while not algorithm_end:
-        print("New safe convex polytope iteration")
-        algorithm_end = safe_poly.step()
-
-    print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
-    print("Total number of samples taken: {}".format(safe_poly._samples_taken))
-    print("Total optimization time required: {}".format(trimmer.optim_time_accumulator))
+        safe_poly.plot_ellipsoid()
+        plt.show()
 
     # Approximate the safe convex polytope with k vertices
     print("Performing clustering")
     # cluster_num = 2 ** n_dim
     # cluster_num = 2 * (n_dim-3)
-    if n_dim == 2:
+    if safe_poly._n_dim == 2:
         cluster_num = 4
-    elif n_dim == 3:
-        cluster_num = 8
+    elif safe_poly._n_dim == 3:
+        cluster_num = 12
 
     safe_poly.cluster(cluster_num)
-
-    t_end = time.time()
-    print("Total script time: {}".format(t_end - t_start))
-
-    # Print human-readable polytope equations
-    unscaled_polytope = safe_poly._reduced_polytope.scale(
-        safe_poly.eps.reshape(safe_poly._n_dim, 1)
-    )
-    eqns = unscaled_polytope.get_equations()
-    divisor = max(np.abs(eqns).min(), 1)
-    eqns = eqns / divisor
-    # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
-    centroid = safe_poly.get_centroid(unscaled_polytope.get_points())
-    for i, eqn in enumerate(eqns):
-        sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0, 0]
-        eqns[i, :] = sign * eqn
-
-    print("Polytope equations ({}):".format(eqns.shape[0]))
-    header = list(safe_poly.axis_label_list)
-    header.append("Offset")
-    print("".join("{:>15s}".format(v) for v in header))
-    for eqn in eqns:
-        line_string = ""
-        for elem in eqn:
-            line_string += "{:>15.1f}".format(elem)
-        line_string += "{:>5s}".format("<0")
-        print(line_string)
+    # if plot:
+    #     safe_poly.plot()
+    #     plt.show()
+        
+    safe_poly.display_constraints()
 
     print("C-type definition:")
-    print(print_c_arrays(eqns))
-
-    if plot:
-        print("Plotting")
-        safe_poly.plot()
-        plt.show()
+    print(safe_poly.print_c_arrays())
 
     if export:
 
-        unscaled_yes_points = safe_poly.points_yes * safe_poly.eps.reshape(
-            safe_poly._n_dim, 1
-        )
-        unscaled_no_points = safe_poly.points_no * safe_poly.eps.reshape(
-            safe_poly._n_dim, 1
-        )
-        unscaled_polytope = safe_poly._polytope.scale(
-            safe_poly.eps.reshape(safe_poly._n_dim, 1)
-        )
-        eqns = unscaled_polytope.get_equations()
-        divisor = max(np.abs(eqns).min(), 1)
-        eqns = eqns / divisor
-        # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
-        centroid = safe_poly.get_centroid(unscaled_polytope.get_points())
-        for i, eqn in enumerate(eqns):
-            sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0, 0]
-            eqns[i, :] = sign * eqn
-        vertices = unscaled_polytope.get_points()
-        print(vertices)
-
         output_path = "/home/george/ros_workspaces/uav_ftc/src/uav_ftc/logs/flight_envelope_va_gamma"
-        header_txt = ",".join(safe_poly.axis_label_list)
-        np.savetxt(
-            "{}/points_yes.csv".format(output_path),
-            unscaled_yes_points.transpose(),
-            fmt="%.3g",
-            delimiter=",",
-            header=header_txt,
-            comments="",
-        )
-        np.savetxt(
-            "{}/points_no.csv".format(output_path),
-            unscaled_no_points.transpose(),
-            fmt="%.3g",
-            delimiter=",",
-            header=header_txt,
-            comments="",
-        )
-        np.savetxt(
-            "{}/separators.csv".format(output_path),
-            eqns,
-            fmt="%15.1f",
-            delimiter=",",
-            header=(header_txt + ",Offset"),
-            comments="",
-        )
-        np.savetxt(
-            "{}/vertices.csv".format(output_path),
-            vertices.transpose(),
-            fmt="%15.1f",
-            delimiter=",",
-            header=header_txt,
-            comments="",
-        )
+        safe_poly.export_csv(output_path)
+
 
 if __name__ == "__main__":
     test_code()
