@@ -2,11 +2,10 @@
 
 import rospy
 import rospkg
-import dynamic_reconfigure.client as dr_client
 
 from trim_traj_fe import FlightEnvelope
 
-from uav_ftc.msg import Parameter
+from uav_ftc.msg import Parameter, FlightEnvelopeEllipsoid
 
 
 class FlightEnvelopeROS:
@@ -15,6 +14,7 @@ class FlightEnvelopeROS:
     safe_poly = None
 
     _dr_client = None
+    _pub = None
 
     def __init__(self):
         # Read the flight envelope box constraints from the parameter server
@@ -32,11 +32,11 @@ class FlightEnvelopeROS:
         self.flight_envelope.set_R_min(self.R_min)
         self.flight_envelope.initialize(uav_name)
 
-        # Raise a dynamic reconfigure server to communicate changing flight envelope constraints
-        self._dr_client = dr_client.Client("flight_envelope", timeout=2)
+        # Set a topic publisher for the flight envelope description
+        self._pub = rospy.Publisher('flight_envelope', FlightEnvelopeEllipsoid, queue_size=10)
 
         # Set a topic callback for receiving parameter changes on the UAV model
-        param_topic_name = '/model_parameters'
+        param_topic_name = 'model_parameters'
         rospy.Subscriber(param_topic_name, Parameter, self.parameter_callback)
 
     def update(self):
@@ -49,24 +49,25 @@ class FlightEnvelopeROS:
         rospy.loginfo("Sent new Flight Envelope parameters")
 
     def send_fe_params(self):
+        fe = FlightEnvelopeEllipsoid()
+
         ellipsoid_coeffs = self.safe_poly._el_v
-        param_dict = dict()
-        param_dict["Va_max"] = self.Va_max
-        param_dict["Va_min"] = self.Va_max
-        param_dict["gamma_max"] = self.gamma_max_deg
-        param_dict["gamma_min"] = self.gamma_min_deg
-        param_dict["R_min"] = self.R_min
-        param_dict["el_A"] = ellipsoid_coeffs[0]
-        param_dict["el_B"] = ellipsoid_coeffs[1]
-        param_dict["el_C"] = ellipsoid_coeffs[2]
-        param_dict["el_D"] = ellipsoid_coeffs[3]
-        param_dict["el_E"] = ellipsoid_coeffs[4]
-        param_dict["el_F"] = ellipsoid_coeffs[5]
-        param_dict["el_G"] = ellipsoid_coeffs[6]
-        param_dict["el_H"] = ellipsoid_coeffs[7]
-        param_dict["el_I"] = ellipsoid_coeffs[8]
-        param_dict["el_J"] = ellipsoid_coeffs[9]
-        self._dr_client.update_configuration(param_dict)
+        fe.Va_max = self.Va_max
+        fe.Va_min = self.Va_max
+        fe.gamma_max = self.gamma_max_deg
+        fe.gamma_min = self.gamma_min_deg
+        fe.R_min = self.R_min
+        fe.el_A = ellipsoid_coeffs[0]
+        fe.el_B = ellipsoid_coeffs[1]
+        fe.el_C = ellipsoid_coeffs[2]
+        fe.el_D = ellipsoid_coeffs[3]
+        fe.el_E = ellipsoid_coeffs[4]
+        fe.el_F = ellipsoid_coeffs[5]
+        fe.el_G = ellipsoid_coeffs[6]
+        fe.el_H = ellipsoid_coeffs[7]
+        fe.el_I = ellipsoid_coeffs[8]
+        fe.el_J = ellipsoid_coeffs[9]
+        self._pub.publish(fe)
 
     def parameter_callback(self, msg):
         self.flight_envelope.set_model_parameter(msg.type, msg.name, msg.value)

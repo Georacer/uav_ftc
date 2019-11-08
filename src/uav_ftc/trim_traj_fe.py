@@ -55,10 +55,17 @@ class Trimmer:
         # Set default values
 
         # Setup optimization method
-        print("Building nlopt_cpp for trim calculations")
         self.nlopt_cpp_trimmer = tcpp.TrimmerState(uav_name)
         self.optim_algorithm = self.nlopt_cpp_optimize
-        self.optim_cost_threshold = 10
+        self.optim_cost_threshold = (
+            50
+        )  # WARNING: The level of this constant is dependent on the weighting costs of the trimmer.cpp cost function
+
+    def set_model_parameter(self, param_type, name, value):
+        return self.nlopt_cpp_trimmer.set_model_parameter(param_type, name, value)
+
+    def update_model(self):
+        self.nlopt_cpp_trimmer.update_model()
 
     def nlopt_cpp_optimize(self, trajectory):
         trim_values = self.nlopt_cpp_trimmer.find_trim_values(trajectory)
@@ -152,6 +159,7 @@ class Trimmer:
 class FlightEnvelope:
     flag_plot = False
     flag_interactive = False
+    uav_name = None
 
     _trimmer = None
     _flag_setup = False
@@ -184,6 +192,7 @@ class FlightEnvelope:
     _indicator = None
 
     def __init__(self, uav_name):
+        self.uav_name = uav_name
         self.initialize(uav_name)
 
     def set_Va(self, Va):
@@ -226,7 +235,16 @@ class FlightEnvelope:
         self._fix_R = value
         self._flag_setup = False
 
-    def initialize(self, uav_name):
+    def set_model_parameter(self, param_type, param_name, param_value):
+        return self._trimmer.set_model_parameter(param_type, param_name, param_value)
+
+    def update_model(self):
+        self._trimmer.update_model()
+
+    def initialize(self, uav_name=None):
+        if uav_name is None:
+            uav_name = self.uav_name
+
         # Build parameter default values
         default_psi_dot = self._default_Va / self._default_R
         self._list_defaults = [self._default_Va, self._default_gamma, default_psi_dot]
@@ -264,8 +282,6 @@ class FlightEnvelope:
             raise RuntimeError(
                 "You must initalize the FlightEnvelope before extracting it"
             )
-
-        n_dim = len(self._current_domain)
 
         # Initialize starting time
         t_start = time.time()
@@ -347,6 +363,38 @@ def test_code(plot, interactive, export_path):
 
     # Approximate by ellipsoid
     safe_poly.ellipsoid_fit()
+    print("Fitted Ellipsoid coefficients:\n")
+    print(safe_poly._el_v)
+    if plot:
+        safe_poly.plot_ellipsoid()
+        # plt.ion()
+        plt.show()
+
+    print("Changing model parameter and re-extracting")
+    result = flight_envelope.set_model_parameter(
+        5, "motor1/k_motor", 0
+    )  # Zero-out propeller efficiency
+    if result:
+        print("Succeeded")
+    else:
+        print("Failed")
+    flight_envelope.update_model()  # Register model changes
+    # Set the model parameters. They will not take effect (be written)
+    # param_type defined as:
+    # typedef enum {
+    #     PARAM_TYPE_WORLD = 0,
+    #     PARAM_TYPE_ENV,
+    #     PARAM_TYPE_INIT,
+    #     PARAM_TYPE_INERTIAL,
+    #     PARAM_TYPE_AERO,
+    #     PARAM_TYPE_PROP,
+    #     PARAM_TYPE_GROUND
+    # } ParamType_t;
+    safe_poly = flight_envelope.find_flight_envelope()
+    # Approximate by ellipsoid
+    safe_poly.ellipsoid_fit()
+    print("Fitted Ellipsoid coefficients:\n")
+    print(safe_poly._el_v)
     if plot:
         safe_poly.plot_ellipsoid()
         plt.show()

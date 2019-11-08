@@ -785,7 +785,6 @@ class SafeConvexPolytope:
     def _get_polytope_volume(self):
         points = self._polytope.get_points()
         hull = ConvexHull(points.T, qhull_options="QJ")
-        # hull = ConvexHull(points.T)
         return hull.volume
 
     def _get_polytope_volume_approximate(self):
@@ -834,10 +833,13 @@ class SafeConvexPolytope:
     def build_safe_polytope(self):
         # Calculate the volume of the old polytope, as an index of approximation convergence
         # print('Calculating existing polytope volume')
-        old_volume = self._get_polytope_volume_approximate_2()
+        try:
+            old_volume = self._get_polytope_volume_approximate_2()
+        except ValueError as e:
+            raise IndexError('Failed to get polytope volume')
 
         # Create a convex polytope around set_yes
-        print("Creating first-pass convex polytope")
+        # print("Creating first-pass convex polytope")
         convex_polytope = self._convex_separator()
         # print("Got preliminary convex polytope")
         e_array = convex_polytope.get_equations()
@@ -855,7 +857,7 @@ class SafeConvexPolytope:
 
         if self._patch_polytope_holes:
             # Remove invalid points which are completely inside the convex shape and violate the no-holes assumption
-            print("Patching holes in the polytope")
+            # print("Patching holes in the polytope")
             invalid_points = self._filter_false_invalid_points(
                 invalid_points, invalid_points_mask
             )
@@ -1055,10 +1057,10 @@ class SafeConvexPolytope:
                 "QHull could not build a convex polytope out of the polytopes",
                 UserWarning,
             )
-            self._reset_polytope()
+            self._decrease_eps()
             return False
 
-        print("Removing distant points")
+        # print("Removing distant points")
         self.remove_distant_points_2()
         if self.points_yes.shape[1] == 0:
             warn(
@@ -1075,39 +1077,39 @@ class SafeConvexPolytope:
 
         algorithm_end = False
         if convergence:
-            print("Polytope converged in the current eps value")
+            # print("Polytope converged in the current eps value")
             if np.all(self._normalized_eps <= self._final_normalized_eps):
-                print("Desired polytope accuracy achieved")
+                # print("Desired polytope accuracy achieved")
                 algorithm_end = True
             else:
-                print("Increasing sampling accuracy")
+                # print("Increasing sampling accuracy")
                 self._decrease_eps()
-                print("New normalized eps:\n{}".format(self._normalized_eps))
+                # print("New normalized eps:\n{}".format(self._normalized_eps))
 
         return algorithm_end
 
     # Take more samples and re-fit the safe convex polygon
     def improve_polytope(self, init=False):
-        print("Getting polytope samples")
+        # print("Getting polytope samples")
         self.sample(init=init, method=self._sampling_method)
 
         # Add boundary no-points if none were found
         if len(self.points_no) == 0:
-            print("No points_no exist in samples, adding boundaries...")
+            # print("No points_no exist in samples, adding boundaries...")
             self._restrict_domain_boundary()
 
         if self.enable_plotting:
-            print("Plotting new sampled points")
+            # print("Plotting new sampled points")
             self.plot()
 
         try:
-            print("Finding new safe convex polytope")
+            # print("Finding new safe convex polytope")
             convergence = self.build_safe_polytope()
             return convergence
         except IndexError:
             raise RuntimeError("Could not build a safe polytope")
         except QhullError as e:
-            print("QHull could not create a hull")
+            print("Could not create a hull or the polytope was degenerate")
             raise e
 
     def new_plot(self):
@@ -1149,7 +1151,7 @@ class SafeConvexPolytope:
             pu.plot_line(ah, point_1, point_2, color)
 
     def plot(self, color="k"):
-        print("Plotting")
+        # print("Plotting")
         if self._n_dim > 3:
             warn("Plotting a slice of polytope in 3D space", UserWarning)
 
@@ -1257,7 +1259,8 @@ class SafeConvexPolytope:
                 face_points = self._slice_face_points(face_points, self.plotting_mask)
 
             # Plot the convex polytope
-            pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
+            if len(face_points)>4:
+                pu.plot_polygons_3(ah, face_points, colorcode=colorcode, alpha=alpha)
 
             ah.set_xlim(x_min, x_max)
             ah.set_ylim(y_min, y_max)
@@ -1348,7 +1351,7 @@ class SafeConvexPolytope:
         # Switch coefficient signs where appropriate to make the hyperplane equation<0 sastisfy the polytope
         centroid = self.get_centroid(unscaled_polytope.get_points())
         for i, eqn in enumerate(eqns):
-            sign = -np.sign(poly.evaluate_hyperplane(centroid, eqn))[0, 0]
+            sign = -np.sign(evaluate_hyperplane(centroid, eqn))[0, 0]
             eqns[i, :] = sign * eqn
         vertices = unscaled_polytope.get_points()
         print(vertices)
@@ -1474,7 +1477,7 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figur
         ind_func = hypertriangle
 
     # define a domain as a n_dim x 2 array
-    print("Creating problem domain and sampling initial points")
+    # print("Creating problem domain and sampling initial points")
     domain = np.zeros((n_dim, 2))
     # domain[:, 0] = -(np.arange(n_dim) + 5)
     # domain[:, 1] = np.arange(n_dim) + 5
@@ -1533,7 +1536,7 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figur
     print(unscaled_polytope.get_equations_normalized(1))
 
     if flag_plot:
-        print("Plotting")
+        # print("Plotting")
         safe_poly.plot()
         plt.show()
 
