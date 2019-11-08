@@ -1,0 +1,7 @@
+# Flight Envelope generator parameters
+
+Va_max: 25
+Va_min: 5
+gamma_max_deg: 30
+gamma_min_deg: -30
+R_min : 100

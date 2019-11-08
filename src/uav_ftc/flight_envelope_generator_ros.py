@@ -6,6 +6,8 @@ import dynamic_reconfigure.client as dr_client
 
 from trim_traj_fe import FlightEnvelope
 
+from uav_ftc.msg import Parameter
+
 
 class FlightEnvelopeROS:
     flight_envelope = None
@@ -16,7 +18,7 @@ class FlightEnvelopeROS:
 
     def __init__(self):
         # Read the flight envelope box constraints from the parameter server
-        uav_name = rospy.get_param("trimmer_uav_name")
+        uav_name = rospy.get_param("~uav_name")
         self.Va_max = rospy.get_param("Va_max", 25)
         self.Va_min = rospy.get_param("Va_min", 5)
         self.gamma_max_deg = rospy.get_param("gamma_max_deg", 30)
@@ -34,8 +36,11 @@ class FlightEnvelopeROS:
         self._dr_client = dr_client.Client("flight_envelope", timeout=2)
 
         # Set a topic callback for receiving parameter changes on the UAV model
+        param_topic_name = '/model_parameters'
+        rospy.Subscriber(param_topic_name, Parameter, self.parameter_callback)
 
     def update(self):
+        self.flight_envelope.update_model() # Write any new model parameters received so far
         self.safe_poly = self.flight_envelope.find_flight_envelope()
         # Approximate by ellipsoid
         self.safe_poly.ellipsoid_fit()
@@ -64,13 +69,13 @@ class FlightEnvelopeROS:
         self._dr_client.update_configuration(param_dict)
 
     def parameter_callback(self, msg):
-        self.flight_envelope.set_model_parameter(msg.name, msg.value)
+        self.flight_envelope.set_model_parameter(msg.type, msg.name, msg.value)
         self.flag_needs_update = True
 
 
 if __name__ == "__main__":
 
-    rospy.init.node("Flight Envelope Generator", anonymous=True)
+    rospy.init_node("Flight Envelope Generator", anonymous=True)
 
     flight_envelope = FlightEnvelopeROS()
     r = rospy.Rate(2)
