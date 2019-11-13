@@ -126,6 +126,6 @@ void SubHandlerLL::cb_output(last_letter_msgs::SimPWM msg)
 {
     for (uint i=0; i<8; ++i)
     {
-        bus_data.rc_out[i] = msg.value[i];
+        bus_data.rc_out[i] = msg.value[i]*0.3491;
     }
 }

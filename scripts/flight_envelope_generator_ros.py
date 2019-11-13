@@ -3,7 +3,7 @@
 import rospy
 import rospkg
 
-from trim_traj_fe import FlightEnvelope
+from uav_ftc.trim_traj_fe import FlightEnvelope
 
 from uav_ftc.msg import Parameter, FlightEnvelopeEllipsoid
 

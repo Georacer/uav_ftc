@@ -137,6 +137,9 @@ include_directories(
 
 ## Declare a C++ library
 
+# Utilities library relevant to this package
+# add_library(ros_utils ros_utils.cpp)
+
 # The rate controller solver library
 add_library(rate_controller_solver
   externals/qpoases/SRC/Bounds.cpp
