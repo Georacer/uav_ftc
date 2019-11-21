@@ -53,7 +53,7 @@ class FlightEnvelopeROS:
 
         ellipsoid_coeffs = self.safe_poly._el_v
         fe.Va_max = self.Va_max
-        fe.Va_min = self.Va_max
+        fe.Va_min = self.Va_min
         fe.gamma_max = self.gamma_max_deg
         fe.gamma_min = self.gamma_min_deg
         fe.R_min = self.R_min

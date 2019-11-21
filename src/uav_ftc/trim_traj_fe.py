@@ -132,6 +132,7 @@ class Trimmer:
         # The success flag
 
         # Perform the optimization step and time execution
+        self.optim_time_accumulator = 0
         t_start = time.time()
         res = self.optim_algorithm(trajectory)
         t_end = time.time()
@@ -159,6 +160,7 @@ class Trimmer:
 class FlightEnvelope:
     flag_plot = False
     flag_interactive = False
+    flag_verbose = False
     uav_name = None
 
     _trimmer = None
@@ -307,22 +309,25 @@ class FlightEnvelope:
         if self.flag_interactive:
             safe_poly.wait_for_user = True
 
-        print("Starting Flight Envelope detection")
+        if self.flag_verbose:
+            print("Starting Flight Envelope detection")
         # Iteratively sample the polytope
         algorithm_end = False
         while not algorithm_end:
             algorithm_end = safe_poly.step()
 
-        print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
-        print("Total number of samples taken: {}".format(safe_poly._samples_taken))
-        print(
-            "Total optimization time required: {}".format(
-                self._trimmer.optim_time_accumulator
+        if self.flag_verbose:
+            print("Final number of sampled points: {}".format(len(safe_poly._set_points)))
+            print("Total number of samples taken: {}".format(safe_poly._samples_taken))
+            print(
+                "Total optimization time required: {}".format(
+                    self._trimmer.optim_time_accumulator
+                )
             )
-        )
 
         t_end = time.time()
-        print("Total script time: {}".format(t_end - t_start))
+        if self.flag_verbose:
+            print("Total script time: {}".format(t_end - t_start))
 
         if self.flag_plot:
             safe_poly.plot()
@@ -347,10 +352,18 @@ class FlightEnvelope:
     default=None,
     help="Path to export relevant data in .csv files",
 )
-def test_code(plot, interactive, export_path):
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=True,
+    help="Enable verbose output",
+)
+def test_code(plot, interactive, export_path, verbose):
 
     uav_name = "skywalker_2013_mod"
     flight_envelope = FlightEnvelope(uav_name)
+    flight_envelope.flag_verbose = verbose
 
     flight_envelope.flag_plot = plot
     flight_envelope.flag_interactive = interactive
@@ -360,6 +373,7 @@ def test_code(plot, interactive, export_path):
     flight_envelope.initialize(uav_name)
 
     safe_poly = flight_envelope.find_flight_envelope()
+    safe_poly._flag_verbose = verbose
 
     # Approximate by ellipsoid
     safe_poly.ellipsoid_fit()
@@ -372,7 +386,7 @@ def test_code(plot, interactive, export_path):
 
     print("Changing model parameter and re-extracting")
     result = flight_envelope.set_model_parameter(
-        5, "motor1/k_motor", 0
+        5, "motor1/omega_max", 10
     )  # Zero-out propeller efficiency
     if result:
         print("Succeeded")

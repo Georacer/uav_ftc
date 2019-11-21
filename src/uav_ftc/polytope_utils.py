@@ -294,6 +294,7 @@ class SafeConvexPolytope:
     _delete_old_points = False
     _samples_taken = 0
     _sample_decimal_places = 3
+    _flag_verbose = False
 
     # Fitted ellipsoid data
     _el_center = None
@@ -399,10 +400,11 @@ class SafeConvexPolytope:
             normalized_ranges / self._default_init_division,
             np.ones(normalized_ranges.shape),
         )
-        print("Original domain given:\n{}".format(domain))
-        print("Converted normalized domain:\n{}".format(self._normalized_domain))
-        print("Original eps given:\n{}".format(eps))
-        print("Initial eps:\n{}".format(self._normalized_eps))
+        if self._flag_verbose:
+            print("Original domain given:\n{}".format(domain))
+            print("Converted normalized domain:\n{}".format(self._normalized_domain))
+            print("Original eps given:\n{}".format(eps))
+            print("Initial eps:\n{}".format(self._normalized_eps))
 
     # Set the sampling resolution
     # TODO: Needs conversion to normalized logic
@@ -416,7 +418,8 @@ class SafeConvexPolytope:
         self._sampling_method = method
 
     def _reset_polytope(self):
-        print("Resetting Polytope")
+        if self._flag_verbose:
+            print("Resetting Polytope")
         self._initialized = False
         # define an initial polygon
         initialization_points = np.zeros((self._n_dim, 2 ** self._n_dim))
@@ -636,7 +639,8 @@ class SafeConvexPolytope:
     # Sample points around a polytope boundary
     def sample(self, init=False, method="rectilinear"):
         if init:  # First-pass sample of the grid
-            print("Initial rectilinear sampling")
+            if self._flag_verbose:
+                print("Initial rectilinear sampling")
             sampled_points = self._array_to_set(self._sample_rectilinear())
         else:
             if method == "rectilinear" or init:
@@ -1255,7 +1259,8 @@ class SafeConvexPolytope:
 
             # Slice extra dimensions if needed
             if self._n_dim > 3:
-                print("Slicing coordinates to plot in 3D space")
+                if self._flag_verbose:
+                    print("Slicing coordinates to plot in 3D space")
                 face_points = self._slice_face_points(face_points, self.plotting_mask)
 
             # Plot the convex polytope
@@ -1292,10 +1297,11 @@ class SafeConvexPolytope:
         return ah
 
     def plot_ellipsoid(self):
-        print(self._el_center)
-        print(self._el_radii)
-        print(self._el_evecs)
-        print(self._el_v)
+        if self._flag_verbose:
+            print(self._el_center)
+            print(self._el_radii)
+            print(self._el_evecs)
+            print(self._el_v)
         el_fit.ellipsoid_plot(self._el_center, self._el_radii, self._el_evecs, self._axis_handle)
 
     def display_constraints(self, reduced=True):
@@ -1462,7 +1468,14 @@ def hypertriangle(p):
     is_flag=True,
     help="Save each plotted figure"
 )
-def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figures):
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=True,
+    help="Print verbose output"
+)
+def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figures, verbose):
 
     n_dim = dimensions
     print("Testing polytope code for {} dimensions".format(n_dim))
@@ -1512,6 +1525,8 @@ def test_code(dimensions, plot, interactive, shape, polytope_engine, write_figur
         safe_poly.wait_for_user = True
     if write_figures:
         safe_poly.save_figures = True
+    if verbose:
+        safe_poly.verbose = True
 
     # Iteratively sample the polytope
     print("Progressive sampling of the polytope")
