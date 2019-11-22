@@ -5,7 +5,8 @@ import rospkg
 
 from uav_ftc.trim_traj_fe import FlightEnvelope
 
-from uav_ftc.msg import Parameter, FlightEnvelopeEllipsoid
+from uav_ftc.msg import FlightEnvelopeEllipsoid
+from last_letter_msgs.msg import Parameter
 
 
 class FlightEnvelopeROS:
@@ -36,7 +37,7 @@ class FlightEnvelopeROS:
         self._pub = rospy.Publisher('flight_envelope', FlightEnvelopeEllipsoid, queue_size=10)
 
         # Set a topic callback for receiving parameter changes on the UAV model
-        param_topic_name = 'model_parameters'
+        param_topic_name = 'estimated_parameters'
         rospy.Subscriber(param_topic_name, Parameter, self.parameter_callback)
 
     def update(self):

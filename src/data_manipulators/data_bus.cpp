@@ -46,8 +46,9 @@ SubHandler::SubHandler()
 ////////////////////////////
 // DataBus Class definitions
 ////////////////////////////
-DataBus::DataBus(ros::NodeHandle n, uint data_source)
+DataBus::DataBus(ros::NodeHandle par_n, uint data_source)
 {
+    n = par_n; // Store nodehandle
     if (data_source == DATA_SOURCE_LL)
     {
         sub_handler_ = new SubHandlerLL(n);
@@ -71,26 +72,40 @@ void DataBus::ekf_init_()
     x0.setZero(); // Initialize EKF state
     x0(0) = bus_data_.airspeed;
 
+    // Read and store covariances
+    double cov_init_vel, cov_init_wind;
+    double cov_proc_vel, cov_proc_wind;
+    double cov_meas_vel_hor, cov_meas_vel_vert, cov_meas_qbar, cov_meas_alpha, cov_meas_beta;
+	n.getParam("ekf/cov_init_vel", cov_init_vel);
+    n.getParam("ekf/cov_init_wind", cov_init_wind);
+    n.getParam("ekf/cov_proc_vel", cov_proc_vel);
+    n.getParam("ekf/cov_proc_wind", cov_proc_wind);
+    n.getParam("ekf/cov_meas_vel_hor", cov_meas_vel_hor);
+    n.getParam("ekf/cov_meas_vel_vert", cov_meas_vel_vert);
+    n.getParam("ekf/cov_meas_qbar", cov_meas_qbar);
+    n.getParam("ekf/cov_meas_alpha", cov_meas_alpha);
+    n.getParam("ekf/cov_meas_beta", cov_meas_beta);
+
     Eigen::MatrixXd P0(6,6), Q(6,6), R(6,6);
     P0.setZero();
-    P0.diagonal() << 16, 16, 16, 4, 4, 4; // Initialize P0 with the square if state std_devs
+    double q1 = std::pow(cov_init_vel, 2);
+    double q2 = std::pow(cov_init_wind, 2);
+    P0.diagonal() << q1, q1, q1, q2, q2, q2; // Initialize P0 with the square if state std_devs
 
     double pn_vel_rel, pn_vel_wind; // Setup process noises
-    pn_vel_rel = std::pow(0.5*0.015*9.81, 2);
-    pn_vel_wind = std::pow(0.01, 2);
+    double q3 = std::pow(cov_proc_vel, 2);
+    double q4 = std::pow(cov_proc_wind, 2);
     Q.setZero();
-    Q.diagonal() << pn_vel_rel, pn_vel_rel, pn_vel_rel, pn_vel_wind, pn_vel_wind, pn_vel_wind;
+    Q.diagonal() << q3, q3, q3, q4, q4, q4;
 
     double mn_vel_gps_hor, mn_vel_gps_vert, mn_qbar, mn_alpha, mn_beta;
-    // Values taken directy from MATLAB scripts, need to parametrize in the future
-    mn_vel_gps_hor = 0.025;
-    mn_vel_gps_vert = 0.05;
-    mn_qbar = 30.198;
-    mn_alpha = 0.0028;
-    mn_beta = 0.0035;
+    double q5 = std::pow(cov_meas_vel_hor, 2);
+    double q6 = std::pow(cov_meas_vel_vert, 2);
+    double q7 = std::pow(cov_meas_qbar, 2);
+    double q8 = std::pow(cov_meas_alpha, 2);
+    double q9 = std::pow(cov_meas_beta, 2);
     R.setZero();
-    R.diagonal() << pow(mn_vel_gps_hor, 2), pow(mn_vel_gps_hor, 2), pow(mn_vel_gps_vert, 2),
-        pow(mn_qbar, 2), pow(mn_alpha, 2), pow(mn_beta, 2);
+    R.diagonal() << q5, q5, q6, q7, q8, q9;
 
     double dt = 1/pub_rate_; 
     ekf_ = new Ekf(x0, P0, Q, R, dt);
@@ -137,7 +152,7 @@ void DataBus::ekf_build_inputs()
     convertEigenVector3(bus_data_.acceleration_linear, acc_vect);
     convertEigenVector3(bus_data_.velocity_angular, omega_vect);
     convertEigenVector3(bus_data_.inertial_velocity, velocity_vect);
-    Eigen::Vector3d acc_linear = acc_vect + omega_vect.cross(velocity_vect);
+    Eigen::Vector3d acc_linear = acc_vect;// + omega_vect.cross(velocity_vect);
 
     ekf_u_ << acc_linear, omega_vect, temp_quat.coeffs();
 }

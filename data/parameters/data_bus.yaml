@@ -1,0 +1,11 @@
+# Data bus node related parameters
+
+ekf/cov_init_vel: 4
+ekf/cov_init_wind: 2
+ekf/cov_proc_vel: 0.074 # Originally 0.5*0.015*9.81=0.074
+ekf/cov_proc_wind: 0.01 # Originally 0.01
+ekf/cov_meas_vel_hor: 0.025
+ekf/cov_meas_vel_vert: 0.05
+ekf/cov_meas_qbar: 30.198
+ekf/cov_meas_alpha: 0.0028
+ekf/cov_meas_beta: 0.0035

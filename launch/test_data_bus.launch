@@ -2,7 +2,7 @@
     <!-- Available arguments -->
     <arg name="manualMode" default="false"/>
     <arg name="autoMode" default="true"/>
-    <arg name="uav_name" default="skywalker_2013"/>
+    <arg name="uav_name" default="skywalker_2013_mod"/>
     <arg name="log" default="false"/>
     <!-- <arg name="groundCam" default="false"/> -->
     <arg name="scenario" default="none"/>
@@ -10,6 +10,7 @@
 
     <!-- Launch the scenario player -->
     <group ns="$(arg uav_name)">
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
         <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
             <param name="data_source" value="1"/>
         </node>
@@ -17,7 +18,7 @@
     <node name="EKF_plotter"
           pkg="rqt_plot"
           type="rqt_plot"
-          args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
+          args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y /$(arg uav_name)/ekf/airspeed /$(arg uav_name)/dataBus/airspeed"
     />
 
 </launch>

@@ -25,6 +25,7 @@ class DataBus
 {
     // Variables
     private:
+    ros::NodeHandle n;
     double pub_rate_;
     ros::Publisher data_pub_;
     ros::Publisher ekf_pub_;
