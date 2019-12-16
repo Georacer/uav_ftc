@@ -89,11 +89,23 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
 
 void SubHandlerLL::cb_state_dot(last_letter_msgs::SimStates msg)
 {
+    geometry_msgs::Vector3 temp_vect_ros;
+    Vector3d temp_vect_eig, temp_vect_omega;
+
     bus_data.inertial_velocity.x = msg.pose.position.x;// NED frame
     bus_data.inertial_velocity.y = msg.pose.position.y;// NED frame
     bus_data.inertial_velocity.z = msg.pose.position.z;// NED frame
     bus_data.acceleration_angular = msg.velocity.angular; // Body frame
-    bus_data.acceleration_linear = msg.velocity.linear; // Body frame
+    // Construct accelerometers measurements
+    // Build and subtract gravity acceleration
+    temp_vect_eig = rotation_be.conjugate()*Vector3d(0, 0, bus_data.g);
+    // Subtract corriolis acceleration
+    convertEigenVector3(bus_data.velocity_angular, temp_vect_omega);
+    temp_vect_eig -= temp_vect_omega.cross(vel_body_inertial);
+    convertRosVector3(temp_vect_eig, temp_vect_ros);
+    bus_data.acceleration_linear.x = msg.velocity.linear.x - temp_vect_ros.x; // Body frame, accelerometer reading
+    bus_data.acceleration_linear.y = msg.velocity.linear.y - temp_vect_ros.y; // Body frame, accelerometer reading
+    bus_data.acceleration_linear.z = msg.velocity.linear.z - temp_vect_ros.z; // Body frame, accelerometer reading
 }
 
 void SubHandlerLL::cb_environment(last_letter_msgs::Environment msg)
@@ -126,6 +138,6 @@ void SubHandlerLL::cb_output(last_letter_msgs::SimPWM msg)
 {
     for (uint i=0; i<8; ++i)
     {
-        bus_data.rc_out[i] = msg.value[i]*0.3491;
+        bus_data.rc_out[i] = msg.value[i];
     }
 }

@@ -20,5 +20,5 @@ float64 qbar # Differential (Dynamic) pressure
 float64 rho # Air density
 float64 g # Gravity acceleration
 float64[8] rc_in
-float64[14] rc_out #Currently in PWM, should change to radians
+float64[14] rc_out # In PWM
 float64 rps_motor
