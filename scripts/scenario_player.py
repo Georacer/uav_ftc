@@ -8,18 +8,25 @@ import rospy
 import rospkg
 from geometry_msgs.msg import Vector3Stamped
 
+from last_letter_msgs.msg import Parameter
+import uav_ftc.fault_generator as fg
+
 class Scheduler:
 
     scenario = None
     pending_item = None
     reference = None
+    timestmap = None
     end_reached = False
     start_time = None
     relative_time = False
 
     def __init__(self, scenario_file):
         self.start_time = rospy.Time.now()  # Store initialization instance
-        self.pub = rospy.Publisher('refTrajectory', Vector3Stamped, queue_size=10)
+        self.ref_pub = rospy.Publisher('refTrajectory', Vector3Stamped, queue_size=10) # Setup reference publisher
+        # Setup fault publisher
+        self.fg = fg.FaultGenerator()
+        self.fault_pub = rospy.Publisher('parameter_changes', Parameter, queue_size=100)
 
         with open(scenario_file) as fh:
             try:
@@ -49,12 +56,12 @@ class Scheduler:
         # print('Time: {}'.format(time.secs))
 
         if self.pending_item['time'] <= time.secs:
-            self.parse_next_reference()
+            self.parse_next_point()
 
-    def parse_next_reference(self):
+    def parse_next_point(self):
         # Apply the reference
         try:
-            self.apply_reference(self.pending_item)
+            self.parse_point(self.pending_item)
         except AttributeError as e:
             print(e)
         # Pop the next item
@@ -63,23 +70,37 @@ class Scheduler:
         except StopIteration:
             self.end_reached = True
 
-    def apply_reference(self, ref_item):
+    def parse_point(self, ref_item):
         for attribute, value in ref_item.iteritems():
             if attribute == 'time':
-                self.reference.header.stamp = rospy.Time.now()
+            # set the timestamp
+                self.timestamp = rospy.Time.now()
                 continue
 
-            if attribute == 'airspeed':
-                v_attr_name = 'x'
-            elif attribute == 'gamma':
-                v_attr_name = 'y'
-            elif attribute == 'turn_radius':
-                v_attr_name = 'z'
-            else:
-                raise AttributeError('Invalid reference attribute {}'.format(attribute))
-            setattr(self.reference.vector, v_attr_name, value)
-        rospy.loginfo("New reference:\n {}".format(self.reference))
-        self.pub.publish(self.reference)
+            if attribute == 'trajectory':
+            # Read and publish a new reference trajectory
+                rospy.loginfo('Publishing new reference trajectory')
+                for ref_type, ref_value in value.iteritems():
+                    if ref_type == 'airspeed':
+                        v_attr_name = 'x'
+                    elif ref_type == 'gamma':
+                        v_attr_name = 'y'
+                    elif ref_type == 'turn_radius':
+                        v_attr_name = 'z'
+                    else:
+                        raise AttributeError('Invalid reference attribute {}'.format(attribute))
+                    setattr(self.reference.vector, v_attr_name, ref_value)
+                rospy.loginfo("New reference:\n {}".format(self.reference))
+                self.reference.header.stamp = self.timestamp
+                self.ref_pub.publish(self.reference)
+
+            if attribute == 'fault':
+            # Signal a new fault from a predetermined set of faults
+                rospy.loginfo('Publishing new fault')
+                message_list = self.fg.generate_fault(value)
+                for msg in message_list:
+                    msg.header.stamp = self.timestamp
+                    self.fault_pub.publish(msg)
 
         
     def popitem(self):

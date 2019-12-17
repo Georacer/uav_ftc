@@ -1,0 +1,6 @@
+{
+    "motor1/omega_max": {
+        "type" : 5,
+        "value" : 0
+    }
+}

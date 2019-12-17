@@ -1,0 +1,48 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="true"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="false"/>
+
+	<!-- Launch the last_letter simulator /-->
+	<include file="$(find last_letter)/launch/launcher.launch" >
+		<arg name="manualMode" value="$(arg manualMode)"/>
+		<arg name="autoMode" value="$(arg autoMode)"/>
+		<arg name="uav_name" value="$(arg uav_name)"/>
+		<arg name="log" value="$(arg log)"/>
+	</include>
+
+    <group ns="$(arg uav_name)">
+
+        <!-- Launch the scenario player -->
+        <node pkg="uav_ftc" name="scenario_player" type="scenario_player.py" output="screen" required="$(arg shutdownOnScenarioEnd)">
+            <param name="scenario" value="$(arg scenario)"/>
+        </node>
+
+        <!-- Launch the online estimator -->
+        <!-- <node pkg="aerodynamic_pi" name="aero_coeff_estimator" type="online_estimator.py" output="screen">
+        </node> -->
+
+        <!-- Launch the flight envelope estimator -->
+        <!-- <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
+        <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
+            <param name="uav_name" value="$(arg uav_name)"/>
+        </node>  -->
+
+        <!-- Visualization nodes -->
+        <!-- Wind estimates-->
+        <node name="EKF_plotter"
+            pkg="rqt_plot"
+            type="rqt_plot"
+            args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
+        />
+
+    </group>
+
+</launch>
