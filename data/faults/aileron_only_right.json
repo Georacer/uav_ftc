@@ -1,0 +1,14 @@
+{
+    "airfoil1/c_Y_deltaa" : {
+        "type" : 4,
+        "value" : 0
+    },
+    "airfoil1/c_l_deltaa" : {
+        "type" : 4,
+        "value" : 0.125
+    },
+    "airfoil1/c_n_deltaa" : {
+        "type" : 4,
+        "value" : 0.1
+    }
+}

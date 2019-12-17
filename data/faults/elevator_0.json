@@ -1,0 +1,14 @@
+{
+    "airfoil1/c_L_deltae" : {
+        "type" : 4,
+        "value" : 0
+    },
+    "airfoil1/c_D_deltae" : {
+        "type" : 4,
+        "value" : 0
+    },
+    "airfoil1/c_m_deltae" : {
+        "type" : 4,
+        "value" : 0
+    }
+}

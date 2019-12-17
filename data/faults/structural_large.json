@@ -1,0 +1,10 @@
+{
+    "airfoil1/c_l_0" : {
+        "type" : 4,
+        "value" : 0.1
+    },
+    "airfoil1/c_n_0" : {
+        "type" : 4,
+        "value" : 0.05
+    }
+}

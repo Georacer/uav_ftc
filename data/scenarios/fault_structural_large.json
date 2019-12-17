@@ -1,0 +1,7 @@
+{
+    "relative_time": true,
+    "point_1": {
+        "time": 10,
+        "fault" : "structural_large"
+    }
+}
