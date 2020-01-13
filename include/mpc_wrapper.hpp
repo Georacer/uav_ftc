@@ -30,6 +30,7 @@ public:
     bool setDefaultRunningReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
     bool setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference);
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
+    bool setOnlineDataSingle(const uint index, const T singleData); // Copy over a single online datum
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference,
                       const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> referenceEnd);
@@ -38,6 +39,7 @@ public:
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
     bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
+    bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state); // Version without online_data
     bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
                 const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool shift();

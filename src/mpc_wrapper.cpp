@@ -115,6 +115,24 @@ bool MpcWrapper<T>::setOnlineData(
 }
 
 /**
+ * @brief Set one item of the Online Data array, for all the time horizon
+ * 
+ * @tparam T Data type
+ * @param singleData The data value
+ * @param index The data index in the OnlineData array (referring to the solver object)
+ * @return true Successfully set the data
+ * @return false 
+ */
+template <typename T>
+bool MpcWrapper<T>::setOnlineDataSingle(const uint index, const T singleData)
+{
+    // Copy over online data
+    acado_online_data_.block(index, 0, 1, ACADO_N + 1) = Eigen::MatrixXf::Constant(1, ACADO_N+1, singleData);
+
+    return true;
+}
+
+/**
  * @brief Set the initial state of the system under optimization, essentially the measurement
  * 
  * @tparam T float or double
@@ -215,16 +233,12 @@ bool MpcWrapper<T>::solve(
  * @brief Perform one step of the MPC 
  * 
  * @tparam T float or double
- * @param state The first-pass guess for the optimal state before optimizing the system
- * @param online_data The currently measured vector of airspeed, AoA, AoS
- * @param do_preparation Peform the ACADO preparation step after the optimization step
+ * @param state State vector measurement
  * @return true 
  * @return false 
  */
 template <typename T>
-bool MpcWrapper<T>::update(
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
-    const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data)
+bool MpcWrapper<T>::update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
 {
     if (!acado_is_prepared_)
     {
@@ -242,12 +256,6 @@ bool MpcWrapper<T>::update(
         ROS_INFO("Prepared controller after set/reset");
     }
 
-    if (kOdSize > 0)
-    {
-        // Pass airdata information
-        setOnlineData(online_data);
-    }
-
     // Pass measurement
     setInitialState(state);
 
@@ -258,6 +266,7 @@ bool MpcWrapper<T>::update(
     // Check if predicted input is valid
     if (!checkInput())
     {
+        // TODO: Maybe reset the MPC somehow?
         ROS_ERROR("MPC has crashed...");
         printSolverState();
         // resetController();
@@ -265,6 +274,37 @@ bool MpcWrapper<T>::update(
     }
 
     return true;
+}
+
+/**
+ * @brief Perform one step of the MPC 
+ * 
+ * @tparam T float or double
+ * @param state State vector measurement
+ * @param online_data The full online data vector
+ * @return true 
+ * @return false 
+ */
+template <typename T>
+bool MpcWrapper<T>::update(
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
+    const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data)
+{
+    if (!acado_is_prepared_)
+    {
+        ROS_ERROR("MPC: Solver was triggered without preparation, abort!");
+        return false;
+    }
+
+    if (kOdSize > 0)
+    {
+        // Pass airdata information
+        setOnlineData(online_data);
+    }
+
+    // Call simple update for the rest of the functionality
+    bool result = update(state);
+    return result;
 }
 
 /**

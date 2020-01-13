@@ -37,12 +37,17 @@
 
         <!-- Visualization nodes -->
         <!-- Wind estimates-->
-        <node name="EKF_plotter"
+        <!-- <node name="EKF_plotter"
             pkg="rqt_plot"
             type="rqt_plot"
             args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
-        />
+        /> -->
 
     </group>
+
+	<include file="$(find uav_ftc)/launch/controller.launch" >
+		<arg name="uav_name" value="$(arg uav_name)"/>
+		<arg name="ftc" value="true"/>
+	</include>
 
 </launch>

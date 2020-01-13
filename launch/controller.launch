@@ -10,15 +10,15 @@
 	<arg name="ftc"/>
 
     <group ns="$(arg uav_name)">
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
         <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen">
-            <remap from="refCmds" to="refTrajectory"/>
-            <!-- <remap from="refCmds" to="refRates"/> -->
+            <!-- <remap from="refCmds" to="refTrajectory"/> -->
+            <remap from="refCmds" to="refRates"/>
         </node>
 		<group if="$(arg ftc)">
             <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller_2" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/> -->
-            <!-- Use the nominal rate controller, as the FTC ones is unstable -->
-            <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>
-            <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller_2" respawn="true" output="screen"/>
+            <node pkg="uav_ftc" name="rate_controller_2" type="rate_controller_2" respawn="true" output="screen"/>
+            <!-- <node pkg="uav_ftc" name="trajectory_controller_2" type="trajectory_controller_2" respawn="true" output="screen"/> -->
         </group>
         <group unless="$(arg ftc)">
             <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>

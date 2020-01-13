@@ -24,6 +24,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Eigen3 REQUIRED)
 
+# Have yaml-cpp already copied and built
+find_package(yaml-cpp PATHS externals/yaml-cpp/build)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -291,6 +294,8 @@ add_executable(rate_controller_2
 add_dependencies(rate_controller_2 ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(rate_controller_2
   ${catkin_LIBRARIES}
+  ${last_letter_lib_LIBRARIES}
+  yaml-cpp
   rate_controller_wrapper_2
 )
 
