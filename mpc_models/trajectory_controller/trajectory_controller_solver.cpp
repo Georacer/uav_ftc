@@ -37,7 +37,7 @@ int main()
 
   // Desired trajectory parameters, used for simulation
   double R = 100; // turn radius in meters
-  double gamma_d = 0.1; // fligh path angle in radians
+  double gamma_d = 0.1; // flight path angle in radians
   double Va_d = 15;
 
   //////////////////////
@@ -49,19 +49,25 @@ int main()
   // Inertial charateristics
   double m = 2.0;
   // Lift parameters
-  double c_lift_0 = 0.56;
-  double c_lift_a = 6.9;
+  double c_lift_0 = 0.4;
+  double c_lift_a = 6.5;
   // Drag parameters
-  double c_drag_p = 0.1;
+  double c_drag_0 = 0.1;
+  double c_drag_a = 0.14;
   double oswald = 0.9;
   // Sideforce parameters
   double c_y_0 = 0;
   double c_y_b = -0.98;
   // Propulsion parameters
-  double k_p = 0.035;
-  double k_m = 30;
+  double propD = 0.28;
+  double c_t_0 = 0.1133;
+  double c_t_1 = -0.0740;
+  double c_t_2 = -0.1849;
+  // double k_p = 0.035;
+  // double k_m = 30;
   // Input parameters
   double deltat_max = 1.0;
+  double omega_max = 1050;
 
   ///////////////
   // System Model
@@ -70,12 +76,12 @@ int main()
   Expression qbar = 0.5 * rho * Va * Va;
   Expression CLa = c_lift_0 + c_lift_a * alpha;
   Expression FL = qbar * S * CLa;
-  Expression FD = qbar * S * (c_drag_p + CLa * CLa / (M_PI * oswald * b * b / S));
+  Expression FD = qbar * S * (c_drag_0 + c_drag_a * alpha);
   Expression FY = qbar * S * (c_y_0 + c_y_b * beta);
-  Expression Fprop = 0.5 * rho * k_p * (k_m * deltat * k_m * deltat - Va * Va);
-  // IntermediateState l = qbar * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr);
-  // IntermediateState m = qbar * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
-  // IntermediateState n = qbar * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
+  // Expression Fprop = 0.5 * rho * k_p * (k_m * deltat * k_m * deltat - Va * Va);
+  Expression J = Va / (deltat*omega_max/6.28*propD);
+  Expression Fprop = rho*pow(deltat*omega_max/6.28,2)*pow(propD,4) * (c_t_0 + c_t_1*J + c_t_2*J*J);
+
   Expression sa = sin(alpha);
   Expression ca = cos(alpha);
   Expression sb = sin(beta);
@@ -91,8 +97,8 @@ int main()
   Expression rw = -p * sa + r * ca;
 
   psi_dot = (q*sph + r*cph)/cth;
-  // gamma = theta - alpha; Holds only for beta==0
-  gamma = (ca*cb)*sth - (sph*sb + cph*sa*cb)*cth; // Stevens-Lewis 3.4-2
+  // gamma = theta - alpha; Holds only for beta==0 AND phi==0
+  gamma = asin((ca*cb)*sth - (sph*sb + cph*sa*cb)*cth); // Stevens-Lewis 2003 3.4-2
 
   // System dynamics
   DifferentialEquation f;
@@ -152,7 +158,7 @@ int main()
 
   // Add constraints
   // Input constraints
-  ocp.subjectTo(0.0 <= deltat <= deltat_max);
+  ocp.subjectTo(0.01 <= deltat <= deltat_max);
   ocp.subjectTo(-1.0 <= p <= 1.0); // Constraining p to help with solution feasibility
   ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
   ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility

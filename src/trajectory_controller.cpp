@@ -32,8 +32,8 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     float inf = std::numeric_limits<float>::infinity();
     referenceTrajectory_(0) = 15.0; // Set airspeed
     referenceTrajectory_(1) = 0.0; // Set flight path angle
-    referenceTrajectory_(2) = inf; // Set turn radius
-    float defaultRefPsi = calcPsiDotDes(referenceTrajectory_);
+    referenceTrajectory_(2) = 0.0; // Set turn rate (psi_dot)
+    // float defaultRefPsi = calcPsiDotDes(referenceTrajectory_);
 
     //Initialize internally stored simulation states to default values
     simStates_.velocity.angular.x = 0;
@@ -59,7 +59,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     mpcController_.setTrimInput(refInputs_);
 
     // Initialize default reference states
-    reference_ << referenceTrajectory_(0), referenceTrajectory_(1), defaultRefPsi,
+    reference_ << referenceTrajectory_(0), referenceTrajectory_(1), referenceTrajectory_(2),
                  trimState(1), trimState(2), refInputs_;
     mpcController_.setDefaultRunningReference(reference_);
     endReference_ << trimState(0), trimState(1), 0.0f;
@@ -72,8 +72,8 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &TrajectoryController::getStates, this);
     subRef = n.subscribe("refTrajectory", 1, &TrajectoryController::getReference, this);
-    pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 100);
-    pubCmdThrottle = n.advertise<geometry_msgs::Vector3Stamped>("throttleCmd", 100);
+    pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 1);
+    pubCmdThrottle = n.advertise<geometry_msgs::Vector3Stamped>("throttleCmd", 1);
 }
 
 /**
@@ -119,6 +119,9 @@ void TrajectoryController::step()
     // Solve problem with given measurements
     Eigen::Matrix<float, 0, 1> dummyOnlineData;
     mpcController_.update(states_, dummyOnlineData);
+
+    ROS_INFO("Trajectory MPC solver state:\n");
+    mpcController_.printSolverState();
 
     // mpcController_.printSolverState();
     // std::cout << "Des / Achieved psi:\n" << reference_(2) << "/\t" << calcPsiDot(states_, predictedControls_) << std::endl;
@@ -219,8 +222,8 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
                                       (float)pRefTrajectory.vector.z;
     reference_(0) = tempTrajectory(0); // Copy over airspeed
     reference_(1) = tempTrajectory(1); // Copy over gamma   
-    float psiDotDes = calcPsiDotDes(tempTrajectory); // Calculate desired psi_dot
-    reference_(2) = psiDotDes;
+    // float psiDotDes = calcPsiDotDes(tempTrajectory); // Calculate desired psi_dot // Not needed anymore, reference is passed as psi_dot
+    reference_(2) = tempTrajectory(2);
     reference_(3) = 0.0f;
     reference_(4) = 0.0f;
     reference_.segment(NUM_STATES, refInputs_.size()) = refInputs_;
@@ -229,7 +232,7 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
     endReference_(1) = tempTrajectory(1);
     // Calculate an estimate for the final roll angle
     float g = 9.81;
-    float endPhi = atan(psiDotDes*reference_(0)/g);
+    float endPhi = atan(reference_(2)*reference_(0)/g);
     endReference_(2) = endPhi;
 }
 
