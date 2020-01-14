@@ -78,7 +78,7 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     subState = n.subscribe("states", 1, &RateController::getStates, this);
     subRef = n.subscribe("refRates", 1, &RateController::getReference, this);
     subParam = n.subscribe("parameter_changes", 100, &RateController::getParameters, this);
-    pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 100);
+    pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 1);
 }
 
 /**
@@ -130,6 +130,8 @@ void RateController::step()
 
     // Write the resulting controller output
     readControls();
+
+    // std::cout << "Produced control surface cmds:\n" << predicted_controls_ << std::endl;
 
     // Shift the solver state by one and re-initialize
     // mpcController_.shift();
@@ -185,13 +187,11 @@ void RateController::writeOutput()
 {
     geometry_msgs::Vector3Stamped channels;
     // MPC controls are in radians, must convert them to -1,1 range
-    double deltaa_max, deltae_max, deltar_max;
-    ros::param::getCached("airfoil1/deltaa_max_nominal", deltaa_max);
-    ros::param::getCached("airfoil1/deltae_max_nominal", deltae_max);
-    ros::param::getCached("airfoil1/deltar_max_nominal", deltar_max);
-    channels.vector.x = constrain(predicted_controls_(0) / deltaa_max, -1.0, 1.0); // Pass aileron input
-    channels.vector.y = constrain(predicted_controls_(1) / deltae_max, -1.0, 1.0); // Pass elevator input
-    channels.vector.z = constrain(predicted_controls_(2) / deltar_max, -1.0, 1.0);   // Pass rudder input
+    // std::cout << "Division result cmd:\n" << predicted_controls_(0)/deltaa_max << "\n"<< predicted_controls_(1)/deltaa_max << "\n"<< predicted_controls_(2)/deltaa_max << std::endl;
+    channels.vector.x = constrain(predicted_controls_(0) / deltaa_max, (float)-1.0, (float)1.0); // Pass aileron input
+    channels.vector.y = constrain(predicted_controls_(1) / deltae_max, (float)-1.0, (float)1.0); // Pass elevator input
+    channels.vector.z = constrain(predicted_controls_(2) / deltar_max, (float)-1.0, (float)1.0);   // Pass rudder input
+    // std::cout << "Equivalent model cmd:\n" << channels.vector.x << "\n"<< channels.vector.y << "\n"<< channels.vector.z << std::endl;
     channels.header.stamp = ros::Time::now();
     pubCtrl.publish(channels);
 }
@@ -254,6 +254,10 @@ void RateController::getDefaultParameters(std::string uavName)
     ROS_INFO("Loading uav configuration for %s", uavName.c_str());
 	ConfigsStruct_t configStruct = loadModelConfig(uavName);
     // std::cout << configStruct << std::endl;
+
+    getParameter(configStruct.aero, "airfoil1/deltaa_max", deltaa_max);
+    getParameter(configStruct.aero, "airfoil1/deltae_max", deltae_max);
+    getParameter(configStruct.aero, "airfoil1/deltar_max", deltar_max);
 
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_0, configStruct.aero["airfoil1/c_l_0"].as<float>());
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_p, configStruct.aero["airfoil1/c_l_pn"].as<float>());

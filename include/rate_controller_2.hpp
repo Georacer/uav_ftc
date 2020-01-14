@@ -42,6 +42,7 @@ private:
     // Eigen::Vector3f airdata_;
     Eigen::Vector3f refRates_, refInputs_;
     Eigen::Matrix<float, kInputSize, 1> predicted_controls_; // Stores control outputs, -1,1 range
+    float deltaa_max, deltae_max, deltar_max;
     ros::Time tprev;
     ros::Subscriber subState, subRef, subParam;
     ros::Publisher pubCtrl;
