@@ -14,6 +14,7 @@
 
 #include <math_utils.hpp>
 #include <uav_utils.hpp>
+#include <prog_utils.hpp>
 
 #include <geometry_msgs/Vector3.h>
 #include <last_letter_msgs/SimPWM.h>
@@ -45,6 +46,8 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     tprev = ros::Time::now();
     simStates_.header.stamp = tprev;
 
+    wind_body_.setZero(); // Initialize wind readings
+
     // Initialize MPC wrapper
     // Set default/initial states
     Eigen::Matrix<real_t, 5, 1> trimState = Eigen::Matrix<real_t, 5, 1>::Zero();
@@ -53,7 +56,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     mpcController_.setTrimState(trimState);
 
     // Set default reference inputs
-    refInputs_ << 0.0f, 0.0f, 0.0f, 0.5f;
+    refInputs_ << 0.0f, 0.0f, 0.0f, 0.0f;
     
     // Set default/initial inputs
     mpcController_.setTrimInput(refInputs_);
@@ -69,8 +72,14 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     mpcController_.resetController();
     mpcController_.prepare();
 
+    // Read propeller thrust curve
+	std::string uavName;
+	n.getParam("uav_name", uavName);
+    getDefaultParameters(uavName); // Read necessary uav parameters
+
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &TrajectoryController::getStates, this);
+	subEnvironment = n.subscribe("environment",1,&TrajectoryController::getEnvironment, this); // Environment subscriber
     subRef = n.subscribe("refTrajectory", 1, &TrajectoryController::getReference, this);
     pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 1);
     pubCmdThrottle = n.advertise<geometry_msgs::Vector3Stamped>("throttleCmd", 1);
@@ -117,8 +126,10 @@ void TrajectoryController::step()
     mpcController_.setReference(reference_, endReference_);
 
     // Solve problem with given measurements
-    Eigen::Matrix<float, 0, 1> dummyOnlineData;
-    mpcController_.update(states_, dummyOnlineData);
+    // Eigen::Matrix<float, 0, 1> dummyOnlineData;
+    // mpcController_.update(states_, dummyOnlineData);
+    std::cout << "Passed measurements to MPC:\n" << states_  << std::endl;
+    mpcController_.update(states_);
 
     ROS_INFO("Trajectory MPC solver state:\n");
     mpcController_.printSolverState();
@@ -154,9 +165,11 @@ void TrajectoryController::getStates(last_letter_msgs::SimStates inpStates)
     simStates_ = inpStates;
 
     // Extract airdata
-    Vector3d tempVect = getAirData(Vector3d(simStates_.velocity.linear.x,
-                                            simStates_.velocity.linear.y,
-                                            simStates_.velocity.linear.z));
+    Vector3d vel_body_inertial = Vector3d(simStates_.velocity.linear.x,
+                                          simStates_.velocity.linear.y,
+                                          simStates_.velocity.linear.z); // Body frame
+    Vector3d vel_body_relative = vel_body_inertial - wind_body_;
+    Vector3d tempVect = getAirData(vel_body_relative);
     airdata_ = tempVect.cast<float>();
 
     // Isolate relevant states
@@ -178,6 +191,18 @@ void TrajectoryController::getStates(last_letter_msgs::SimStates inpStates)
     // std::cout req/act: " <<  reference_(2) << "/\t" << psi_dot << std::endl;
 
     statesReceivedStatus_ = true;
+}
+
+void TrajectoryController::getEnvironment(last_letter_msgs::Environment msg)
+{
+    wind_body_.x() = msg.wind.x;
+    wind_body_.y() = msg.wind.y;
+    wind_body_.z() = msg.wind.z;
+    // bus_data.temperature_air = msg.temperature;
+    // bus_data.temperature_imu = msg.temperature;
+    // bus_data.pressure_absolute = msg.pressure;
+    // bus_data.rho = msg.density; // Air density
+    // bus_data.g = msg.gravity; // Gravity acceleration
 }
 
 /**
@@ -203,10 +228,41 @@ void TrajectoryController::writeOutput()
     outputRates.header.stamp = ros::Time::now();
     pubCmdRates.publish(outputRates);
 
+    // Build throttle command
     geometry_msgs::Vector3Stamped throttleCmd;
-    throttleCmd.vector.x = predictedControls_(3);
+    float thrust_req = predictedControls_(3);
+    float omega_req = calcOmega(thrust_req);
+    // std::cout << "Calculated omega_req: " << omega_req << std::endl;
+    if ((omega_req > omega_max) || (omega_req < 0))
+    {
+        ROS_WARN("omega_req value malformed: %g", omega_req);
+        omega_req = constrain(omega_req, (float)0.0, (float)omega_max);
+        // std::cout << "Actually passed omega_req: " << omega_req << std::endl;
+    }
+    throttleCmd.vector.x = omega_req/omega_max;
+    // std::cout << "Actually passed deltat: " << omega_req/omega_max << std::endl;
     throttleCmd.header.stamp = ros::Time::now();
+
+    std::cout << "Mid-MPC output:\n" << predictedControls_ << "\n" << throttleCmd.vector.x << std::endl;
     pubCmdThrottle.publish(throttleCmd);
+}
+
+/**
+ * @brief Calculate the angular velocity required (in rad/s) to produce require thrust
+ * 
+ * @param thrust Thrust requirement (in N)
+ * @return the desired angular velocity
+ */
+float TrajectoryController::calcOmega(const float thrust)
+{
+    // Solve quadratic equation
+    // Assumes 2nd-order thrust polynomial
+    float Va = airdata_.x();
+    float a = c_t_0;
+    float b = c_t_1*Va/propD;
+    float c = c_t_2*Va*Va/propD/propD - thrust/rho/pow(propD, 4);
+    float rps = (-b + sqrt(b*b - 4*a*c))/(2*a);
+    return rps*2*M_PI;
 }
 
 /**
@@ -250,6 +306,36 @@ float calcPsiDotDes(Eigen::Vector3f refTrajectory)
 float calcPsiDot(Eigen::Matrix<float, NUM_STATES, 1> states, Eigen::Matrix<float, NUM_INPUTS, 1> inputs)
 {
     return (inputs(1)*sin(states(3)) + inputs(2)*cos(states(3)))/cos(states(4));
+}
+
+/**
+ * @brief Read default uav parameters
+ * 
+ * @param uavName The name of the uav to read from
+ */
+void TrajectoryController::getDefaultParameters(std::string uavName)
+{
+	// Read the uav configuration
+    ROS_INFO("Loading uav configuration for %s", uavName.c_str());
+	ConfigsStruct_t configStruct = loadModelConfig(uavName);
+    // std::cout << configStruct << std::endl;
+
+    // Get propeller diameter
+    getParameter(configStruct.prop, "motor1/propDiam", propD);
+
+    // Grab the thrust polynomial coefficients
+    YAML::Node thrustPolyConfig = filterConfig(configStruct.prop, "motor1/thrust_poly/");
+    uint polyNo;
+    getParameter(thrustPolyConfig, "polyNo", polyNo); // Get polynomial order for debugging purposes
+    std::vector<float> coeffVect;
+    getParameterList(thrustPolyConfig, "coeffs", coeffVect);
+    if (coeffVect.size() != (polyNo+1)) throw runtime_error("Parameter array coeffs size did not match polyNo");
+    // Single-out coefficient values
+    c_t_0 = coeffVect[0];
+    c_t_1 = coeffVect[1];
+    c_t_2 = coeffVect[2];
+
+    getParameter(configStruct.prop, "motor1/omega_max", omega_max);
 }
 
 

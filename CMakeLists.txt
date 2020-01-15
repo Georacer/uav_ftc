@@ -306,6 +306,8 @@ add_executable(trajectory_controller
 add_dependencies(trajectory_controller ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(trajectory_controller
   ${catkin_LIBRARIES}
+  ${last_letter_lib_LIBRARIES}
+  yaml-cpp
   trajectory_controller_wrapper
 )
 

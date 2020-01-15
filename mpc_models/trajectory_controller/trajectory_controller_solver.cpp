@@ -25,7 +25,7 @@ int main()
   DifferentialState Va, alpha, beta, phi, theta;
   IntermediateState psi_dot, gamma;
   // AlgebraicState psi_dot, gamma; // Simulation cannot handle DAEs
-  Control p, q, r, deltat;
+  Control p, q, r, deltaF;
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
@@ -34,6 +34,7 @@ int main()
   const int N = round(t_end / dt); // Number of computation nodes
   const double g0 = 9.81;          // Gravity acceleration [m/s^2]
   const double rho = 1.225;        // Air density [kg/m^3]
+  const double Fmax = 300.0/10;               // Maximum motor thrust
 
   // Desired trajectory parameters, used for simulation
   double R = 100; // turn radius in meters
@@ -52,22 +53,14 @@ int main()
   double c_lift_0 = 0.4;
   double c_lift_a = 6.5;
   // Drag parameters
-  double c_drag_0 = 0.1;
+  double c_drag_0 = 0.09;
   double c_drag_a = 0.14;
   double oswald = 0.9;
   // Sideforce parameters
   double c_y_0 = 0;
   double c_y_b = -0.98;
-  // Propulsion parameters
-  double propD = 0.28;
-  double c_t_0 = 0.1133;
-  double c_t_1 = -0.0740;
-  double c_t_2 = -0.1849;
-  // double k_p = 0.035;
-  // double k_m = 30;
   // Input parameters
-  double deltat_max = 1.0;
-  double omega_max = 1050;
+  // double deltaF_max = 1.0;
 
   ///////////////
   // System Model
@@ -78,9 +71,8 @@ int main()
   Expression FL = qbar * S * CLa;
   Expression FD = qbar * S * (c_drag_0 + c_drag_a * alpha);
   Expression FY = qbar * S * (c_y_0 + c_y_b * beta);
-  // Expression Fprop = 0.5 * rho * k_p * (k_m * deltat * k_m * deltat - Va * Va);
-  Expression J = Va / (deltat*omega_max/6.28*propD);
-  Expression Fprop = rho*pow(deltat*omega_max/6.28,2)*pow(propD,4) * (c_t_0 + c_t_1*J + c_t_2*J*J);
+  // Expression Fmax = Pmax/Va;
+  Expression Fprop = deltaF; // Direct thrust requirement
 
   Expression sa = sin(alpha);
   Expression ca = cos(alpha);
@@ -120,7 +112,7 @@ int main()
     << psi_dot // Prescribed turn rate
     << alpha << beta // Minimize alpha and beta
     << p << q << r // Prescribed angular rates
-    << deltat; // Minimize throttle
+    << deltaF; // Minimize throttle
 
   // End cost vector, cannot depend on controls, only on state
   hN << Va // Presribed airspeed 
@@ -132,14 +124,14 @@ int main()
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
   Q(0, 0) = 10; // Va
-  Q(1, 1) = 1000; // Flight path angle
+  Q(1, 1) = 10000; // Flight path angle
   Q(2, 2) = 1000; // turn rate
   Q(3, 3) = 0.01;  // alpha
   Q(4, 4) = 10;  // beta
-  Q(5, 5) = 0.5;   // p
+  Q(5, 5) = 1;   // p
   Q(6, 6) = 5;   // q
   Q(7, 7) = 10;   // r
-  Q(8, 8) = 1;   // throttle
+  Q(8, 8) = 0.1;   // throttle
 
   // End cost weight matrix
   DMatrix QN(hN.getDim(), hN.getDim());
@@ -158,7 +150,7 @@ int main()
 
   // Add constraints
   // Input constraints
-  ocp.subjectTo(0.01 <= deltat <= deltat_max);
+  ocp.subjectTo(0.0 <= deltaF <= Fmax);
   ocp.subjectTo(-1.0 <= p <= 1.0); // Constraining p to help with solution feasibility
   ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
   ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility
@@ -284,7 +276,7 @@ int main()
     window.addSubplot(feedbackControl(0), "p");
     window.addSubplot(feedbackControl(1), "q");
     window.addSubplot(feedbackControl(2), "r");
-    window.addSubplot(feedbackControl(3), "deltat");
+    window.addSubplot(feedbackControl(3), "deltaF");
     window.plot();
 
     // Plot intermediate states
