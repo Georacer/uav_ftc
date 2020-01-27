@@ -27,6 +27,24 @@ int main()
   // AlgebraicState psi_dot, gamma; // Simulation cannot handle DAEs
   Control p, q, r, deltaF;
 
+  // Specify OnlineData which will be passed in real-time
+  // CAUTION!!! This online data order must be reflected exactly in trajectory_controller.hpp
+  // Geometric data
+  OnlineData S;
+  OnlineData b;
+  OnlineData c;
+  // Inertial data
+  OnlineData m;
+  // Lift parameters
+  OnlineData c_lift_0;
+  OnlineData c_lift_a;
+  // Drag parameters
+  OnlineData c_drag_0;
+  OnlineData c_drag_a;
+  // Sideforce parameters
+  OnlineData c_y_0;
+  OnlineData c_y_b;
+
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
   const double t_end = 4.0;        // Time horizon [s]
@@ -44,21 +62,6 @@ int main()
   //////////////////////
   // Aircraft parameters
   //////////////////////
-  double S = 0.45; // Wing area
-  double b = 1.88; // Wingspan
-  double c = 0.24; // Mean chord
-  // Inertial charateristics
-  double m = 2.0;
-  // Lift parameters
-  double c_lift_0 = 0.4;
-  double c_lift_a = 6.5;
-  // Drag parameters
-  double c_drag_0 = 0.09;
-  double c_drag_a = 0.14;
-  double oswald = 0.9;
-  // Sideforce parameters
-  double c_y_0 = 0;
-  double c_y_b = -0.98;
   // Input parameters
   // double deltaF_max = 1.0;
 

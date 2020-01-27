@@ -70,17 +70,20 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
 
     // Mandatory controller setup 
     mpcController_.resetController();
-    mpcController_.prepare();
 
     // Read propeller thrust curve
 	std::string uavName;
 	n.getParam("uav_name", uavName);
     getDefaultParameters(uavName); // Read necessary uav parameters
 
+    mpcController_.prepare();
+
+
     //Subscribe and advertize
     subState = n.subscribe("states", 1, &TrajectoryController::getStates, this);
 	subEnvironment = n.subscribe("environment",1,&TrajectoryController::getEnvironment, this); // Environment subscriber
     subRef = n.subscribe("refTrajectory", 1, &TrajectoryController::getReference, this);
+    subParam = n.subscribe("parameter_changes", 100, &TrajectoryController::getParameters, this);
     pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 1);
     pubCmdThrottle = n.advertise<geometry_msgs::Vector3Stamped>("throttleCmd", 1);
 }
@@ -282,7 +285,7 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
     reference_(2) = tempTrajectory(2);
     reference_(3) = 0.0f;
     reference_(4) = 0.0f;
-    reference_.segment(NUM_STATES, refInputs_.size()) = refInputs_;
+    reference_.segment(kStateSize, refInputs_.size()) = refInputs_;
 
     endReference_(0) = tempTrajectory(0);
     endReference_(1) = tempTrajectory(1);
@@ -303,9 +306,46 @@ float calcPsiDotDes(Eigen::Vector3f refTrajectory)
     return refTrajectory(0)/refTrajectory(2)*cos(refTrajectory(1));
 }
 
-float calcPsiDot(Eigen::Matrix<float, NUM_STATES, 1> states, Eigen::Matrix<float, NUM_INPUTS, 1> inputs)
+float calcPsiDot(Eigen::Matrix<float, kStateSize, 1> states, Eigen::Matrix<float, kInputSize, 1> inputs)
 {
     return (inputs(1)*sin(states(3)) + inputs(2)*cos(states(3)))/cos(states(4));
+}
+
+/**
+ * @brief Callback to store incoming parameter changes
+ * 
+ * @param parameter Message containing a new paramter/value pair
+ */
+void TrajectoryController::getParameters(last_letter_msgs::Parameter parameter)
+{
+    std::string paramName = parameter.name;
+    float paramValue = parameter.value;
+    uint paramType = parameter.type;
+
+    if (paramType == 4) // Aerodynamic parameters
+    {
+        ROS_INFO("Got new parameter %s with value %g", paramName.c_str(), paramValue);
+
+        if (paramName.compare("s")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::S, paramValue); return; }
+        if (paramName.compare("b")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::b, paramValue); return; }
+        if (paramName.compare("r")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c, paramValue); return; }
+        if (paramName.compare("c_L_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_0, paramValue); return; }
+        if (paramName.compare("c_L_alpha")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_a, paramValue); return; }
+        if (paramName.compare("c_D_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_0, paramValue); return; }
+        if (paramName.compare("c_D_alpha")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_a, paramValue); return; }
+        if (paramName.compare("c_Y_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_0, paramValue); return; }
+        if (paramName.compare("c_Y_beta")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_b, paramValue); return; }
+    }
+    else if (paramType == 3) // Inertial parameters
+    {
+        ROS_INFO("Got new parameter %s with value %g", paramName.c_str(), paramValue);
+
+        if (paramName.compare("m")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::m, paramValue); return; }
+    }
+    else // We don't care about other paramter types
+    {
+        return;
+    }
 }
 
 /**
@@ -336,6 +376,19 @@ void TrajectoryController::getDefaultParameters(std::string uavName)
     c_t_2 = coeffVect[2];
 
     getParameter(configStruct.prop, "motor1/omega_max", omega_max);
+
+    // Pass required parameters to MPC controller
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::S, configStruct.aero["airfoil1/s"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::b, configStruct.aero["airfoil1/b"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c, configStruct.aero["airfoil1/c"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_0, configStruct.aero["airfoil1/c_L_0"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_a, configStruct.aero["airfoil1/c_L_alpha"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_0, configStruct.aero["airfoil1/c_D_0"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_a, configStruct.aero["airfoil1/c_D_alpha"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_0, configStruct.aero["airfoil1/c_Y_0"].as<float>());
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_b, configStruct.aero["airfoil1/c_Y_beta"].as<float>());
+
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::m, configStruct.inertial["m"].as<float>());
 }
 
 
