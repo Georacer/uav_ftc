@@ -6,9 +6,11 @@ ctrlMode: 2
 # 0: Direct passthrough from joystick (controllers still active)
 # 1: Angular rate control
 # 2: Trajectory control
+# 3: Path control
 
 ctrlRateRate: 50 # Frequency of the rate controller
 ctrlTrajectoryRate: 5 # Frequency of the rate controller
+ctrlPathRate: 1 # Frequency of the rate controller
 
 # # Reference generator parameters for trajectory input
 referenceMin: [10.0, -0.52, -0.5] # Minimum trajectory limits

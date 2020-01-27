@@ -321,6 +321,15 @@ target_link_libraries(trajectory_controller_2
   trajectory_controller_wrapper_2
 )
 
+# The path controller
+add_executable(path_controller
+  src/path_controller_node.cpp
+  src/path_controller.cpp
+)
+add_dependencies(path_controller ${catkin_EXPORTED_TARGETS}
+  ${catkin_LIBRARIES}
+)
+
 # Node reading from joystick and generating reference commands
 add_executable(reference_generator
   src/reference_generator.cpp
