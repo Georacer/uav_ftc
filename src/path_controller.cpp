@@ -29,8 +29,9 @@ VectorXd obs6(3);
 
 PathController::PathController(const PathControllerSettings& s) {
     pc_settings_ = s;
+    state_target_.setZero();
+
     opt = nlopt_create(NLOPT_LN_COBYLA, pc_settings_.num_inputs*pc_settings_.num_samples); /* algorithm and dimensionality */
-    
     //nlopt_set_population(opt, 10);
 
     /* Initialize Optimization*/
@@ -176,24 +177,10 @@ void PathController::constraints(unsigned int m, double* c, unsigned int n, cons
     }
 }
 
-void PathController::set_waypoints(Matrix<double, Dynamic, 3> waypoints)
-{
-    waypoints_ = waypoints;
-    did_receive_waypoints_ = true;
-}
+void PathController::step(Vector4d state, Vector3d waypoint){
+    state_target_.segment<3>(0) = waypoint;
 
-void PathController::step(Vector4d state){
-
-    if (!did_receive_waypoints_) {
-        setup_error err("waypoints");
-        throw err;
-    }
-
-    uav_state_ = state;
-
-    // Find current waypoint
     Vector3d pos = state.segment<3>(0);
-    wp_target_ = waypoints_.row(get_current_wp_idx(pos)).transpose();
 
     // Declare input structure with initial guess
     int input_arr_size = pc_settings_.num_inputs*pc_settings_.num_samples;
@@ -210,18 +197,26 @@ void PathController::step(Vector4d state){
     // cout << "STATE:" <<uav_q.transpose() << endl;
     // cout << "NAVIGATING TO WP: " <<wpCounter<< " VALUE: " << n_des.transpose() << endl;
 
-    // Store first sesults
+    // Store first sesults sample
     input_result(0) = inputs[0];
     input_result(1) = inputs[1];
     input_result(2) = inputs[2];
+}
 
-    // Increment waypoint if needed
-    double distance_to_wp = get_distance_from_target(pos.segment<2>(0), wp_target_.segment<2>(0));
-    if (distance_to_wp < goal_radius_){
-        if (wp_counter-1<waypoints_.rows()){
-            wp_counter += 1;
-        }
-    }
+void WaypointMngr::set_waypoints(const Matrix<double, Dynamic, 3>& waypoints)
+{
+    waypoints_ = waypoints;
+    did_receive_waypoints_ = true;
+}
+
+void WaypointMngr::set_num_wp_lookahead(const int num_wp)
+{
+    num_wp_lookahead_ = num_wp;
+}
+
+void WaypointMngr::set_goal_radius(const double radius)
+{
+    goal_radius_ = radius;
 }
 
 /**
@@ -233,7 +228,7 @@ void PathController::step(Vector4d state){
  * @param pos 
  * @return double 
  */
-double PathController::get_distance_from_target(Vector2d pos, Vector2d start, Vector2d finish) const{
+double WaypointMngr::get_distance_from_target(Vector2d pos, Vector2d start, Vector2d finish) const{
     // Build vector from prev wp to next wp
     Vector2d v_ab = start - finish;
     v_ab.normalize();
@@ -242,15 +237,51 @@ double PathController::get_distance_from_target(Vector2d pos, Vector2d start, Ve
     return v_ab.dot(v_pb);
 }
 
-double PathController::get_distance_from_target(Vector2d pos, Vector2d target) const{
+double WaypointMngr::get_distance_from_target(Vector2d pos, Vector2d target) const{
     // Build vector from prev wp to next wp
     Vector2d v_at = pos - target;
     return v_at.norm();
 }
 
-int PathController::get_current_wp_idx(Vector3d pos) const{
+Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
+{
+    if (!did_receive_waypoints_) {
+        setup_error err("waypoints");
+        throw err;
+    }
+
+    // Check if we have arrived at the current waypoint
+    Vector2d wp_next = waypoints_.row(wp_counter_).transpose().segment<2>(0);
+    double distance_to_wp = get_distance_from_target(pos.segment<2>(0), wp_next);
+    // if yes, increase the counter
+    if (distance_to_wp < goal_radius_){
+        if (wp_counter_-1<waypoints_.rows()){
+            wp_counter_ += 1;
+        }
+    }
+    // Also check if we have flown past the current waypoint
+    Vector2d wp_prev;
+    if (wp_counter_>0) {
+        wp_prev = pos.segment<2>(0); 
+    }
+    else {
+        wp_prev = waypoints_.row(wp_counter_-1).transpose().segment<2>(0);
+    }
+    double distance_to_finish_line = get_distance_from_target(wp_prev, wp_next, pos.segment<2>(0));
+    if (distance_to_finish_line < 0) {
+        wp_counter_ += 1;
+    }
+
+    // Obtain the leading tracking waypoint (which is ahead of the current wp) 
+    int wp_idx = get_current_wp_idx(pos);
+
+    Vector3d tracking_wp = waypoints_.row(wp_idx).transpose();
+    return tracking_wp;
+}
+
+int WaypointMngr::get_current_wp_idx(Vector3d pos) const{
     int num_wp = waypoints_.rows();
-    for (int wp_idx = wp_counter+num_wp_lookahead; wp_idx<num_wp; ++num_wp){
+    for (int wp_idx = wp_counter_+num_wp_lookahead_; wp_idx<num_wp; ++num_wp){
         // Construct the previous waypoint
         int wp_prev_idx = wp_idx -1;
         Vector2d wp_prev;
@@ -282,51 +313,3 @@ void constraints_wrapper(unsigned int m, double* c, unsigned int n, const double
     PathController* pc_ptr = static_cast<PathController*>(data);
     return pc_ptr->constraints(m, c, n, x, grad);
 }
-
-
-// void updatePathControls(const std_msgs::Float32MultiArray::ConstPtr& msg){
-
-//     int nrows = msg->layout.dim[0].size;
-//     int ncols = msg->layout.dim[1].size;
-    
-//     pathControlsMatrix.setZero(nrows, ncols);
-
-//     for (int i=0;i<nrows;i++)
-//         for (int j=0;j<ncols;j++)
-//             pathControlsMatrix(i,j) = msg->data[i*ncols+j];
-
-//     pathControlsMatrix.conservativeResize(pathControlsMatrix.rows(), pathControlsMatrix.cols()+1);
-//     pathControlsMatrix.col(0).setZero();
-//     return;
-// }
-
-// VectorXd getPwmCmd(double* input){
-
-//     double Rmin = 50.0;
-//     double Vamax = 25.0;
-//     double Vamin = 10.0;
-//     double gammamax = 20.0*M_PI/180.0;
-//     double gammamin = -20.0*M_PI/180.0;
-//     double psi_dot_max = Vamax/Rmin;
-//     double psi_dot_min = -psi_dot_max;
-
-//     double Va_dash = (Vamax + Vamin)/2.0;
-//     double gamma_dash = (gammamax + gammamin)/2.0;
-//     double psi_dot_dash = (psi_dot_max + psi_dot_min)/2.0;
-
-//     double Va_span = Vamax - Vamin;
-//     double gamma_span = gammamax - gammamin;
-//     double psi_dot_span = (psi_dot_max - psi_dot_min);
-
-//     double Va_pwm = ((input[2] - Va_dash)/(Va_span/2.0))*500.0 + 1500.0;
-//     double gamma_pwm = ((-input[1] - gamma_dash)/(gamma_span/2.0))*500.0 + 1500.0; 
-//     double psi_dot_pwm = ((input[0] - psi_dot_dash)/(psi_dot_span/2.0))*500.0 + 1500.0;
-
-//     VectorXd pwm;
-//     pwm.setZero(3);
-//     pwm(0) = psi_dot_pwm;
-//     pwm(1) = gamma_pwm;
-//     pwm(2) = Va_pwm;
-
-//     return pwm;
-// }

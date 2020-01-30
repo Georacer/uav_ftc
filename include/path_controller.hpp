@@ -48,24 +48,14 @@ class PathController {
     VectorXd uav_model(VectorXd U);
     double cost_function(unsigned int n, const double* x, double* grad);
     void constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad);
-    void set_waypoints(Matrix<double, Dynamic, 3>);
-    void step(Vector4d uav_state);
-    int num_wp_lookahead{5};
+    void step(Vector4d uav_state, Vector3d waypoint);
     Vector3d input_result; // Ouptut from the optimizer
 
     private:
-    double get_distance_from_target(Vector2d pos, Vector2d start, Vector2d finish) const;
-    double get_distance_from_target(Vector2d pos, Vector2d target) const;
-    int get_current_wp_idx(Vector3d pos) const;
     PathControllerSettings pc_settings_;
-    int wp_counter{0};
     Vector4d uav_state_;
     Vector4d state_target_;
-    Vector3d wp_target_;
     Vector3d input_target_;
-    Matrix<double, Dynamic, 3> waypoints_; // N x 3, NED coordinates
-    bool did_receive_waypoints_{false};
-    double goal_radius_{10};
     nlopt_opt opt;
     double minJ; // Last optimization cost
     // MPC parameters
@@ -73,6 +63,28 @@ class PathController {
     MatrixXd Q_;
     MatrixXd R_;
     double dt_; // Integration interval
+};
+
+class WaypointMngr {
+    public:
+    WaypointMngr()
+    {};
+    ~WaypointMngr()
+    {};
+    void set_waypoints(const Matrix<double, Dynamic, 3>&);
+    void set_num_wp_lookahead(const int);
+    void set_goal_radius(const double);
+    Vector3d next_waypoint(const Vector3d& pos);
+
+    private:
+    double get_distance_from_target(Vector2d pos, Vector2d start, Vector2d finish) const;
+    double get_distance_from_target(Vector2d pos, Vector2d target) const;
+    int get_current_wp_idx(Vector3d pos) const;
+    Matrix<double, Dynamic, 3> waypoints_; // N x 3, NED coordinates
+    int wp_counter_{0};
+    int num_wp_lookahead_{5};
+    double goal_radius_{10};
+    bool did_receive_waypoints_{false};
 };
 
 // Static wrappers for optimization functions residing within the PathController objects

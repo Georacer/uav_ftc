@@ -59,7 +59,7 @@ void PathControllerROS::cb_update_path(const visualization_msgs::MarkerArray::Co
             wp_matrix(idx, 1) = path_msg->markers[idx].pose.position.y;
             wp_matrix(idx, 2) = path_msg->markers[idx].pose.position.z;
         }
-        path_controller.set_waypoints(wp_matrix);
+        waypoint_mngr_.set_waypoints(wp_matrix);
         did_receive_wps = true;
     }
 
@@ -70,7 +70,9 @@ void PathControllerROS::step()
 {
     // Only call the controller if we have a valid position and waypoint sequence
     if (did_receive_wps && did_receive_state) {
-        path_controller.step(uav_state_);
+        Vector3d pos = uav_state_.segment<3>(0);
+        Vector3d waypoint = waypoint_mngr_.next_waypoint(pos);
+        path_controller.step(uav_state_, pos);
 
         // Grab resulting inputs
         Vector3d input = path_controller.input_result;

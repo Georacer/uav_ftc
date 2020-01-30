@@ -16,6 +16,7 @@ class PathControllerROS {
     MatrixXd get_obstacles(ros::NodeHandle) const;
     PathControllerSettings get_controller_settings(ros::NodeHandle) const;
     PathController path_controller;
+    WaypointMngr waypoint_mngr_;
     ros::Publisher pub_uav_cmd_;
     ros::Subscriber sub_uav_state_;
     ros::Subscriber sub_uav_path_;
