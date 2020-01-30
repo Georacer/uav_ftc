@@ -73,7 +73,7 @@ PathController::PathController(const PathControllerSettings& s) {
     Q(0,0) = 0.1;
     Q(1,1) = 0.1;
     Q(2,2) = 0.1;
-    Q(3,3) = 0.04;
+    Q(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
     R(0,0) = 0.002;
@@ -129,7 +129,7 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     //Calculate Running Costs
     double Ji{0};
     for (int k = 0; k < pc_settings_.num_samples; ++k) {
-       VectorXd x_err = traj_n.col(k) - state_target_.segment<3>(0);
+       VectorXd x_err = traj_n.col(k) - state_target_;
        Ji += x_err.transpose()*Q_*x_err;
        VectorXd u_err = inputs.col(k) - input_target_;
        Ji += u_err.transpose()*R_*u_err;
