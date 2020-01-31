@@ -1,0 +1,38 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="true"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="false"/>
+
+	<!-- Launch the last_letter simulator /-->
+	<!-- <include file="$(find last_letter)/launch/launcher.launch" >
+		<arg name="manualMode" value="$(arg manualMode)"/>
+		<arg name="autoMode" value="$(arg autoMode)"/>
+		<arg name="uav_name" value="$(arg uav_name)"/>
+		<arg name="log" value="$(arg log)"/>
+	</include> -->
+
+    <!-- Playback waypoints broadcasting -->
+    <node pkg="rosbag" name="replayer" type="play" args="-s 120 waypoints.bag"/> <!-- topic activity recorder node -->
+
+    <group ns="$(arg uav_name)">
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
+        <rosparam command="load" file="$(find uav_planner)data/parameters/params.yaml" />
+        <rosparam command="load" file="$(find uav_planner)data/parameters/map_sparse.yaml" />
+        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>
+        <!-- <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/> -->
+    </group>
+
+    <group ns="$(arg uav_name)">
+
+        <!-- Visualization nodes -->
+
+    </group>
+
+</launch>

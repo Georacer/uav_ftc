@@ -8,25 +8,6 @@
 #include <math_utils.hpp>
 
 
-//RRT Planner
-// MatrixXd pathControlsMatrix;
-
-//Desired Inputs (From RRT)
-VectorXd input_des(3);
-//MPC Gain Matrices
-MatrixXd Q;
-MatrixXd R;
-MatrixXd P;
-
-VectorXd uav_q(4); // UAV States
-
-VectorXd obs1(3); // Obstacles
-VectorXd obs2(3);
-VectorXd obs3(3);
-VectorXd obs4(3);
-VectorXd obs5(3);
-VectorXd obs6(3);
-
 PathController::PathController(const PathControllerSettings& s) {
     pc_settings_ = s;
     state_target_.setZero();
@@ -43,7 +24,7 @@ PathController::PathController(const PathControllerSettings& s) {
         inputs_lb_arr[i+1] = s.input_constraints.gamma_min; //flight path angle rad
         inputs_lb_arr[i+2] = s.input_constraints.va_min; //velocity Va m/s
 
-        inputs_ub_arr[i] = s.input_constraints.psi_dot_max; //turn rate rad/s
+        inputs_ub_arr[i] = s.input_constraints.psi_dot_max; //turn rate rad/s  
         inputs_ub_arr[i+1] = s.input_constraints.gamma_max; //flight path angle rad
         inputs_ub_arr[i+2] = s.input_constraints.va_max; //velocity Va m/s
     }
@@ -70,18 +51,18 @@ PathController::PathController(const PathControllerSettings& s) {
     //Initialize MPC Parameters
     
     Q_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
-    Q(0,0) = 0.1;
-    Q(1,1) = 0.1;
-    Q(2,2) = 0.1;
-    Q(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
+    Q_(0,0) = 0.1;
+    Q_(1,1) = 0.1;
+    Q_(2,2) = 0.1;
+    Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
-    R(0,0) = 0.002;
-    R(1,1) = 0.002;
-    R(2,2) = 0.002;
+    R_(0,0) = 0.002;
+    R_(1,1) = 0.002;
+    R_(2,2) = 0.002;
 
     P_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
-    P = 5.0*Q;
+    P_ = 5.0*Q_;
 }
 
 PathController::~PathController(){
@@ -93,8 +74,8 @@ VectorXd PathController::uav_model(VectorXd U) {
     double we = 0.0;
     double wd = 0.0;
     
-    double pndot = U(2)*cos(uav_q(3))*cos(U(1)) + wn ;
-    double pedot = U(2)*sin(uav_q(3))*cos(U(1)) + we ;
+    double pndot = U(2)*cos(uav_state_(3))*cos(U(1)) + wn ;
+    double pedot = U(2)*sin(uav_state_(3))*cos(U(1)) + we ;
     double hdot =  U(2)*sin(U(1)) - wd;
     double psidot = U(0);
     
