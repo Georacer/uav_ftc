@@ -72,7 +72,7 @@ void PathControllerROS::step()
     if (did_receive_wps && did_receive_state) {
         Vector3d pos = uav_state_.segment<3>(0);
         Vector3d waypoint = waypoint_mngr_.next_waypoint(pos);
-        path_controller.step(uav_state_, pos);
+        path_controller.step(uav_state_, waypoint);
 
         // Grab resulting inputs
         Vector3d input = path_controller.input_result;

@@ -11,6 +11,7 @@
 PathController::PathController(const PathControllerSettings& s) {
     pc_settings_ = s;
     state_target_.setZero();
+    dt_ = s.dt;
 
     opt = nlopt_create(NLOPT_LN_COBYLA, pc_settings_.num_inputs*pc_settings_.num_samples); /* algorithm and dimensionality */
     //nlopt_set_population(opt, 10);
@@ -51,9 +52,9 @@ PathController::PathController(const PathControllerSettings& s) {
     //Initialize MPC Parameters
     
     Q_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
-    Q_(0,0) = 0.1;
-    Q_(1,1) = 0.1;
-    Q_(2,2) = 0.1;
+    Q_(0,0) = 1.0;
+    Q_(1,1) = 1.0;
+    Q_(2,2) = 1.0;
     Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
@@ -77,7 +78,7 @@ VectorXd PathController::uav_model(VectorXd U) {
     
     double pndot = U(2)*cos(uav_state_(3))*cos(U(1)) + wn ;
     double pedot = U(2)*sin(uav_state_(3))*cos(U(1)) + we ;
-    double hdot =  U(2)*sin(U(1)) - wd;
+    double hdot =  -U(2)*sin(U(1)) - wd;
     double psidot = U(0);
     
     VectorXd ndot(pc_settings_.num_states);
@@ -86,13 +87,39 @@ VectorXd PathController::uav_model(VectorXd U) {
     return ndot;
 }
 
-double PathController::cost_function(unsigned int n, const double* x, double* grad){
-    MatrixXd inputs(pc_settings_.num_inputs, pc_settings_.num_samples);
-    Map<MatrixXd>((double*)x, inputs.rows(), inputs.cols()) = inputs;
+double PathController::cost_function(unsigned int n, const double* x, double* grad)
+{
+    // Copy over much-used constants
+    const int num_states = pc_settings_.num_states;
+    const int num_inputs = pc_settings_.num_inputs;
+    const int num_samples = pc_settings_.num_samples;
+
+    MatrixXd inputs = Map<Matrix<double, 3, 4> > ((double*) x); // This works
+
+    // Matrix<double, Dynamic, Dynamic, RowMajor> inputs;
+    // inputs.resize(num_inputs, num_samples);
+    // Map<MatrixXd>((double*)x, inputs.rows(), inputs.cols()) = inputs;
+
+    // Matrix<double, Dynamic, Dynamic> inputs_tr;
+    // inputs_tr.resize(num_samples, num_inputs);
+    // Map<MatrixXd>((double*)x, inputs_tr.rows(), inputs_tr.cols()) = inputs_tr;
+    // MatrixXd inputs = inputs_tr.transpose(); // Tranpose needed. For some reason RowMajor option isn't effective in this
+    // // case
+
+    // std::cout << "Inputs passed to cost function\n";
+    // for (int i=0; i<num_inputs; ++i){
+    //     for (int j=0; j<num_samples; ++j){
+    //         cout << x[num_inputs*j+i] << "\t";
+    //     }
+    //     cout << std::endl;
+    // }
+
+    // std::cout << "Eigen-converged inputs passed to cost function\n";
+    // std::cout << inputs << std::endl;
 
     //Trajectory of States 
-    MatrixXd traj_n(pc_settings_.num_states, pc_settings_.num_samples+1);
-    traj_n.setZero(pc_settings_.num_states, pc_settings_.num_samples+1);
+    MatrixXd traj_n(num_states, num_samples+1);
+    traj_n.setZero(num_states, num_samples+1);
     
     //Initialize state trajectory
     traj_n.col(0) = uav_state_;
@@ -100,17 +127,14 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     //cout << "TRAJ:" << traj_n.col(0) << endl;
 
     //Progate the model (kinematics)
-    for (int k = 0; k < pc_settings_.num_samples; k++){
-
-        //cout << "HERE 1" << endl;
+    for (int k = 0; k < num_samples; k++){
         VectorXd ndot = uav_model(inputs.col(k));
         traj_n.col(k+1) = traj_n.col(k) + ndot*dt_;
-        //traj_n.col(k+1) = uvmsModel(traj_n.col(k), inputs.col(k));
     }
-  
+
     //Calculate Running Costs
     double Ji{0};
-    for (int k = 0; k < pc_settings_.num_samples; ++k) {
+    for (int k = 0; k < num_samples; ++k) {
        VectorXd x_err = traj_n.col(k) - state_target_;
        Ji += x_err.transpose()*Q_*x_err;
        VectorXd u_err = inputs.col(k) - input_target_;
@@ -118,29 +142,55 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     }
  
     //Calculate Terminal Costs
-    VectorXd et = traj_n.col(pc_settings_.num_samples) - state_target_;
+    VectorXd et = traj_n.col(num_samples) - state_target_;
     double Jt{et.transpose()*P_*et};
     return Ji + Jt;
 }
 
-void PathController::constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad) {
-    MatrixXd inputs(pc_settings_.num_inputs, pc_settings_.num_samples);
-    Map<MatrixXd>((double*)x, inputs.rows(), inputs.cols()) = inputs;
+void PathController::constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad)
+{
+    // Copy over much-used constants
+    const int num_states = pc_settings_.num_states;
+    const int num_inputs = pc_settings_.num_inputs;
+    const int num_samples = pc_settings_.num_samples;
+
+    MatrixXd inputs = Map<Matrix<double, 3, 4> > ((double*) x); // This works
+
+    // Matrix<double, Dynamic, Dynamic, RowMajor> inputs;
+    // inputs.resize(num_inputs, num_samples);
+    // Map<MatrixXd>((double*)x, inputs.rows(), inputs.cols()) = inputs;
+
+    // Matrix<double, Dynamic, Dynamic> inputs_tr;
+    // inputs_tr.resize(num_samples, num_inputs);
+    // Map<MatrixXd>((double*)x, inputs_tr.rows(), inputs_tr.cols()) = inputs_tr;
+    // MatrixXd inputs = inputs_tr.transpose(); // Tranpose needed. For some reason RowMajor option isn't effective in this
+    // // case
+
+    // std::cout << "Inputs passed to cost function\n";
+    // for (int i=0; i<num_inputs; ++i){
+    //     for (int j=0; j<num_samples; ++j){
+    //         cout << x[num_inputs*j+i] << "\t";
+    //     }
+    //     cout << std::endl;
+    // }
+
+    // std::cout << "Eigen-converged inputs passed to cost function\n";
+    // std::cout << inputs << std::endl;
 
     //Trajectory of States 
-    MatrixXd traj_n(pc_settings_.num_states, pc_settings_.num_samples+1);
-    traj_n.setZero(pc_settings_.num_states, pc_settings_.num_samples+1);
+    MatrixXd traj_n(num_states, num_samples+1);
+    traj_n.setZero(num_states, num_samples+1);
   
     //Initialize state trajectory
     traj_n.col(0) = uav_state_;
     
     // Propagate model state
-    for (int k = 0; k < pc_settings_.num_samples; k++){
+    for (int k = 0; k < num_samples; k++){
         VectorXd ndot = uav_model(inputs.col(k));
         traj_n.col(k+1) = traj_n.col(k) + ndot*dt_;
     }
     // Check constraint validity for each time sample
-    for (int i = 0; i < pc_settings_.num_samples + 1; i++){ // Sample iterator
+    for (int i = 0; i < num_samples + 1; i++){ // Sample iterator
         MatrixXd obstacle_pos = pc_settings_.obstacles.leftCols<3>(); // Isolate obstacle positions
         VectorXd obstacle_rad = pc_settings_.obstacles.rightCols<1>(); // Isolate obstacle radii
 
@@ -162,6 +212,7 @@ void PathController::constraints(unsigned int m, double* c, unsigned int n, cons
 void PathController::step(Vector4d state, Vector3d waypoint){
     state_target_.segment<3>(0) = waypoint;
 
+    uav_state_ = state;
     Vector3d pos = state.segment<3>(0);
 
     // Declare input structure with initial guess
@@ -174,10 +225,17 @@ void PathController::step(Vector4d state, Vector3d waypoint){
     }
     // Call solver
     nlopt_result res = nlopt_optimize(opt, inputs, &minJ);
-    // cout << "Optimization Return Code: " << res;
-    // printf("found minimum at J(%g,%g,%g) = %g\n", inputs[0], inputs[1],inputs[2], minJ);
-    // cout << "STATE:" <<uav_q.transpose() << endl;
-    // cout << "NAVIGATING TO WP: " <<wpCounter<< " VALUE: " << n_des.transpose() << endl;
+    cout << "Optimization Return Code: " << res << std::endl;
+    std::cout << "Found minimum at\n";
+    for (int i=0; i<pc_settings_.num_inputs; ++i){
+        for (int j=0; j<pc_settings_.num_samples; ++j){
+            cout << inputs[pc_settings_.num_inputs*j+i] << "\t";
+        }
+        cout << std::endl;
+    }
+    printf("with value %g\n", minJ);
+    cout << "STATE:" <<uav_state_.transpose() << std::endl;
+    cout << "NAVIGATING TO VALUE: " << state_target_.transpose() << std::endl;
 
     // Store first sesults sample
     input_result(0) = inputs[0];
@@ -243,7 +301,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     }
     // Also check if we have flown past the current waypoint
     Vector2d wp_prev;
-    if (wp_counter_>0) {
+    if (wp_counter_==0) {
         wp_prev = pos.segment<2>(0); 
     }
     else {
@@ -254,13 +312,26 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
         wp_counter_ += 1;
     }
 
+    // Update the waypoint in case the wp_counter_ has increased
+    wp_next = waypoints_.row(wp_counter_).transpose().segment<2>(0); 
+    std::cout << "Desired waypoint: " << wp_next.transpose() <<  " with idx " << wp_counter_ << std::endl;
+
     // Obtain the leading tracking waypoint (which is ahead of the current wp) 
-    int wp_idx = get_current_wp_idx(pos);
+    // int wp_idx = get_current_wp_idx(pos);
+    int wp_idx = wp_counter_ + num_wp_lookahead_;
 
     Vector3d tracking_wp = waypoints_.row(wp_idx).transpose();
+    std::cout << "Leash waypoint index: " << wp_idx << " @ location " << tracking_wp.transpose() << std::endl;
     return tracking_wp;
 }
 
+/**
+ * @brief Get the index of the waypoint that is at least num_wp_lookahead waypoints ahead of the current waypoint and
+ has heading in the same half-plane as the current heading.
+ * 
+ * @param pos 
+ * @return int 
+ */
 int WaypointMngr::get_current_wp_idx(Vector3d pos) const{
     int num_wp = waypoints_.rows();
     for (int wp_idx = wp_counter_+num_wp_lookahead_; wp_idx<num_wp; ++wp_idx){
