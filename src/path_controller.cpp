@@ -63,6 +63,7 @@ PathController::PathController(const PathControllerSettings& s) {
 
     P_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
     P_ = 5.0*Q_;
+    P_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 }
 
 PathController::~PathController(){
@@ -117,7 +118,7 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     }
  
     //Calculate Terminal Costs
-    VectorXd et = traj_n.col(pc_settings_.num_samples) - state_target_.segment<3>(0);
+    VectorXd et = traj_n.col(pc_settings_.num_samples) - state_target_;
     double Jt{et.transpose()*P_*et};
     return Ji + Jt;
 }
@@ -262,7 +263,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
 
 int WaypointMngr::get_current_wp_idx(Vector3d pos) const{
     int num_wp = waypoints_.rows();
-    for (int wp_idx = wp_counter_+num_wp_lookahead_; wp_idx<num_wp; ++num_wp){
+    for (int wp_idx = wp_counter_+num_wp_lookahead_; wp_idx<num_wp; ++wp_idx){
         // Construct the previous waypoint
         int wp_prev_idx = wp_idx -1;
         Vector2d wp_prev;
