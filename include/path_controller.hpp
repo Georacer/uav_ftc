@@ -45,7 +45,8 @@ class PathController {
     public:
     PathController(const PathControllerSettings& s);
     ~PathController();
-    VectorXd uav_model(VectorXd U);
+    VectorXd uav_model(Vector4d state, Vector3d inputs);
+    MatrixXd propagate_model(MatrixXd inputs);
     double cost_function(unsigned int n, const double* x, double* grad);
     void constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad);
     void step(Vector4d uav_state, Vector3d waypoint);

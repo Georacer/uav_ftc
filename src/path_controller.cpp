@@ -71,20 +71,42 @@ PathController::~PathController(){
     nlopt_destroy(opt); 
 }
 
-VectorXd PathController::uav_model(VectorXd U) {    
+VectorXd PathController::uav_model(Vector4d state, Vector3d inputs) {    
     double wn = 0.0;
     double we = 0.0;
     double wd = 0.0;
     
-    double pndot = U(2)*cos(uav_state_(3))*cos(U(1)) + wn ;
-    double pedot = U(2)*sin(uav_state_(3))*cos(U(1)) + we ;
-    double hdot =  -U(2)*sin(U(1)) - wd;
-    double psidot = U(0);
+    double pndot = inputs(2)*cos(state(3))*cos(inputs(1)) + wn ;
+    double pedot = inputs(2)*sin(state(3))*cos(inputs(1)) + we ;
+    double hdot =  -inputs(2)*sin(inputs(1)) - wd;
+    double psidot = inputs(0);
     
     VectorXd ndot(pc_settings_.num_states);
     ndot << pndot, pedot, hdot, psidot;
 
     return ndot;
+}
+
+MatrixXd PathController::propagate_model(MatrixXd inputs)
+{
+    const int num_states = pc_settings_.num_states;
+    const int num_samples = pc_settings_.num_samples;
+
+    MatrixXd traj_n(num_states, num_samples+1);
+    traj_n.setZero(num_states, num_samples+1);
+    
+    //Initialize state trajectory
+    traj_n.col(0) = uav_state_;
+
+    //Progate the model (kinematics)
+    for (int k = 0; k < num_samples; k++){
+        VectorXd ndot = uav_model(traj_n.col(k), inputs.col(k));
+        traj_n.col(k+1) = traj_n.col(k) + ndot*dt_;
+        // cout << "State: " << traj_n.col(k).transpose() << std::endl;
+        // cout << "Derivative: " << ndot.transpose() << std::endl;
+        // cout << "Propagated State: " << traj_n.col(k+1).transpose() << std::endl;
+    }
+    return traj_n;
 }
 
 double PathController::cost_function(unsigned int n, const double* x, double* grad)
@@ -119,18 +141,7 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
 
     //Trajectory of States 
     MatrixXd traj_n(num_states, num_samples+1);
-    traj_n.setZero(num_states, num_samples+1);
-    
-    //Initialize state trajectory
-    traj_n.col(0) = uav_state_;
-    
-    //cout << "TRAJ:" << traj_n.col(0) << endl;
-
-    //Progate the model (kinematics)
-    for (int k = 0; k < num_samples; k++){
-        VectorXd ndot = uav_model(inputs.col(k));
-        traj_n.col(k+1) = traj_n.col(k) + ndot*dt_;
-    }
+    traj_n = propagate_model(inputs);
 
     //Calculate Running Costs
     double Ji{0};
@@ -179,16 +190,8 @@ void PathController::constraints(unsigned int m, double* c, unsigned int n, cons
 
     //Trajectory of States 
     MatrixXd traj_n(num_states, num_samples+1);
-    traj_n.setZero(num_states, num_samples+1);
-  
-    //Initialize state trajectory
-    traj_n.col(0) = uav_state_;
-    
-    // Propagate model state
-    for (int k = 0; k < num_samples; k++){
-        VectorXd ndot = uav_model(inputs.col(k));
-        traj_n.col(k+1) = traj_n.col(k) + ndot*dt_;
-    }
+    traj_n = propagate_model(inputs);
+
     // Check constraint validity for each time sample
     for (int i = 0; i < num_samples + 1; i++){ // Sample iterator
         MatrixXd obstacle_pos = pc_settings_.obstacles.leftCols<3>(); // Isolate obstacle positions
@@ -236,6 +239,11 @@ void PathController::step(Vector4d state, Vector3d waypoint){
     printf("with value %g\n", minJ);
     cout << "STATE:" <<uav_state_.transpose() << std::endl;
     cout << "NAVIGATING TO VALUE: " << state_target_.transpose() << std::endl;
+    MatrixXd inputs_mat = Map<Matrix<double, 3, 4> > ((double*) inputs); // This works
+    cout << "Eigen-converted inputs\n";
+    cout << inputs_mat << std::endl;
+    cout << "Propagated state:\n";
+    cout << propagate_model(inputs_mat) << std::endl;
 
     // Store first sesults sample
     input_result(0) = inputs[0];
