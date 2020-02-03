@@ -150,7 +150,7 @@ Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
         break;
     
     default:
-        ROS_ERROR("Please specify a value for ctrlMode parameter");
+        ROS_ERROR("Please specify a valid value for ctrlMode parameter");
         break;
     }
     // ROS_INFO("Created reference:");

@@ -82,9 +82,9 @@ void PathControllerROS::step()
         msg.header.stamp = ros::Time::now();
         msg.header.frame_id = "base_link";
 
-        msg.vector.x = input.x();
-        msg.vector.y = input.y();
-        msg.vector.z = input.z();
+        msg.vector.x = input.z(); // Copy over airspeed
+        msg.vector.y = input.y(); // Copy over gamma
+        msg.vector.z = input.x(); // Copy over psi_dot
 
         pub_uav_cmd_.publish(msg);
     }

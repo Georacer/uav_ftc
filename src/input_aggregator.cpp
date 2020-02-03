@@ -52,7 +52,10 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     surfaceCtrls_.vector.y = msg.vector.y;
     surfaceCtrls_.vector.z = msg.vector.z;
 
-    if (ctrlMode_ == 1 || ctrlMode_ == 2) // Publish as fast as you have control surface inputs
+    if (ctrlMode_ == 1 || 
+        ctrlMode_ == 2 ||
+        ctrlMode_ == 3
+       ) // Publish as fast as you have control surface inputs
     {
         publishCtrls();
     }
@@ -90,6 +93,7 @@ void InputAggregator::mixer()
         break;
     
     case 2: // Use the control surface signals from the controller and throttle from the trajectory controller
+    case 3:
         mixedCtrls_ = rawCtrls_; // Copy over all of the raw signals
         mixedCtrls_.header.stamp = ros::Time::now(); // Stamp the message
         // Pick selected channels and convert them to PWM values

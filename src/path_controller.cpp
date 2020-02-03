@@ -305,6 +305,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     if (distance_to_wp < goal_radius_){
         if (wp_counter_-1<waypoints_.rows()){
             wp_counter_ += 1;
+            std::cout << "Got near enough current waypoint\n";
         }
     }
     // Also check if we have flown past the current waypoint
@@ -318,6 +319,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     double distance_to_finish_line = get_distance_from_target(wp_prev, wp_next, pos.segment<2>(0));
     if (distance_to_finish_line < 0) {
         wp_counter_ += 1;
+        std::cout << "Got past current waypoint\n";
     }
 
     // Update the waypoint in case the wp_counter_ has increased

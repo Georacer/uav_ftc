@@ -2,7 +2,7 @@
 
 
 # Controller parameters
-ctrlMode: 2
+ctrlMode: 3
 # 0: Direct passthrough from joystick (controllers still active)
 # 1: Angular rate control
 # 2: Trajectory control

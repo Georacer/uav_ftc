@@ -131,11 +131,11 @@ void TrajectoryController::step()
     // Solve problem with given measurements
     // Eigen::Matrix<float, 0, 1> dummyOnlineData;
     // mpcController_.update(states_, dummyOnlineData);
-    std::cout << "Passed measurements to MPC:\n" << states_  << std::endl;
+    // std::cout << "Passed measurements to MPC:\n" << states_  << std::endl;
     mpcController_.update(states_);
 
-    ROS_INFO("Trajectory MPC solver state:\n");
-    mpcController_.printSolverState();
+    // ROS_INFO("Trajectory MPC solver state:\n");
+    // mpcController_.printSolverState();
 
     // mpcController_.printSolverState();
     // std::cout << "Des / Achieved psi:\n" << reference_(2) << "/\t" << calcPsiDot(states_, predictedControls_) << std::endl;
@@ -246,7 +246,7 @@ void TrajectoryController::writeOutput()
     // std::cout << "Actually passed deltat: " << omega_req/omega_max << std::endl;
     throttleCmd.header.stamp = ros::Time::now();
 
-    std::cout << "Mid-MPC output:\n" << predictedControls_ << "\n" << throttleCmd.vector.x << std::endl;
+    // std::cout << "Mid-MPC output:\n" << predictedControls_ << "\n" << throttleCmd.vector.x << std::endl;
     pubCmdThrottle.publish(throttleCmd);
 }
 
@@ -269,9 +269,9 @@ float TrajectoryController::calcOmega(const float thrust)
 }
 
 /**
- * @brief Callback to store the angular rate reference commands
+ * @brief Callback to store the velocity commands
  * 
- * @param pRefRates The reference angular rates p, q, r.
+ * @param pRefRates The reference velocity commands Va, gamma, psi_dot
  */
 void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajectory)
 {
