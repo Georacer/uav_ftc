@@ -60,7 +60,7 @@
         <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
 
         <!-- Playback waypoints broadcasting from log file-->
-        <node pkg="rosbag" name="replayer" type="play" args="waypoints_filtered_synched.bag"/> <!-- topic activity recorder node -->
+        <node pkg="rosbag" name="replayer" type="play" args="-d 2 waypoints_filtered_synched.bag"/> <!-- topic activity recorder node -->
 
     </group>
 

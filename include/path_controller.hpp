@@ -82,7 +82,7 @@ class WaypointMngr {
     double get_distance_from_target(Vector2d pos, Vector2d target) const;
     int get_current_wp_idx(Vector3d pos) const;
     Matrix<double, Dynamic, 3> waypoints_; // N x 3, NED coordinates
-    int wp_counter_{0};
+    int wp_counter_{1};
     int num_wp_lookahead_{5};
     double goal_radius_{10};
     bool did_receive_waypoints_{false};
