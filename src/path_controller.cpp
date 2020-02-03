@@ -58,9 +58,9 @@ PathController::PathController(const PathControllerSettings& s) {
     Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
-    R_(0,0) = 0.002;
-    R_(1,1) = 0.002;
-    R_(2,2) = 0.002;
+    R_(0,0) = 1.0;
+    R_(1,1) = 1.0;
+    R_(2,2) = 1000.0;
 
     P_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
     P_ = 5.0*Q_;
@@ -228,22 +228,22 @@ void PathController::step(Vector4d state, Vector3d waypoint){
     }
     // Call solver
     nlopt_result res = nlopt_optimize(opt, inputs, &minJ);
-    cout << "Optimization Return Code: " << res << std::endl;
-    std::cout << "Found minimum at\n";
-    for (int i=0; i<pc_settings_.num_inputs; ++i){
-        for (int j=0; j<pc_settings_.num_samples; ++j){
-            cout << inputs[pc_settings_.num_inputs*j+i] << "\t";
-        }
-        cout << std::endl;
-    }
-    printf("with value %g\n", minJ);
-    cout << "STATE:" <<uav_state_.transpose() << std::endl;
-    cout << "NAVIGATING TO VALUE: " << state_target_.transpose() << std::endl;
-    MatrixXd inputs_mat = Map<Matrix<double, 3, 4> > ((double*) inputs); // This works
-    cout << "Eigen-converted inputs\n";
-    cout << inputs_mat << std::endl;
-    cout << "Propagated state:\n";
-    cout << propagate_model(inputs_mat) << std::endl;
+    // cout << "Optimization Return Code: " << res << std::endl;
+    // std::cout << "Found minimum at\n";
+    // for (int i=0; i<pc_settings_.num_inputs; ++i){
+    //     for (int j=0; j<pc_settings_.num_samples; ++j){
+    //         cout << inputs[pc_settings_.num_inputs*j+i] << "\t";
+    //     }
+    //     cout << std::endl;
+    // }
+    // printf("with value %g\n", minJ);
+    // cout << "STATE:" <<uav_state_.transpose() << std::endl;
+    // cout << "NAVIGATING TO VALUE: " << state_target_.transpose() << std::endl;
+    // MatrixXd inputs_mat = Map<Matrix<double, 3, 4> > ((double*) inputs); // This works
+    // cout << "Eigen-converted inputs\n";
+    // cout << inputs_mat << std::endl;
+    // cout << "Propagated state:\n";
+    // cout << propagate_model(inputs_mat) << std::endl;
 
     // Store first sesults sample
     input_result(0) = inputs[0];
