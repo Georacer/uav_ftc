@@ -278,11 +278,14 @@ void WaypointMngr::set_goal_radius(const double radius)
  */
 double WaypointMngr::get_distance_from_target(Vector2d pos, Vector2d start, Vector2d finish) const{
     // Build vector from prev wp to next wp
-    Vector2d v_ab = start - finish;
+    Vector2d v_ab = finish - start;
     v_ab.normalize();
     // Build vector from current pos to next wp
     Vector2d v_pb = finish - pos;
-    return v_ab.dot(v_pb);
+    double result = v_ab.dot(v_pb);
+    // std::cout << "Checking distance of " << pos.transpose() << " from " << start.transpose() << " to " << finish.transpose()
+    //           << ": " << result << std::endl;
+    return result;
 }
 
 double WaypointMngr::get_distance_from_target(Vector2d pos, Vector2d target) const{
@@ -316,7 +319,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     else {
         wp_prev = waypoints_.row(wp_counter_-1).transpose().segment<2>(0);
     }
-    double distance_to_finish_line = get_distance_from_target(wp_prev, wp_next, pos.segment<2>(0));
+    double distance_to_finish_line = get_distance_from_target(pos.segment<2>(0), wp_prev, wp_next);
     if (distance_to_finish_line < 0) {
         wp_counter_ += 1;
         std::cout << "Got past current waypoint\n";
@@ -357,7 +360,7 @@ int WaypointMngr::get_current_wp_idx(Vector3d pos) const{
         // Pick the next waypoint
         Vector2d wp_next = waypoints_.row(wp_idx).transpose().segment<2>(0);
         // Find distance from next wp
-        double distance = get_distance_from_target(wp_prev, wp_next, pos.segment<2>(0));
+        double distance = get_distance_from_target( pos.segment<2>(0), wp_prev, wp_next);
         // If we are before the next wp return its index
         if (distance>0){
             return wp_idx;
