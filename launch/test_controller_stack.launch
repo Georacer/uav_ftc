@@ -1,0 +1,67 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="true"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="false"/>
+
+	<!-- Launch the last_letter simulator /-->
+	<include file="$(find last_letter)/launch/launcher.launch" >
+		<arg name="manualMode" value="$(arg manualMode)"/>
+		<arg name="autoMode" value="$(arg autoMode)"/>
+		<arg name="uav_name" value="$(arg uav_name)"/>
+		<arg name="log" value="$(arg log)"/>
+	</include>
+
+    <group ns="$(arg uav_name)">
+
+        <!-- Launch the online estimator -->
+        <!-- <node pkg="aerodynamic_pi" name="aero_coeff_estimator" type="online_estimator.py" output="screen">
+        </node> -->
+
+        <!-- Launch the flight envelope estimator -->
+        <!-- <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
+        <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
+            <param name="uav_name" value="$(arg uav_name)"/>
+        </node>  -->
+
+        <!-- Visualization nodes -->
+        <!-- Wind estimates-->
+        <!-- <node name="EKF_plotter"
+            pkg="rqt_plot"
+            type="rqt_plot"
+            args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
+        /> -->
+
+        <!--  -->
+        <!-- Launch controllers -->
+        <!--  -->
+        <!-- Load controller parameters -->
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
+        <!-- Load planner parameters -->
+        <rosparam command="load" file="$(find uav_planner)data/parameters/params.yaml" />
+        <!-- Load map -->
+        <rosparam command="load" file="$(find uav_planner)data/parameters/map_sparse.yaml" />
+        
+        <!-- Raise rate controller -->
+        <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller_2" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/> -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller_2" respawn="true" output="screen"/>
+        <!-- Raise velocity controller -->
+        <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
+        <!-- Raise path controller -->
+        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
+
+        <!-- Raise input aggreggator node -->
+        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
+
+        <!-- Playback waypoints broadcasting from log file-->
+        <node pkg="rosbag" name="replayer" type="play" args="waypoints_filtered_synched.bag"/> <!-- topic activity recorder node -->
+
+    </group>
+
+</launch>
