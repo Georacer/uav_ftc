@@ -4,7 +4,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Eigen>
 
-#include <last_letter_msgs/SimStates.h>
+#include <uav_ftc/BusData.h>
 #include <last_letter_msgs/Parameter.h>
 
 // Declare the order of OnlineData in the solver code
@@ -37,7 +37,7 @@ class RateController
 private:
     ////////////
     // Variables
-    last_letter_msgs::SimStates states_; // Complete aircraft state
+    uav_ftc::BusData states_; // Complete aircraft state
     Eigen::Vector3f angularStates_;     // p, q, r measurements
     // Eigen::Vector3f airdata_;
     Eigen::Vector3f refRates_, refInputs_;
@@ -59,7 +59,7 @@ public:
     ////////////
     // Functions
     void step();                                                // Caller of rate_controller_wrapper
-    void getStates(last_letter_msgs::SimStates measuredStates); // Callback to store measured states
+    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
     void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
     void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
     void getParameters(last_letter_msgs::Parameter parameter);  // Callback to store estimated parameters

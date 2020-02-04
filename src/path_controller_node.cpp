@@ -16,8 +16,7 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
     //Create Publishers
     pub_uav_cmd_ = nh.advertise<geometry_msgs::Vector3Stamped>("refTrajectory", 10);
     //Create Subscribers
-    sub_uav_state_ = nh.subscribe<last_letter_msgs::SimStates>("states", 100,
-                                                               &PathControllerROS::cb_update_uav_states, this);
+    sub_uav_state_ = nh.subscribe<uav_ftc::BusData>("dataBus", 100, &PathControllerROS::cb_update_uav_states, this);
     sub_uav_path_ = nh.subscribe<visualization_msgs::MarkerArray>("waypoints", 100,
                                                                   &PathControllerROS::cb_update_path, this);
 }
@@ -26,13 +25,13 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
  * 
  * @param nav_msg 
  */
-void PathControllerROS::cb_update_uav_states(const last_letter_msgs::SimStates::ConstPtr& nav_msg){
-    uav_state_(0)= nav_msg->pose.position.x;
-    uav_state_(1)= nav_msg->pose.position.y;
-    uav_state_(2)= nav_msg->pose.position.z;
+void PathControllerROS::cb_update_uav_states(const uav_ftc::BusData::ConstPtr& nav_msg){
+    uav_state_(0)= nav_msg->position.x;
+    uav_state_(1)= nav_msg->position.y;
+    uav_state_(2)= nav_msg->position.z;
 
     geometry_msgs::Quaternion quat;
-    quat = nav_msg->pose.orientation;
+    quat = nav_msg->orientation;
     Quaterniond rot_quat(quat.w, quat.x, quat.y, quat.z);
     Vector3d rot_euler = quat2euler(rot_quat);
     

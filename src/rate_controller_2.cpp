@@ -29,12 +29,16 @@ using Eigen::Vector3d;
 RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConstraints_)
 {
     //Initialize states
-    states_.velocity.angular.x = 0;
-    states_.velocity.angular.y = 0;
-    states_.velocity.angular.z = 0;
-    states_.velocity.linear.x = 15.0;
-    states_.velocity.linear.y = 0.034;
-    states_.velocity.linear.z = 0.0;
+    states_.velocity_angular.x = 0;
+    states_.velocity_angular.y = 0;
+    states_.velocity_angular.z = 0;
+    states_.airspeed = 15.0;
+    states_.angle_of_attack = 0.034;
+    states_.angle_of_sideslip = 0.0;
+    states_.orientation.x = 0.0;
+    states_.orientation.y = 0.0;
+    states_.orientation.z = 0.0;
+    states_.orientation.w = 1.0;
     tprev = ros::Time::now();
     states_.header.stamp = tprev;
 
@@ -49,12 +53,12 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     Eigen::Matrix<real_t, 3, 1> trimInput = Eigen::Matrix<real_t, 3, 1>::Zero();
     mpcController_.setTrimInput(trimInput);
     // Set default/initial online data
-	Eigen::Quaterniond tempQuat(states_.pose.orientation.w, states_.pose.orientation.x, states_.pose.orientation.y, states_.pose.orientation.z);
+	Eigen::Quaterniond tempQuat(states_.orientation.w, states_.orientation.x, states_.orientation.y, states_.orientation.z);
     Eigen::Vector3d tempVect(quat2euler(tempQuat));
     Eigen::Matrix<real_t, 5, 1> trimOnlineData = (Eigen::Matrix<real_t, 5, 1>() << 
-        states_.velocity.linear.x,
-        states_.velocity.linear.y,
-        states_.velocity.linear.z,
+        states_.airspeed,
+        states_.angle_of_attack,
+        states_.angle_of_sideslip,
         tempVect.x(), // Pass phi
         tempVect.y() // Pass theta
         ).finished();
@@ -75,7 +79,7 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     mpcController_.printSolverState();
 
     //Subscribe and advertize
-    subState = n.subscribe("states", 1, &RateController::getStates, this);
+    subState = n.subscribe("dataBus", 1, &RateController::getStates, this);
     subRef = n.subscribe("refRates", 1, &RateController::getReference, this);
     subParam = n.subscribe("parameter_changes", 100, &RateController::getParameters, this);
     pubCtrl = n.advertise<geometry_msgs::Vector3Stamped>("ctrlSurfaceCmds", 1);
@@ -103,10 +107,15 @@ void RateController::step()
         return;
     }
     
+    // Set the MPC reference state
+    Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
+    reference << refRates_, refInputs_;
+    mpcController_.setReference(reference, refRates_);
+
     // Convert airdata triplet
-    Vector3d airdata = getAirData(Vector3d(states_.velocity.linear.x,
-                                            states_.velocity.linear.y,
-                                            states_.velocity.linear.z));
+    Vector3d airdata = Vector3d(states_.airspeed,
+                                states_.angle_of_attack,
+                                states_.angle_of_sideslip);
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata(0) < 1)
     {
@@ -114,11 +123,6 @@ void RateController::step()
         airdata(0) = 1;
     }
     // refRates are already saved in the controller
-
-    // Set the MPC reference state
-    Eigen::VectorXf reference(refRates_.size() + refInputs_.size());
-    reference << refRates_, refInputs_;
-    mpcController_.setReference(reference, refRates_);
 
     // Set the airdata related online data
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::Va, airdata(0));
@@ -156,15 +160,15 @@ void RateController::step()
  * 
  * @param inpStates The whole UAV state
  */
-void RateController::getStates(last_letter_msgs::SimStates inpStates)
+void RateController::getStates(uav_ftc::BusData bus_data)
 {
     // Copy over all aircraft state
-    states_ = inpStates;
+    states_ = bus_data;
 
     // Isolate angular velocity system measurements
-    angularStates_(0) = inpStates.velocity.angular.x;
-    angularStates_(1) = inpStates.velocity.angular.y;
-    angularStates_(2) = inpStates.velocity.angular.z;
+    angularStates_(0) = bus_data.velocity_angular.x;
+    angularStates_(1) = bus_data.velocity_angular.y;
+    angularStates_(2) = bus_data.velocity_angular.z;
 
     statesReceivedStatus_ = true;
 }

@@ -37,14 +37,14 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     // float defaultRefPsi = calcPsiDotDes(referenceTrajectory_);
 
     //Initialize internally stored simulation states to default values
-    simStates_.velocity.angular.x = 0;
-    simStates_.velocity.angular.y = 0;
-    simStates_.velocity.angular.z = 0;
-    simStates_.velocity.linear.x = referenceTrajectory_(0);
-    simStates_.velocity.linear.y = 0.034;
-    simStates_.velocity.linear.z = 0.0;
+    bus_data_.velocity_angular.x = 0;
+    bus_data_.velocity_angular.y = 0;
+    bus_data_.velocity_angular.z = 0;
+    bus_data_.airspeed = referenceTrajectory_(0);
+    bus_data_.angle_of_attack = 0.034;
+    bus_data_.angle_of_sideslip = 0.0;
     tprev = ros::Time::now();
-    simStates_.header.stamp = tprev;
+    bus_data_.header.stamp = tprev;
 
     wind_body_.setZero(); // Initialize wind readings
 
@@ -80,8 +80,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
 
 
     //Subscribe and advertize
-    subState = n.subscribe("states", 1, &TrajectoryController::getStates, this);
-	subEnvironment = n.subscribe("environment",1,&TrajectoryController::getEnvironment, this); // Environment subscriber
+    subState = n.subscribe("dataBus", 1, &TrajectoryController::getStates, this);
     subRef = n.subscribe("refTrajectory", 1, &TrajectoryController::getReference, this);
     subParam = n.subscribe("parameter_changes", 100, &TrajectoryController::getParameters, this);
     pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 1);
@@ -94,7 +93,6 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
  */
 TrajectoryController::~TrajectoryController()
 {
-    delete &mpcController_;
 }
 
 /**
@@ -110,12 +108,6 @@ void TrajectoryController::step()
         return;
     }
     
-    // // Convert airdata triplet
-    // Already doing that in state callback
-    // airdata_ = getAirdata(Vector3d(simStates_.velocity.linear.x,
-    //                                simStates_.velocity.linear.y,
-    //                                simStates_.velocity.linear.z));
-
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata_(0) < 1)
     {
@@ -160,52 +152,39 @@ void TrajectoryController::step()
  * @brief Callback function to store the UAV states
  * Used to capture the angular rate measurements
  * 
- * @param inpStates The whole UAV state
+ * @param bus_data The BusData message, containing all available measurements
  */
-void TrajectoryController::getStates(last_letter_msgs::SimStates inpStates)
+void TrajectoryController::getStates(uav_ftc::BusData bus_data)
 {
     // Copy over all aircraft state
-    simStates_ = inpStates;
+    bus_data_ = bus_data;
 
     // Extract airdata
-    Vector3d vel_body_inertial = Vector3d(simStates_.velocity.linear.x,
-                                          simStates_.velocity.linear.y,
-                                          simStates_.velocity.linear.z); // Body frame
-    Vector3d vel_body_relative = vel_body_inertial - wind_body_;
-    Vector3d tempVect = getAirData(vel_body_relative);
-    airdata_ = tempVect.cast<float>();
+    airdata_ = Vector3f(bus_data_.airspeed, bus_data_.angle_of_attack, bus_data_.angle_of_sideslip);
 
     // Isolate relevant states
     states_(0) = airdata_.x();
     states_(1) = airdata_.y();
     states_(2) = airdata_.z();
 
-    Eigen::Quaterniond tempQuat(inpStates.pose.orientation.w,
-                                inpStates.pose.orientation.x,
-                                inpStates.pose.orientation.y,
-                                inpStates.pose.orientation.z);
+    Eigen::Quaterniond tempQuat(bus_data.orientation.w,
+                                bus_data.orientation.x,
+                                bus_data.orientation.y,
+                                bus_data.orientation.z);
     Vector3d euler = quat2euler(tempQuat);
     states_(3) = euler.x();
     states_(4) = euler.y();
 
-    double q = simStates_.velocity.angular.y;
-    double r = simStates_.velocity.angular.z;
+    double q = bus_data_.velocity_angular.y;
+    double r = bus_data_.velocity_angular.z;
     double psi_dot = (q*sin(euler.x()) + r*cos(euler.x()))/cos(euler.y());
     // std::cout req/act: " <<  reference_(2) << "/\t" << psi_dot << std::endl;
 
-    statesReceivedStatus_ = true;
-}
+    wind_body_.x() = bus_data.wind.x;
+    wind_body_.y() = bus_data.wind.y;
+    wind_body_.z() = bus_data.wind.z;
 
-void TrajectoryController::getEnvironment(last_letter_msgs::Environment msg)
-{
-    wind_body_.x() = msg.wind.x;
-    wind_body_.y() = msg.wind.y;
-    wind_body_.z() = msg.wind.z;
-    // bus_data.temperature_air = msg.temperature;
-    // bus_data.temperature_imu = msg.temperature;
-    // bus_data.pressure_absolute = msg.pressure;
-    // bus_data.rho = msg.density; // Air density
-    // bus_data.g = msg.gravity; // Gravity acceleration
+    statesReceivedStatus_ = true;
 }
 
 /**

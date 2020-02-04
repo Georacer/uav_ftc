@@ -38,6 +38,12 @@
             args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y"
         /> -->
 
+        <!-- Launch the databus generator -->
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
+        <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+            <param name="data_source" value="1"/>
+        </node>
+
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->

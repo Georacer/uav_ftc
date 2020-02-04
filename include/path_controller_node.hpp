@@ -1,13 +1,13 @@
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include <last_letter_msgs/SimStates.h>
+#include <uav_ftc/BusData.h>
 #include "path_controller.hpp"
 
 class PathControllerROS {
     public:
     PathControllerROS(ros::NodeHandle);
-    void cb_update_uav_states(const last_letter_msgs::SimStates::ConstPtr& nav_msg);
+    void cb_update_uav_states(const uav_ftc::BusData::ConstPtr& nav_msg);
     void cb_update_path(const visualization_msgs::MarkerArray::ConstPtr& path_msg);
     void step();
 
