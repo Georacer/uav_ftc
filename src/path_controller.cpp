@@ -58,8 +58,8 @@ PathController::PathController(const PathControllerSettings& s) {
     Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
-    R_(0,0) = 10.0;
-    R_(1,1) = 10.0;
+    R_(0,0) = 100.0;
+    R_(1,1) = 100.0;
     R_(2,2) = 1000.0;
 
     P_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
@@ -116,7 +116,11 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     const int num_inputs = pc_settings_.num_inputs;
     const int num_samples = pc_settings_.num_samples;
 
-    MatrixXd inputs = Map<Matrix<double, 3, 4> > ((double*) x); // This works
+    // Proper Map initialization doesn't work properly for some reason
+    // Need to hard code dimensions
+    constexpr int num_inputs_temp = 3;
+    constexpr int num_samples_temp = 4;
+    MatrixXd inputs = Map<Matrix<double, num_inputs_temp, num_samples_temp> > ((double*) x); // This works
 
     // Matrix<double, Dynamic, Dynamic, RowMajor> inputs;
     // inputs.resize(num_inputs, num_samples);
