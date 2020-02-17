@@ -1,0 +1,10 @@
+device: /dev/odroid_gps_module
+frame_id: base_link
+rate: 5
+gnss/sbas: true
+sbas/max: 3
+sbas/usage: 7
+dynamic_model: airborne2
+fix_mode: 3d
+
+gnss/glonass: true
