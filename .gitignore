@@ -2,12 +2,23 @@
 \.vscode/
 
 include/uav_ftc/__pycache__/
+
 mpc_models/*/CMakeFiles
 mpc_models/*/CMakeCache.txt
+mpc_models/*/*.cmake
+mpc_models/*/*_codegen
 mpc_models/*/Makefile
 mpc_models/*/*/qpoases
-mpc_models/uav_ftc_codegen/qpoases
-mpc_models/rate_controller_mpc_solver/qpoases
+mpc_models/rate_controller/rate_controller_mpc_solver/*
+!mpc_models/rate_controller/rate_controller_mpc_solver/acado_problem_definitions.h
+mpc_models/rate_controller_2/rate_controller_mpc_solver_2/*
+!mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_problem_definitions.h
+mpc_models/trajectory_controller/trajectory_controller_mpc_solver/*
+!mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_problem_definitions.h
+mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/*
+!mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_problem_definitions.h
+
+utilities/*
 
 logs/*/*/
 
