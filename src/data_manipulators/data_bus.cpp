@@ -31,6 +31,7 @@ void convertEigenQuaternion(const geometry_msgs::Quaternion quatRos, Eigen::Quat
 }
 
 #include "data_from_last_letter.cpp"
+#include "data_from_hardware.cpp"
 
 
 ///////////////////////////////
@@ -52,6 +53,10 @@ DataBus::DataBus(ros::NodeHandle par_n, uint data_source)
     if (data_source == DATA_SOURCE_LL)
     {
         sub_handler_ = new SubHandlerLL(n);
+    }
+    if (data_source == DATA_SOURCE_HW)
+    {
+        sub_handler_ = new SubHandlerHW(n);
     }
     data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 100);
     ekf_pub_ = n.advertise<uav_ftc::BusData>("ekf", 100);

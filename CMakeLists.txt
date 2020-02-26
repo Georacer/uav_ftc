@@ -20,6 +20,8 @@ find_package(catkin REQUIRED COMPONENTS
   last_letter_msgs
 	last_letter_lib
   dynamic_reconfigure
+  rosflight_msgs
+  minidaq
 )
 
 find_package(Eigen3 REQUIRED)
