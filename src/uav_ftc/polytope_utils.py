@@ -16,6 +16,7 @@ import time
 import fractions as fr
 
 import numpy as np
+import vg  # Very Good vector geometry module
 import scipy as sp
 from scipy.cluster.vq import kmeans2
 from scipy.spatial import ConvexHull
@@ -29,7 +30,10 @@ import click
 import plot_utils as pu
 from ellipsoid_fit_python import ellipsoid_fit as el_fit
 
-mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['pdf.fonttype'] = 42 # Avoid Type 3 fonts, some journals don't accept them
+mpl.rcParams.update({'font.size': 14})
+# mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+mpl.rc('text', usetex=True)
 
 # Get the distance of a point from a hypersurface
 # Essentially this is an evaluation of the point for the hypersurface expression
@@ -300,13 +304,14 @@ class SafeConvexPolytope:
     _el_center = None
     _el_evecs = None
     _el_radii = None
-    _el_v = None
+    _el_v = None  # Ellipsoid coefficients
 
     _axis_handle = None
     _plot_index = 0
     save_figures = False
     axis_label_list = None
     plotting_mask = None
+    _plot_points = True
 
     def __init__(self, ind_func, domain, eps=None):
         self.indicator = ind_func
@@ -815,23 +820,44 @@ class SafeConvexPolytope:
     def _get_face_points(self, polytope):
         face_list = []
         all_points = polytope.get_points()
+        centerpoint = self.get_centroid(all_points)  # 3x1
         all_equations = polytope.get_equations()
-        # print("Getting face points")
-        # print(all_points)
-        # print(all_equations)
         multiplier = 10**(-3) # Same as significant decimal places of polyotpe
 
+        # Iterate over the equations and match their points
         for equation in all_equations:
             equation_normalized = equation/np.linalg.norm(equation)
             face_points = []
-            # print("New face")
+            # New face.
             for point in all_points.transpose():
                 point_distance = np.abs(evaluate_hyperplane(point, equation_normalized))
-                # print(point_distance)
-                if point_distance < multiplier:
+                if point_distance < multiplier: # Add some lee-way
                     face_points.append(point)
             face_list.append(face_points)
-        return face_list
+
+        face_list_sorted = []
+        # Sort the points of each face to produce a closed, flat polygon 
+        for face_points in face_list:
+            # print('centerpoint', centerpoint.shape)
+            points = np.array(face_points).T  # 3xN
+            # Find their centroid
+            centroid = self.get_centroid(points)  # 3x1
+            # print('centroid', centroid.shape)
+            vec1 = points[:, [0]] - centroid
+            # print('vec1', vec1.shape)
+            vec1_array = np.repeat(vec1, points.shape[1], axis=1)  # 3xN
+            # print('vec1_array', vec1_array.shape)
+            vec_array = points - centroid
+            look = vg.normalize(centerpoint - centroid).reshape((3,))  # Inwards to the polytope, 3x1
+            # print('look', look.shape)
+            # look_array = np.repeat(look, points.shape[1], axis=1)
+            angles = vg.signed_angle(vec1_array.T, vec_array.T, look, units='rad')
+
+            sorted_idx = np.argsort(angles)
+            sorted_points = [face_points[i] for i in sorted_idx]
+            face_list_sorted.append(sorted_points)
+
+        return face_list_sorted
 
     # Create a convex polytope around elements of set_yes that contains zero elements of set_no
     def build_safe_polytope(self):
@@ -1230,14 +1256,15 @@ class SafeConvexPolytope:
             z_max = domain[2, 1]
 
             # Plot the points
-            if self._n_dim == 3:
-                pu.plot_points_3(ah, points_yes, "o", "g")
-                pu.plot_points_3(ah, points_no, "X", "r", alpha=0.2)
-            else:
-                pu.plot_points_3(ah, points_yes[self.plotting_mask, :], "o", "g")
-                pu.plot_points_3(
-                    ah, points_no[self.plotting_mask, :], "X", "r", alpha=0.2
-                )
+            if self._plot_points:
+                if self._n_dim == 3:
+                    pu.plot_points_3(ah, points_yes, "o", "g")
+                    pu.plot_points_3(ah, points_no, "X", "r", alpha=0.2)
+                else:
+                    pu.plot_points_3(ah, points_yes[self.plotting_mask, :], "o", "g")
+                    pu.plot_points_3(
+                        ah, points_no[self.plotting_mask, :], "X", "r", alpha=0.2
+                    )
 
             # Get the object to plot
             if self._reduced_polytope is not None:
@@ -1361,6 +1388,7 @@ class SafeConvexPolytope:
             eqns[i, :] = sign * eqn
         vertices = unscaled_polytope.get_points()
         print(vertices)
+        (_, _, _, ellipsoid_coeffs) = unscaled_polytope.ellipsoid_fit()  # Construct fitted ellipsoid
 
         header_txt = ",".join(self.axis_label_list)
         np.savetxt(
@@ -1390,6 +1418,14 @@ class SafeConvexPolytope:
         np.savetxt(
             "{}/vertices.csv".format(output_path),
             vertices.transpose(),
+            fmt="%15.1f",
+            delimiter=",",
+            header=header_txt,
+            comments="",
+        )
+        np.savetxt(
+            "{}/ellipsoid.csv".format(output_path),
+            ellipsoid_coeffs.transpose(),
             fmt="%15.1f",
             delimiter=",",
             header=header_txt,

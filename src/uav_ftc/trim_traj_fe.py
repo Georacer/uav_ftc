@@ -294,9 +294,9 @@ class FlightEnvelope:
         )
 
         # Pass the variable strings
-        string_Va = "Va"
-        string_gamma = "Gamma"
-        string_psi_dot = "psi_dot"
+        string_Va = "$V_a (m/s)$"
+        string_gamma = "$\gamma (rad)$"
+        string_psi_dot = "$\dot{\psi} (rad/s)$"
         string_list = [string_Va, string_gamma, string_psi_dot]
         safe_poly.axis_label_list = list(
             it.compress(string_list, np.invert(self._list_fixed))
@@ -338,6 +338,12 @@ class FlightEnvelope:
 
 @click.command()
 @click.option(
+    "-m",
+    "--model-name",
+    default="skywalker_2013_mod",
+    help="last_letter_lib UAV model name"
+)
+@click.option(
     "-p", "--plot", is_flag=True, help="Enable plotting. Only for 2D and 3D problems."
 )
 @click.option(
@@ -359,18 +365,18 @@ class FlightEnvelope:
     default=True,
     help="Enable verbose output",
 )
-def test_code(plot, interactive, export_path, verbose):
+def test_code(model_name, plot, interactive, export_path, verbose):
 
-    uav_name = "skywalker_2013_mod"
-    flight_envelope = FlightEnvelope(uav_name)
+    flight_envelope = FlightEnvelope(model_name)
     flight_envelope.flag_verbose = verbose
 
     flight_envelope.flag_plot = plot
     flight_envelope.flag_interactive = interactive
+    # Set the limits of the search domain
     flight_envelope.set_domain_Va((5, 25))
     flight_envelope.set_domain_gamma((-30, 30))
     flight_envelope.set_R_min(100)
-    flight_envelope.initialize(uav_name)
+    flight_envelope.initialize(model_name)
 
     safe_poly = flight_envelope.find_flight_envelope()
     safe_poly._flag_verbose = verbose
