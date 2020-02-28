@@ -2,6 +2,7 @@
 #include <visualization_msgs/MarkerArray.h>
 
 #include <uav_ftc/BusData.h>
+#include <uav_ftc/FlightEnvelopeEllipsoid.h>
 #include "path_controller.hpp"
 
 class PathControllerROS {
@@ -9,6 +10,7 @@ class PathControllerROS {
     PathControllerROS(ros::NodeHandle);
     void cb_update_uav_states(const uav_ftc::BusData::ConstPtr& nav_msg);
     void cb_update_path(const visualization_msgs::MarkerArray::ConstPtr& path_msg);
+    void cb_update_flight_envelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg);
     void step();
 
     private:
@@ -20,6 +22,7 @@ class PathControllerROS {
     ros::Publisher pub_uav_cmd_;
     ros::Subscriber sub_uav_state_;
     ros::Subscriber sub_uav_path_;
+    ros::Subscriber sub_flight_envelope_;
     Vector4d uav_state_;
     bool did_receive_wps{false};
     bool did_receive_state{false};

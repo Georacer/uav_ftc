@@ -4,6 +4,8 @@
 #include <eigen3/Eigen/SVD>
 #include <nlopt.h>
 
+#include <math_utils.hpp>
+
 namespace {
     using namespace std;
     using namespace Eigen;
@@ -46,14 +48,19 @@ class PathController {
     PathController(const PathControllerSettings& s);
     ~PathController();
     VectorXd uav_model(Vector4d state, Vector3d inputs);
+    void set_fe_ellipsoid(const Ellipsoid3DCoefficients_t);
     MatrixXd propagate_model(MatrixXd inputs);
     double cost_function(unsigned int n, const double* x, double* grad);
+    MatrixXd obstacle_constraints(const MatrixXd trajectory);
+    VectorXd flight_envelope_constraints(const MatrixXd trajectory);
     void constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad);
     void step(Vector4d uav_state, Vector3d waypoint);
     Vector3d input_result; // Ouptut from the optimizer
 
     private:
     PathControllerSettings pc_settings_;
+    Ellipsoid3DCoefficients_t default_fe_coeffs_ = {1000.0, 1000.0, 1000.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  // Assign very large coeffs on squares to force always valid
+    Ellipsoid3D fe_ellipsoid_;
     Vector4d uav_state_;
     Vector4d state_target_;
     Vector3d input_target_;

@@ -8,7 +8,9 @@
 #include <math_utils.hpp>
 
 
-PathController::PathController(const PathControllerSettings& s) {
+PathController::PathController(const PathControllerSettings& s)
+    : fe_ellipsoid_(default_fe_coeffs_)  // Assign very large coeffs on squares to force always valid
+{
     pc_settings_ = s;
     state_target_.setZero();
     dt_ = s.dt;
@@ -39,6 +41,7 @@ PathController::PathController(const PathControllerSettings& s) {
     input_target_ << 0, 0, 15;
     
     int num_constraints = pc_settings_.obstacles.rows();
+    // TODO: enrich constraints with FE (1xnum_samples+1 )
     double constraints_tol[num_constraints*(pc_settings_.num_samples+1)];
     for (int k = 0; k < num_constraints*(pc_settings_.num_samples+1); k++)
         constraints_tol[k] = 0.01;
@@ -47,7 +50,7 @@ PathController::PathController(const PathControllerSettings& s) {
                                      num_constraints*(pc_settings_.num_samples+1),
                                      constraints_wrapper,
                                      this,
-                                     constraints_tol); //NO CONSTRAINTS
+                                     constraints_tol);
 
     //Initialize MPC Parameters
     
@@ -85,6 +88,12 @@ VectorXd PathController::uav_model(Vector4d state, Vector3d inputs) {
     ndot << pndot, pedot, hdot, psidot;
 
     return ndot;
+}
+
+// Set the flight envelope ellipsoid coeffients anew
+void PathController::set_fe_ellipsoid(const Ellipsoid3DCoefficients_t new_coeffs)
+{
+    fe_ellipsoid_.update_coeffs(new_coeffs);
 }
 
 MatrixXd PathController::propagate_model(MatrixXd inputs)
@@ -162,14 +171,65 @@ double PathController::cost_function(unsigned int n, const double* x, double* gr
     return Ji + Jt;
 }
 
+/**
+ * @brief Evaluate the inequalities referring to the obstacle constraints
+ * 
+ * @param trajectory The num_states x (num_samples+1) MatrixXd projected trajectory of the UAV
+ * @return MatrixXd The num_obstacles x (num_samples+1) matrix of inequality evaluations
+ */
+MatrixXd PathController::obstacle_constraints(const MatrixXd trajectory)
+{
+    const int num_states = pc_settings_.num_states;
+    const int num_samples = pc_settings_.num_samples;
+    const int num_obstacles = pc_settings_.obstacles.rows();
+    MatrixXd ineq_evaluations(num_obstacles, num_samples+1); // Allocate result
+
+    // Check constraint validity for each time sample
+    for (int i = 0; i < num_samples + 1; i++){ // Sample iterator
+        MatrixXd obstacle_pos = pc_settings_.obstacles.leftCols<3>(); // Isolate obstacle positions
+        VectorXd obstacle_rad = pc_settings_.obstacles.rightCols<1>(); // Isolate obstacle radii
+        VectorXd projected_state = trajectory.block(0, i, num_states, 1); // Isolate propagated state instance
+
+        // Calculate squared distance of uav from obstacles surface
+        VectorXd cons_vector(num_obstacles); // Constraints vector for this sample
+        for (int j=0; j<num_obstacles; ++j){
+            Vector3d rel_pos = projected_state.segment<3>(0) - obstacle_pos.row(j).transpose();
+            cons_vector(j) = pow(obstacle_rad(j), 2) - rel_pos.transpose()*rel_pos;
+        }
+
+        ineq_evaluations.block(0, i, num_obstacles, 1) = cons_vector;
+    }
+
+    return ineq_evaluations;
+}
+
+/**
+ * @brief Evaluate the inequality refierring the flight envelope
+ * 
+ * @param trajectory The num_states x (num_samples+1) MatrixXd projected trajectory of the UAV
+ * @return VectorXd The (num_samples+1) x 1 vector of inequality evaluations
+ */
+VectorXd PathController::flight_envelope_constraints(const MatrixXd trajectory)
+{
+    VectorXd fe_evaluations;
+    return fe_evaluations;
+}
+
+// Constraints to the MPC
 void PathController::constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad)
 {
     // Copy over much-used constants
     const int num_states = pc_settings_.num_states;
     const int num_inputs = pc_settings_.num_inputs;
     const int num_samples = pc_settings_.num_samples;
+    const int num_obstacles = pc_settings_.obstacles.rows();
+
+    // Calculate how many are the (leading) constraints referring to obstacles
+    const int num_ineq_for_obstacles = num_obstacles*(num_samples+1);
 
     MatrixXd inputs = Map<Matrix<double, 3, 4> > ((double*) x); // This works
+
+    // Other Eigen::Map formulations which didn't work for some reason
 
     // Matrix<double, Dynamic, Dynamic, RowMajor> inputs;
     // inputs.resize(num_inputs, num_samples);
@@ -194,24 +254,13 @@ void PathController::constraints(unsigned int m, double* c, unsigned int n, cons
 
     //Trajectory of States 
     MatrixXd traj_n(num_states, num_samples+1);
-    traj_n = propagate_model(inputs);
+    traj_n = propagate_model(inputs);  // traj_n: num_states x num_samples+1
 
-    // Check constraint validity for each time sample
+    MatrixXd obstacle_ineqs = obstacle_constraints(traj_n);
+    // Convert squared distances to C-style array
     for (int i = 0; i < num_samples + 1; i++){ // Sample iterator
-        MatrixXd obstacle_pos = pc_settings_.obstacles.leftCols<3>(); // Isolate obstacle positions
-        VectorXd obstacle_rad = pc_settings_.obstacles.rightCols<1>(); // Isolate obstacle radii
-
-        // Calculate squared distance of uav from obstacles surface
-        int num_obstacles = pc_settings_.obstacles.rows();
-        VectorXd cons_vector(num_obstacles); // Constraints vector for this sample
-        for (int j=0; j<num_obstacles; ++j){
-            Vector3d rel_pos = uav_state_.segment<3>(0) - obstacle_pos.row(j).transpose();
-            cons_vector(j) = pow(obstacle_rad(j), 2) - rel_pos.transpose()*rel_pos;
-        }
-
-        // Convert squared distances to C-style array
         for (int j = 0; j<num_obstacles; ++j){ // Obstacle iterator
-            c[num_obstacles*i+j] = cons_vector(j);
+            c[num_obstacles*i+j] = obstacle_ineqs(j, i);
         }
     }
 }

@@ -19,7 +19,11 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
     sub_uav_state_ = nh.subscribe<uav_ftc::BusData>("dataBus", 100, &PathControllerROS::cb_update_uav_states, this);
     sub_uav_path_ = nh.subscribe<visualization_msgs::MarkerArray>("waypoints", 100,
                                                                   &PathControllerROS::cb_update_path, this);
+    sub_flight_envelope_ = nh.subscribe<uav_ftc::FlightEnvelopeEllipsoid>(
+        "flight_envelope", 1, &PathControllerROS::cb_update_flight_envelope, this);
+
 }
+
 /**
  * @brief Callback to read the state of the UAV
  * 
@@ -63,6 +67,24 @@ void PathControllerROS::cb_update_path(const visualization_msgs::MarkerArray::Co
     }
 
     return;
+}
+
+void PathControllerROS::cb_update_flight_envelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
+{
+    Ellipsoid3DCoefficients_t coeffs = {
+        fe_msg->el_A,
+        fe_msg->el_B,
+        fe_msg->el_C,
+        fe_msg->el_D,
+        fe_msg->el_E,
+        fe_msg->el_F,
+        fe_msg->el_G,
+        fe_msg->el_H,
+        fe_msg->el_I,
+        fe_msg->el_J,
+    };
+    path_controller.set_fe_ellipsoid(coeffs);
+    // TODO: could also pass box constraints provided in fe_msg
 }
 
 void PathControllerROS::step()

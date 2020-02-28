@@ -1,3 +1,4 @@
+// DEPRECATE THIS! trajectory_controller_solver.cpp is more advanced by now
 #include "acado_toolkit.hpp"
 #include "acado_code_generation.hpp"
 #include "acado_gnuplot.hpp"
