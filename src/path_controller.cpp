@@ -72,8 +72,8 @@ PathController::PathController(const PathControllerSettings& s)
     Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
     R_.setIdentity(num_inputs, num_inputs);
-    R_(0,0) = 100.0;
-    R_(1,1) = 100.0;
+    R_(0,0) = 500.0;
+    R_(1,1) = 500.0;
     R_(2,2) = 1000.0;
 
     P_.setIdentity(num_states, num_states);
