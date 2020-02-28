@@ -52,14 +52,14 @@ class PathController {
     MatrixXd propagate_model(MatrixXd inputs);
     double cost_function(unsigned int n, const double* x, double* grad);
     MatrixXd obstacle_constraints(const MatrixXd trajectory);
-    VectorXd flight_envelope_constraints(const MatrixXd trajectory);
+    VectorXd flight_envelope_constraints(const MatrixXd inputs);
     void constraints(unsigned int m, double* c, unsigned int n, const double* x, double* grad);
     void step(Vector4d uav_state, Vector3d waypoint);
     Vector3d input_result; // Ouptut from the optimizer
 
     private:
     PathControllerSettings pc_settings_;
-    Ellipsoid3DCoefficients_t default_fe_coeffs_ = {1000.0, 1000.0, 1000.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  // Assign very large coeffs on squares to force always valid
+    Ellipsoid3DCoefficients_t default_fe_coeffs_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0};  // Assign coeffs which always evaluate true
     Ellipsoid3D fe_ellipsoid_;
     Vector4d uav_state_;
     Vector4d state_target_;

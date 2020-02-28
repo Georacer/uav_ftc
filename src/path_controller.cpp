@@ -15,14 +15,16 @@ PathController::PathController(const PathControllerSettings& s)
     state_target_.setZero();
     dt_ = s.dt;
 
-    opt = nlopt_create(NLOPT_LN_COBYLA, pc_settings_.num_inputs*pc_settings_.num_samples); /* algorithm and dimensionality */
+    const int num_inputs = pc_settings_.num_inputs;
+    const int num_samples = pc_settings_.num_samples;
+    opt = nlopt_create(NLOPT_LN_COBYLA, num_inputs*num_samples); /* algorithm and dimensionality */
     //nlopt_set_population(opt, 10);
 
     /* Initialize Optimization*/
-    double inputs_lb_arr[pc_settings_.num_inputs*pc_settings_.num_samples];
-    double inputs_ub_arr[pc_settings_.num_inputs*pc_settings_.num_samples];
+    double inputs_lb_arr[num_inputs*num_samples];
+    double inputs_ub_arr[num_inputs*num_samples];
     
-    for (int i = 0; i < pc_settings_.num_inputs*pc_settings_.num_samples ; i+=3){
+    for (int i = 0; i < num_inputs*num_samples ; i+=3){
         inputs_lb_arr[i] = s.input_constraints.psi_dot_min; //turn rate rad/s
         inputs_lb_arr[i+1] = s.input_constraints.gamma_min; //flight path angle rad
         inputs_lb_arr[i+2] = s.input_constraints.va_min; //velocity Va m/s
@@ -40,32 +42,41 @@ PathController::PathController(const PathControllerSettings& s)
 
     input_target_ << 0, 0, 15;
     
-    int num_constraints = pc_settings_.obstacles.rows();
-    // TODO: enrich constraints with FE (1xnum_samples+1 )
-    double constraints_tol[num_constraints*(pc_settings_.num_samples+1)];
-    for (int k = 0; k < num_constraints*(pc_settings_.num_samples+1); k++)
+    // Setup optimization constraints
+    // Convention:
+    // Row-major C-array. Each row hosts num_obstacles+1 constraints, i.e. each column is one obstacle
+    // Each row is one time sample
+    // AND APPENDED
+    // appended to that are num_samples constraints one for each Flight Envelope evaluation
+    const int num_states = pc_settings_.num_states;
+    const int num_obstacles = pc_settings_.obstacles.rows();
+
+    const int num_obstacle_constraints = num_obstacles*(num_samples+1);
+    const int num_fe_constraints = num_samples;
+    int num_constraints = num_obstacle_constraints + num_fe_constraints; // Plus the Flight Envelope constraints
+    double constraints_tol[num_constraints];
+    for (int k = 0; k < num_constraints; k++)
         constraints_tol[k] = 0.01;
-    // add constraints
     nlopt_add_inequality_mconstraint(opt,
-                                     num_constraints*(pc_settings_.num_samples+1),
+                                     num_constraints,
                                      constraints_wrapper,
                                      this,
                                      constraints_tol);
 
     //Initialize MPC Parameters
     
-    Q_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
+    Q_.setIdentity(num_states, num_states);
     Q_(0,0) = 1.0;
     Q_(1,1) = 1.0;
     Q_(2,2) = 1.0;
     Q_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 
-    R_.setIdentity(pc_settings_.num_inputs, pc_settings_.num_inputs);
+    R_.setIdentity(num_inputs, num_inputs);
     R_(0,0) = 100.0;
     R_(1,1) = 100.0;
     R_(2,2) = 1000.0;
 
-    P_.setIdentity(pc_settings_.num_states, pc_settings_.num_states);
+    P_.setIdentity(num_states, num_states);
     P_ = 5.0*Q_;
     P_(3,3) = 0.0; // Do not penalize heading error, it is not passed as a requirement.
 }
@@ -194,7 +205,7 @@ MatrixXd PathController::obstacle_constraints(const MatrixXd trajectory)
         VectorXd cons_vector(num_obstacles); // Constraints vector for this sample
         for (int j=0; j<num_obstacles; ++j){
             Vector3d rel_pos = projected_state.segment<3>(0) - obstacle_pos.row(j).transpose();
-            cons_vector(j) = pow(obstacle_rad(j), 2) - rel_pos.transpose()*rel_pos;
+            cons_vector(j) = pow(obstacle_rad(j), 2) - rel_pos.transpose()*rel_pos; // <0 is a non-violated constraint
         }
 
         ineq_evaluations.block(0, i, num_obstacles, 1) = cons_vector;
@@ -206,12 +217,24 @@ MatrixXd PathController::obstacle_constraints(const MatrixXd trajectory)
 /**
  * @brief Evaluate the inequality refierring the flight envelope
  * 
- * @param trajectory The num_states x (num_samples+1) MatrixXd projected trajectory of the UAV
- * @return VectorXd The (num_samples+1) x 1 vector of inequality evaluations
+ * @param inputs The num_inputs x num_samples UAV inputs (psi_dot, gamma, Va)
+ * @return VectorXd The num_samples x 1 vector of inequality evaluations
  */
-VectorXd PathController::flight_envelope_constraints(const MatrixXd trajectory)
+VectorXd PathController::flight_envelope_constraints(const MatrixXd inputs)
 {
-    VectorXd fe_evaluations;
+    const int num_inputs = pc_settings_.num_inputs;
+    const int num_samples = pc_settings_.num_samples;
+    VectorXd fe_evaluations(num_samples);
+
+    // Check constraint validity for each time sample
+    for (int i = 0; i < num_samples; i++) // Sample iterator
+    {
+        double psi_dot = inputs(0,i);
+        double gamma = inputs(1,i);
+        double Va = inputs(2,i);
+
+        fe_evaluations(i) = fe_ellipsoid_.evaluate(Va, gamma, psi_dot); // Shall evaluate <0 for points inside the ellipsoid
+    }
     return fe_evaluations;
 }
 
@@ -256,13 +279,24 @@ void PathController::constraints(unsigned int m, double* c, unsigned int n, cons
     MatrixXd traj_n(num_states, num_samples+1);
     traj_n = propagate_model(inputs);  // traj_n: num_states x num_samples+1
 
+    // Evaluate obstacle constraints
     MatrixXd obstacle_ineqs = obstacle_constraints(traj_n);
-    // Convert squared distances to C-style array
+    // Convert obstacle constraints to C-style array
     for (int i = 0; i < num_samples + 1; i++){ // Sample iterator
-        for (int j = 0; j<num_obstacles; ++j){ // Obstacle iterator
+        for (int j = 0; j<num_obstacles; j++){ // Obstacle iterator
             c[num_obstacles*i+j] = obstacle_ineqs(j, i);
         }
     }
+
+    // Evaluate FE constraints
+    VectorXd fe_ineq = flight_envelope_constraints(inputs);
+    // Append n_samples more FE constraints
+    const int num_obstacle_constraints = num_obstacles*(num_samples+1);
+    for (int i = 0; i < num_samples; i++)
+    {
+        c[i+num_obstacle_constraints] = fe_ineq(i);
+    }
+
 }
 
 void PathController::step(Vector4d state, Vector3d waypoint){
