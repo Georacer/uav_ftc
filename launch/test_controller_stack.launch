@@ -25,10 +25,10 @@
         </node> -->
 
         <!-- Launch the flight envelope estimator -->
-        <!-- <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
         <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
             <param name="uav_name" value="$(arg uav_name)"/>
-        </node>  -->
+        </node> 
 
         <!-- Visualization nodes -->
         <!-- Wind estimates-->
@@ -60,6 +60,7 @@
         <!-- Raise velocity controller -->
         <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
         <!-- Raise path controller -->
+        <!-- <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>  -->
         <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
 
         <!-- Raise input aggreggator node -->

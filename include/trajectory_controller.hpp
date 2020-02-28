@@ -5,6 +5,7 @@
 #include <Eigen/Eigen>
 
 #include <uav_ftc/BusData.h>
+#include <uav_ftc/FlightEnvelopeEllipsoid.h>
 #include <last_letter_msgs/Environment.h>
 #include <last_letter_msgs/Parameter.h>
 
@@ -81,7 +82,7 @@ private:
     Eigen::Vector4f refInputs_; // Stores reference inputs
     Eigen::Vector4f predictedControls_; // Stores control outputs
     ros::Time tprev;
-    ros::Subscriber subState, subRef, subEnvironment, subParam;
+    ros::Subscriber subState, subRef, subEnvironment, subParam, subFE;
     ros::Publisher pubCmdRates, pubCmdThrottle;
     float dt_ = 0.2;
     int numConstraints_ = 4;
@@ -103,6 +104,7 @@ public:
     void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
     void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
     void getParameters(last_letter_msgs::Parameter parameter);  // Callback to capture parameter changes
+    void getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr&); // Callback to capture Flight Envelope ellipsoid parameters
     void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
     void writeOutput();                                         // Send control signals to the control inputs aggregator
     void getDefaultParameters(std::string uavName);             // Read necessary UAV parameters

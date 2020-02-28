@@ -74,6 +74,7 @@ void PathControllerROS::cb_update_path(const visualization_msgs::MarkerArray::Co
 
 void PathControllerROS::cb_update_flight_envelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
 {
+    ROS_INFO("Received new Flight Envelope");
     Ellipsoid3DCoefficients_t coeffs = {
         fe_msg->el_A,
         fe_msg->el_B,

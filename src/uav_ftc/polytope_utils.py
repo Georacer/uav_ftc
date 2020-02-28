@@ -419,6 +419,11 @@ class SafeConvexPolytope:
             raise IndexError("Eps dimension mismatch")
         self.eps = eps
 
+    # Return a polytope whose scale is not normalized
+    # Used for plotting and extracting actual FE values
+    def get_unscaled_polytope(self):
+        return self._polytope.scale(self.eps.reshape(self._n_dim, 1))
+
     def set_sampling_method(self, method):
         self._sampling_method = method
 
@@ -820,6 +825,7 @@ class SafeConvexPolytope:
     def _get_face_points(self, polytope):
         face_list = []
         all_points = polytope.get_points()
+        # print('all_points', all_points.shape)
         centerpoint = self.get_centroid(all_points)  # 3x1
         all_equations = polytope.get_equations()
         multiplier = 10**(-3) # Same as significant decimal places of polyotpe
@@ -1031,9 +1037,7 @@ class SafeConvexPolytope:
         if self._n_dim != 3:
             raise RuntimeError('Ellispoid fitting is only available for 3 dimensions')
 
-        unscaled_polytope = self._polytope.scale(
-            self.eps.reshape(self._n_dim, 1)
-        )
+        unscaled_polytope = self.get_unscaled_polytope()
         points = unscaled_polytope.get_points()
         center, evecs, radii, v = el_fit.ellipsoid_fit(points.T)
         self._el_center = center
@@ -1343,9 +1347,7 @@ class SafeConvexPolytope:
             polytope = self._polytope
 
 
-        unscaled_polytope = polytope.scale(
-            self.eps.reshape(self._n_dim, 1)
-        )
+        unscaled_polytope = self.get_unscaled_polytope()
         eqns = unscaled_polytope.get_equations()
         divisor = max(np.abs(eqns).min(), 1)
         eqns = eqns / divisor

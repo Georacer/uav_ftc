@@ -233,7 +233,7 @@ VectorXd PathController::flight_envelope_constraints(const MatrixXd inputs)
         double gamma = inputs(1,i);
         double Va = inputs(2,i);
 
-        fe_evaluations(i) = fe_ellipsoid_.evaluate(Va, gamma, psi_dot); // Shall evaluate <0 for points inside the ellipsoid
+        fe_evaluations(i) = -fe_ellipsoid_.evaluate(Va, gamma, psi_dot); // Shall evaluate <0 for points inside the ellipsoid
     }
     return fe_evaluations;
 }
@@ -414,14 +414,14 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
 
     // Update the waypoint in case the wp_counter_ has increased
     wp_next = waypoints_.row(wp_counter_).transpose().segment<2>(0); 
-    std::cout << "Desired waypoint: " << wp_next.transpose() <<  " with idx " << wp_counter_ << std::endl;
+    // std::cout << "Desired waypoint: " << wp_next.transpose() <<  " with idx " << wp_counter_ << std::endl;
 
     // Obtain the leading tracking waypoint (which is ahead of the current wp) 
     // int wp_idx = get_current_wp_idx(pos);
     int wp_idx = wp_counter_ + num_wp_lookahead_;
 
     Vector3d tracking_wp = waypoints_.row(wp_idx).transpose();
-    std::cout << "Leash waypoint index: " << wp_idx << " @ location " << tracking_wp.transpose() << std::endl;
+    // std::cout << "Leash waypoint index: " << wp_idx << " @ location " << tracking_wp.transpose() << std::endl;
     return tracking_wp;
 }
 

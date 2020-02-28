@@ -82,6 +82,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     subState = n.subscribe("dataBus", 1, &TrajectoryController::getStates, this);
     subRef = n.subscribe("refTrajectory", 1, &TrajectoryController::getReference, this);
     subParam = n.subscribe("parameter_changes", 100, &TrajectoryController::getParameters, this);
+    subFE = n.subscribe<uav_ftc::FlightEnvelopeEllipsoid>("flight_envelope", 1, &TrajectoryController::getFlightEnvelope, this);
     pubCmdRates = n.advertise<geometry_msgs::Vector3Stamped>("refRates", 1);
     pubCmdThrottle = n.advertise<geometry_msgs::Vector3Stamped>("throttleCmd", 1);
 }
@@ -377,6 +378,22 @@ void TrajectoryController::getDefaultParameters(std::string uavName)
     }
     trimOnlineData_(kOdSize) = -1;
     // ... and set constant term to negative
+}
+
+void TrajectoryController::getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
+{
+    ROS_INFO("Received new Flight Envelope");
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_A, fe_msg->el_A);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_B, fe_msg->el_B);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_C, fe_msg->el_C);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_D, fe_msg->el_E);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_E, fe_msg->el_D);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_F, fe_msg->el_F);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_G, fe_msg->el_G);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_H, fe_msg->el_H);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_I, fe_msg->el_I);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_J, fe_msg->el_J);
+    // TODO: could also pass box constraints provided in fe_msg
 }
 
 
