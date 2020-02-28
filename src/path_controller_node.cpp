@@ -13,6 +13,10 @@ constexpr int k_mpc_number_of_samples = 4;
 PathControllerROS::PathControllerROS(ros::NodeHandle nh)
     : path_controller{get_controller_settings(nh)} {
 
+    double wp_radius;
+    ros::param::param<double>("waypointRadius", wp_radius, 10);
+    waypoint_mngr_.set_goal_radius(wp_radius);
+
     //Create Publishers
     pub_uav_cmd_ = nh.advertise<geometry_msgs::Vector3Stamped>("refTrajectory", 10);
     //Create Subscribers
@@ -21,7 +25,6 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
                                                                   &PathControllerROS::cb_update_path, this);
     sub_flight_envelope_ = nh.subscribe<uav_ftc::FlightEnvelopeEllipsoid>(
         "flight_envelope", 1, &PathControllerROS::cb_update_flight_envelope, this);
-
 }
 
 /**
