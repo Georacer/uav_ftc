@@ -53,7 +53,7 @@ std::vector<std::string> online_data_names {
     "c_n_pn",
     "c_n_rn",
     "c_n_deltaa",
-    "c_n_deltar",
+    "c_n_deltar"
 };
 
 class RateController
@@ -71,7 +71,7 @@ private:
     ros::Subscriber subState, subRef, subParam;
     ros::Publisher pubCtrl;
     float dt_ = 0.02;
-    int numConstraints_ = 19; // TODO: Does this need fixing?
+    int numConstraints_ = 3;
     bool statesReceivedStatus_ = false;
 
     //////////

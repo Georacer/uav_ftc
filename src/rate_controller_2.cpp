@@ -45,8 +45,6 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     // Initialize MPC wrapper
 
     // Set default model parameters
-	string uavName;
-	n.getParam("uav_name", uavName);
 
     // Set default/initial states
     Eigen::Matrix<real_t, 3, 1> trimState = Eigen::Matrix<real_t, 3, 1>::Zero();
@@ -68,7 +66,8 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     trimOnlineData_(0) = states_.airspeed;
     trimOnlineData_(1) = states_.angle_of_attack;
     trimOnlineData_(2) = states_.angle_of_sideslip;
-    // Restore aerodynamic parameters online data AFTER controller reset
+	string uavName;
+	n.getParam("uav_name", uavName);
     getDefaultParameters(uavName);
     mpcController_.setTrimOnlineData(trimOnlineData_);
 
@@ -237,7 +236,7 @@ void RateController::getParameters(last_letter_msgs::Parameter parameter)
             return;
         }
     }
-    ROS_INFO("New parameter not included in Rate Controller MPC model");
+    // ROS_INFO("New parameter not included in Rate Controller MPC model");
 }
 
 /**
@@ -262,7 +261,6 @@ void RateController::getDefaultParameters(std::string uavName)
         // ROS_INFO("Getting default value for %s", param_name.c_str());
         trimOnlineData_(i) = configStruct.aero[param_name].as<float>();
     }
-    std::cout << "Build trimOnlineData vector:\n" << trimOnlineData_ << std::endl;
 }
 
 ///////////////
