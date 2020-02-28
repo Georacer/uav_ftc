@@ -43,26 +43,19 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     states_.header.stamp = tprev;
 
     // Initialize MPC wrapper
+
     // Set default model parameters
 	string uavName;
 	n.getParam("uav_name", uavName);
+
     // Set default/initial states
     Eigen::Matrix<real_t, 3, 1> trimState = Eigen::Matrix<real_t, 3, 1>::Zero();
     mpcController_.setTrimState(trimState);
+
     // Set default/initial inputs
     Eigen::Matrix<real_t, 3, 1> trimInput = Eigen::Matrix<real_t, 3, 1>::Zero();
     mpcController_.setTrimInput(trimInput);
-    // Set default/initial online data
-	Eigen::Quaterniond tempQuat(states_.orientation.w, states_.orientation.x, states_.orientation.y, states_.orientation.z);
-    Eigen::Vector3d tempVect(quat2euler(tempQuat));
-    Eigen::Matrix<real_t, 5, 1> trimOnlineData = (Eigen::Matrix<real_t, 5, 1>() << 
-        states_.airspeed,
-        states_.angle_of_attack,
-        states_.angle_of_sideslip,
-        tempVect.x(), // Pass phi
-        tempVect.y() // Pass theta
-        ).finished();
-    mpcController_.setTrimOnlineData(trimOnlineData);
+
     // Initialize default reference
     refRates_ << 0.0f, 0.0f, 0.0f;
     refInputs_ << 0.0f, 0.0f, 0.0f;
@@ -70,9 +63,17 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     reference << refRates_, refInputs_;
     mpcController_.setDefaultRunningReference(reference);
     mpcController_.setDefaultEndReference(refRates_);
+
+    // Capture trim/default online data values
+    trimOnlineData_(0) = states_.airspeed;
+    trimOnlineData_(1) = states_.angle_of_attack;
+    trimOnlineData_(2) = states_.angle_of_sideslip;
+    // Restore aerodynamic parameters online data AFTER controller reset
+    getDefaultParameters(uavName);
+    mpcController_.setTrimOnlineData(trimOnlineData_);
+
     // Mandatory controller setup 
     mpcController_.resetController();
-    getDefaultParameters(uavName); // Restore aerodynamic parameters online data AFTER controller reset
     mpcController_.prepare();
 
     ROS_INFO("Initial rate MPC solver state:\n");
@@ -227,28 +228,20 @@ void RateController::getParameters(last_letter_msgs::Parameter parameter)
 
     ROS_INFO("Got new parameter %s with value %g", paramName.c_str(), paramValue);
 
-    if (paramName.compare("c_l_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_0, paramValue); return; }
-    if (paramName.compare("c_l_pn")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_p, paramValue); return; }
-    if (paramName.compare("c_l_beta")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_b, paramValue); return; }
-    if (paramName.compare("c_l_rn")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_r, paramValue); return; }
-    if (paramName.compare("c_l_deltae")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_de, paramValue); return; }
-    if (paramName.compare("c_l_deltar")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_dr, paramValue); return; }
-
-    if (paramName.compare("c_m_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_0, paramValue); return; }
-    if (paramName.compare("c_m_alpha")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_a, paramValue); return; }
-    if (paramName.compare("c_m_qn")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_q, paramValue); return; }
-    if (paramName.compare("c_m_deltae")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_de, paramValue); return; }
-
-    if (paramName.compare("c_n_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_0, paramValue); return; }
-    if (paramName.compare("c_n_beta")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_b, paramValue); return; }
-    if (paramName.compare("c_n_pn")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_p, paramValue); return; }
-    if (paramName.compare("c_n_rn")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_r, paramValue); return; }
-    if (paramName.compare("c_n_deltaa")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_da, paramValue); return; }
-    if (paramName.compare("c_n_deltar")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_dr, paramValue); return; }
+    for (int i=3; i < kOdSize; i++) // Skip Va, alpha, beta
+    {
+        std:string name_to_match = online_data_names[i];
+        if (paramName.compare(name_to_match))
+        {
+            mpcController_.setOnlineDataSingle(i, paramValue);
+            return;
+        }
+    }
+    ROS_INFO("New parameter not included in Rate Controller MPC model");
 }
 
 /**
- * @brief Read default uav parameters and pass them to the MPC
+ * @brief Read default uav parameters and fill the trimOnlineData_ vector
  * 
  * @param uavName The name of the uav to read from
  */
@@ -263,24 +256,13 @@ void RateController::getDefaultParameters(std::string uavName)
     getParameter(configStruct.aero, "airfoil1/deltae_max", deltae_max);
     getParameter(configStruct.aero, "airfoil1/deltar_max", deltar_max);
 
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_0, configStruct.aero["airfoil1/c_l_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_p, configStruct.aero["airfoil1/c_l_pn"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_b, configStruct.aero["airfoil1/c_l_beta"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_r, configStruct.aero["airfoil1/c_l_rn"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_de, configStruct.aero["airfoil1/c_l_deltaa"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_l_dr, configStruct.aero["airfoil1/c_l_deltar"].as<float>());
-
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_0, configStruct.aero["airfoil1/c_m_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_a, configStruct.aero["airfoil1/c_m_alpha"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_q, configStruct.aero["airfoil1/c_m_qn"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_m_de, configStruct.aero["airfoil1/c_m_deltae"].as<float>());
-
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_0, configStruct.aero["airfoil1/c_n_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_b, configStruct.aero["airfoil1/c_n_beta"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_p, configStruct.aero["airfoil1/c_n_pn"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_r, configStruct.aero["airfoil1/c_n_rn"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_da, configStruct.aero["airfoil1/c_n_deltaa"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_n_dr, configStruct.aero["airfoil1/c_n_deltar"].as<float>());
+    for (int i=3; i < kOdSize; i++) // Skip Va, alpha, beta
+    {
+        std:string param_name = "airfoil1/" + online_data_names[i];
+        // ROS_INFO("Getting default value for %s", param_name.c_str());
+        trimOnlineData_(i) = configStruct.aero[param_name].as<float>();
+    }
+    std::cout << "Build trimOnlineData vector:\n" << trimOnlineData_ << std::endl;
 }
 
 ///////////////

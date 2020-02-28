@@ -100,7 +100,7 @@ bool MpcWrapper<T>::setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<
  * @brief Set the online data used by the model
  * 
  * @tparam T float or double
- * @param online_data airspeed, AoA, AoS
+ * @param online_data 
  * @return true 
  * @return false 
  */

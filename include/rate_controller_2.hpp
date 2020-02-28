@@ -32,6 +32,30 @@ enum class Parameter {
     c_n_dr
 };
 
+// Vector containing the corresponding names of the Online Data components
+// Starts with variables and states and ends with UAV parameters
+std::vector<std::string> online_data_names {
+    "Va",
+    "alpha",
+    "beta",
+    "c_l_0",
+    "c_l_pn",
+    "c_l_beta",
+    "c_l_rn",
+    "c_l_deltaa",
+    "c_l_deltar",
+    "c_m_0",
+    "c_m_alpha",
+    "c_m_qn",
+    "c_m_deltae",
+    "c_n_0",
+    "c_n_beta",
+    "c_n_pn",
+    "c_n_rn",
+    "c_n_deltaa",
+    "c_n_deltar",
+};
+
 class RateController
 {
 private:
@@ -39,7 +63,7 @@ private:
     // Variables
     uav_ftc::BusData states_; // Complete aircraft state
     Eigen::Vector3f angularStates_;     // p, q, r measurements
-    // Eigen::Vector3f airdata_;
+    Eigen::Matrix<real_t, kOdSize, 1> trimOnlineData_; // Vector holding default Online Data values
     Eigen::Vector3f refRates_, refInputs_;
     Eigen::Matrix<float, kInputSize, 1> predicted_controls_; // Stores control outputs, -1,1 range
     float deltaa_max, deltae_max, deltar_max;
