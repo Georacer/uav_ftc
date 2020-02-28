@@ -68,16 +68,15 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     endReference_ << trimState(0), trimState(1), 0.0f;
     mpcController_.setDefaultEndReference(endReference_);
 
-    // Mandatory controller setup 
-    mpcController_.resetController();
-
-    // Read propeller thrust curve
+    // Capture trim/default online data values
 	std::string uavName;
 	n.getParam("uav_name", uavName);
-    getDefaultParameters(uavName); // Read necessary uav parameters
+    getDefaultParameters(uavName);
+    mpcController_.setTrimOnlineData(trimOnlineData_);
 
+    // Mandatory controller setup 
+    mpcController_.resetController();
     mpcController_.prepare();
-
 
     //Subscribe and advertize
     subState = n.subscribe("dataBus", 1, &TrajectoryController::getStates, this);
@@ -301,25 +300,23 @@ void TrajectoryController::getParameters(last_letter_msgs::Parameter parameter)
     float paramValue = parameter.value;
     uint paramType = parameter.type;
 
-    if (paramType == 4) // Aerodynamic parameters
+    const int inertial_start_idx = 0;
+    const int aerodynamic_start_idx = inertial_start_idx + 1; // There is 1 inertial parameter
+    const int ellipsoid_start_idx = aerodynamic_start_idx + 9; // There are 9 aerodynamic parameters
+
+    if ((paramType == 3) || (paramType == 4)) // Inertial and aerodynamic parameters parameters
     {
         ROS_INFO("Got new parameter %s with value %g", paramName.c_str(), paramValue);
 
-        if (paramName.compare("s")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::S, paramValue); return; }
-        if (paramName.compare("b")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::b, paramValue); return; }
-        if (paramName.compare("r")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c, paramValue); return; }
-        if (paramName.compare("c_L_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_0, paramValue); return; }
-        if (paramName.compare("c_L_alpha")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_a, paramValue); return; }
-        if (paramName.compare("c_D_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_0, paramValue); return; }
-        if (paramName.compare("c_D_alpha")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_a, paramValue); return; }
-        if (paramName.compare("c_Y_0")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_0, paramValue); return; }
-        if (paramName.compare("c_Y_beta")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_b, paramValue); return; }
-    }
-    else if (paramType == 3) // Inertial parameters
-    {
-        ROS_INFO("Got new parameter %s with value %g", paramName.c_str(), paramValue);
-
-        if (paramName.compare("m")) { mpcController_.setOnlineDataSingle((unsigned int) Parameter::m, paramValue); return; }
+        for (int i=inertial_start_idx; i < ellipsoid_start_idx; i++) // Skip Va, alpha, beta
+        {
+            std:string name_to_match = online_data_names[i];
+            if (paramName.compare(name_to_match))
+            {
+                mpcController_.setOnlineDataSingle(i, paramValue);
+                return;
+            }
+        }
     }
     else // We don't care about other paramter types
     {
@@ -356,18 +353,30 @@ void TrajectoryController::getDefaultParameters(std::string uavName)
 
     getParameter(configStruct.prop, "motor1/omega_max", omega_max);
 
-    // Pass required parameters to MPC controller
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::S, configStruct.aero["airfoil1/s"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::b, configStruct.aero["airfoil1/b"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c, configStruct.aero["airfoil1/c"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_0, configStruct.aero["airfoil1/c_L_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_lift_a, configStruct.aero["airfoil1/c_L_alpha"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_0, configStruct.aero["airfoil1/c_D_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_drag_a, configStruct.aero["airfoil1/c_D_alpha"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_0, configStruct.aero["airfoil1/c_Y_0"].as<float>());
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::c_y_b, configStruct.aero["airfoil1/c_Y_beta"].as<float>());
+    // Setup trimOnlineData_ vector
+    const int inertial_start_idx = 0;
+    const int aerodynamic_start_idx = inertial_start_idx + 1; // There is 1 inertial parameter
+    const int ellipsoid_start_idx = aerodynamic_start_idx + 9; // There are 9 aerodynamic parameters
 
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::m, configStruct.inertial["m"].as<float>());
+    // Read inertial parameters
+    std::string param_name = online_data_names[(unsigned int) Parameter::m];
+    trimOnlineData_(0) = configStruct.inertial[param_name].as<float>();
+
+    // Read aerodynamic parameters
+    for (int i = aerodynamic_start_idx; i < ellipsoid_start_idx; i++)
+    {
+        std:string param_name = "airfoil1/" + online_data_names[i];
+        // ROS_INFO("Getting default value for %s", param_name.c_str());
+        trimOnlineData_(i) = configStruct.aero[param_name].as<float>();
+    }
+
+    // Build default ellipsoid parameters
+    for (int i = ellipsoid_start_idx; i < kOdSize; i++)
+    {
+        trimOnlineData_(i) = 0; // Set all to zero...
+    }
+    trimOnlineData_(kOdSize) = -1;
+    // ... and set constant term to negative
 }
 
 

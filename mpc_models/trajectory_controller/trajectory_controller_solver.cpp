@@ -29,12 +29,12 @@ int main()
 
   // Specify OnlineData which will be passed in real-time
   // CAUTION!!! This online data order must be reflected exactly in trajectory_controller.hpp
+  // Inertial data
+  OnlineData m;
   // Geometric data
   OnlineData S;
   OnlineData b;
   OnlineData c;
-  // Inertial data
-  OnlineData m;
   // Lift parameters
   OnlineData c_lift_0;
   OnlineData c_lift_a;
@@ -44,6 +44,17 @@ int main()
   // Sideforce parameters
   OnlineData c_y_0;
   OnlineData c_y_b;
+  // Ellipsoid Flight Envelope parameters
+  OnlineData el_A;
+  OnlineData el_B;
+  OnlineData el_C;
+  OnlineData el_D;
+  OnlineData el_E;
+  OnlineData el_F;
+  OnlineData el_G;
+  OnlineData el_H;
+  OnlineData el_I;
+  OnlineData el_J;
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
@@ -105,6 +116,18 @@ int main()
   // f << 0 == -psi_dot + (q*sph + r*cph)/cth;
   // f << 0 == -gamma + theta - alpha;
 
+  // Flight Envelope expression
+  Expression fe_value = el_A*Va*Va
+                      + el_B*gamma*gamma
+                      + el_C*psi_dot*psi_dot
+                      + 2*el_D*Va*gamma
+                      + 2*el_E*Va*psi_dot
+                      + 2*el_F*gamma*psi_dot
+                      + 2*el_G*Va
+                      + 2*el_H*gamma
+                      + 2*el_I*psi_dot
+                      + el_J;
+
   ////////
   // Costs
   ////////
@@ -164,10 +187,15 @@ int main()
   ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
   ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
 
+  // Flight Envelope constraint
+  ocp.subjectTo( fe_value <= 0 );
+
   // Other feasibility constraints
   // ocp.subjectTo(0 <= phi*psi_dot); // Force a positive-G maneuvera the end of the horizon
+
   // Set Number of Online Data
-  // ocp.setNOD(3); // No online data for this model
+  ocp.setNOD(20);
+
   if (!CODE_GEN)
   {
     // Set a reference for the analysis

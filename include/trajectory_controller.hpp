@@ -12,12 +12,12 @@
 // Used to easily access the online data array elements
 // WARNING: enumerator order must be the same as declared in the solver code
 enum class Parameter {
+    // Inertial data
+    m=0,
     // Geometric data
-    S=0,
+    S,
     b,
     c,
-    // Inertial data
-    m,
     // Lift parameters
     c_lift_0,
     c_lift_a,
@@ -26,7 +26,43 @@ enum class Parameter {
     c_drag_a,
     // Sideforce parameters
     c_y_0,
-    c_y_b
+    c_y_b,
+    // Ellipsoid Flight Envelope parameters
+    el_A,
+    el_B,
+    el_C,
+    el_D,
+    el_E,
+    el_F,
+    el_G,
+    el_H,
+    el_I,
+    el_J
+};
+
+// Vector containing the corresponding names of the Online Data components
+// Starts with UAV parameters and end with Flight Envelope parameters
+std::vector<std::string> online_data_names {
+    "m",
+    "s",
+    "b",
+    "c",
+    "c_L_0",
+    "c_L_alpha",
+    "c_D_0",
+    "c_D_alpha",
+    "c_Y_0",
+    "c_Y_beta",
+    "el_A",
+    "el_B",
+    "el_C",
+    "el_D",
+    "el_E",
+    "el_F",
+    "el_G",
+    "el_H",
+    "el_I",
+    "el_J"
 };
 
 class TrajectoryController
@@ -36,6 +72,7 @@ private:
     // Variables
     uav_ftc::BusData bus_data_; // Complete aircraft state
     Eigen::Matrix<float, kStateSize, 1> states_; // Va, alpha, beta, phi, theta
+    Eigen::Matrix<real_t, kOdSize, 1> trimOnlineData_; // Vector holding default Online Data values
     Eigen::Vector3f airdata_;
     Eigen::Vector3d wind_body_;
     Eigen::Matrix<float, kRefSize, 1> reference_; // Va, gamma, psi_dot, alpha, beta
