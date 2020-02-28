@@ -1,6 +1,10 @@
 #include <Eigen/Eigen>
 
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/Temperature.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <geometry_msgs/Point.h>
+
 #include <rosflight_msgs/RCRaw.h>
 #include <rosflight_msgs/OutputRaw.h>
 #include <rosflight_msgs/Attitude.h>
@@ -14,7 +18,7 @@
 
 using Eigen::Vector3d;
 using Eigen::Quaterniond;
-using geodetic_converter::GeodeticConverter
+using geodetic_converter::GeodeticConverter;
 
 class SubHandlerHW : public SubHandler
 {
@@ -38,9 +42,9 @@ class SubHandlerHW : public SubHandler
     void cb_imu_temp(sensor_msgs::Temperature msg);
     void cb_attitude(rosflight_msgs::Attitude msg);
     void cb_minidaq(minidaq::minidaq_peripherals msg);
-    void cb_gps(sensor_msgs::navSatFix msg);
+    void cb_gps(sensor_msgs::NavSatFix msg);
     void cb_input(rosflight_msgs::RCRaw msg);
-    void cb_output(last_letter_msgs::SimPWM msg);
+    void cb_output(rosflight_msgs::OutputRaw msg);
     Vector3d coords_to_ned(Vector3d coords, Vector3d coords_init);
 
 };
@@ -98,19 +102,22 @@ void SubHandlerHW::cb_minidaq(minidaq::minidaq_peripherals msg)
 
 void SubHandlerHW::cb_gps(sensor_msgs::NavSatFix msg)
 {
-    if (msg.fix == msg.FIX_TYPE_3D)
+    if (msg.status.status == msg.status.STATUS_FIX)
     {
         if (!did_set_home_)
         {
-            geodetic_converter.initializeReference(msg.latitude, msg.longitude, msg.alitutde);
+            geodetic_converter.initialiseReference(msg.latitude, msg.longitude, msg.altitude);
             did_set_home_ = true;
         }
         double n, e, d;
-        geodetic_converter.geodetic2Ned(msg.latitude, msg.longitdue, msg.altitude,
-                                       &n, &e, &d);
+        geodetic_converter.geodetic2Ned(msg.latitude, msg.longitude, msg.altitude,
+                                        &n, &e, &d);
 
-        geometry_msgs::Vector3 temp_vect_ros(n, e, d);
-        bus_data.position = temp_vect_ros;
+        geometry_msgs::Point temp_point;
+        temp_point.x = n;
+        temp_point.y = e;
+        temp_point.z = d;
+        bus_data.position = temp_point;
 
         // Use another message to capture velocity messages
         // bus_data.inertial_velocity.x = msg.pose.position.x;// NED frame
