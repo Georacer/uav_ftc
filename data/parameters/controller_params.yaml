@@ -20,4 +20,4 @@ referenceMax: [20.0,  0.52,  0.5] # Scaling factor of reference commands
 # referenceMin: [-1.0, -1.0, -0.5] # Minimum rate limits
 # referenceMax: [ 1.0,  1.0,  0.5] # Maximum rate limits
 
-waypointRadius: 20
+waypointRadius: 30
