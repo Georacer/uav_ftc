@@ -13,7 +13,9 @@ from nav_msgs.msg import Path
 from visualization_msgs.msg import MarkerArray
 
 in_path = os.path.expanduser('~/.ros/waypoints.bag')
-out_path = os.path.expanduser('~/.ros/waypoints_filtered_synched.bag')
+out_path = os.path.expanduser('~/.ros/waypoints_sparse_filtered_synched.bag')
+# in_path = os.path.expanduser('~/.ros/waypoints_mountain.bag')
+# out_path = os.path.expanduser('~/.ros/waypoints_mountain_filtered_synched.bag')
 
 in_bag = rosbag.Bag(in_path)
 out_bag = rosbag.Bag(out_path, 'w')
