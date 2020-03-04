@@ -1039,7 +1039,12 @@ class SafeConvexPolytope:
 
         unscaled_polytope = self.get_unscaled_polytope()
         points = unscaled_polytope.get_points()
-        center, evecs, radii, v = el_fit.ellipsoid_fit(points.T)
+        centroid = self.get_centroid(unscaled_polytope.get_points())
+        centered_points = points - np.repeat(centroid, points.shape[1], axis=1)
+        shrinked_points = centered_points
+        # shrinked_points = 0.7*centered_points
+        new_points = shrinked_points + np.repeat(centroid, points.shape[1], axis=1)
+        center, evecs, radii, v = el_fit.ellipsoid_fit(new_points.T)
         self._el_center = center
         self._el_radii = radii
         self._el_evecs = evecs
