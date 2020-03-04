@@ -56,7 +56,7 @@ PathController::PathController(const PathControllerSettings& s)
     int num_constraints = num_obstacle_constraints + num_fe_constraints; // Plus the Flight Envelope constraints
     double constraints_tol[num_constraints];
     for (int k = 0; k < num_constraints; k++)
-        constraints_tol[k] = 0.01;
+        constraints_tol[k] = 0.0001;
     nlopt_add_inequality_mconstraint(opt,
                                      num_constraints,
                                      constraints_wrapper,
