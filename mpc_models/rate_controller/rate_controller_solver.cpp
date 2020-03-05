@@ -244,7 +244,7 @@ int main()
     mpc.set(GENERATE_SIMULINK_INTERFACE, NO);
 
     // Finally, export everything.
-    if (mpc.exportCode("rate_controller_mpc_solver_2") != SUCCESSFUL_RETURN)
+    if (mpc.exportCode("rate_controller_mpc_solver") != SUCCESSFUL_RETURN)
       exit(EXIT_FAILURE);
     mpc.printDimensionsQP();
   }

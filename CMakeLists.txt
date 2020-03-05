@@ -168,30 +168,6 @@ target_include_directories(rate_controller_solver PUBLIC
   externals/qpoases/SRC
 )
 
-# The rate controller solver library, with full state constraints, nominal
-add_library(rate_controller_solver_2
-  externals/qpoases/SRC/Bounds.cpp
-  externals/qpoases/SRC/Constraints.cpp
-  externals/qpoases/SRC/CyclingManager.cpp
-  externals/qpoases/SRC/Indexlist.cpp
-  externals/qpoases/SRC/MessageHandling.cpp
-  externals/qpoases/SRC/QProblem.cpp
-  externals/qpoases/SRC/QProblemB.cpp
-  externals/qpoases/SRC/SubjectTo.cpp
-  externals/qpoases/SRC/Utils.cpp
-  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
-  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_qpoases_interface.cpp
-  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_integrator.c
-  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_solver.c
-  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_auxiliary_functions.c
-)
-target_include_directories(rate_controller_solver_2 PUBLIC
-  mpc_models/rate_controller_2/rate_controller_mpc_solver_2/
-  externals/qpoases
-  externals/qpoases/INCLUDE
-  externals/qpoases/SRC
-)
-
 # The trajectory controller solver library
 add_library(trajectory_controller_solver
   externals/qpoases/SRC/Bounds.cpp
@@ -216,30 +192,6 @@ target_include_directories(trajectory_controller_solver PUBLIC
   externals/qpoases/SRC
 )
 
-# The trajectory controller solver 2 library, with Va, theta constraints
-add_library(trajectory_controller_solver_2
-  externals/qpoases/SRC/Bounds.cpp
-  externals/qpoases/SRC/Constraints.cpp
-  externals/qpoases/SRC/CyclingManager.cpp
-  externals/qpoases/SRC/Indexlist.cpp
-  externals/qpoases/SRC/MessageHandling.cpp
-  externals/qpoases/SRC/QProblem.cpp
-  externals/qpoases/SRC/QProblemB.cpp
-  externals/qpoases/SRC/SubjectTo.cpp
-  externals/qpoases/SRC/Utils.cpp
-  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
-  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_qpoases_interface.cpp
-  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_integrator.c
-  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_solver.c
-  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_auxiliary_functions.c
-)
-target_include_directories(trajectory_controller_solver_2 PUBLIC
-  mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/
-  externals/qpoases
-  externals/qpoases/INCLUDE
-  externals/qpoases/SRC
-)
-
 # The rate controller wrapper
 add_library(rate_controller_wrapper
   src/mpc_wrapper.cpp
@@ -248,28 +200,12 @@ target_link_libraries(rate_controller_wrapper
   rate_controller_solver
 )
 
-# The rate controller 2 wrapper, with full state constraints, no fault
-add_library(rate_controller_wrapper_2
-  src/mpc_wrapper.cpp
-)
-target_link_libraries(rate_controller_wrapper_2
-  rate_controller_solver_2
-)
-
 # The trajectory controller wrapper
 add_library(trajectory_controller_wrapper
   src/mpc_wrapper.cpp
 )
 target_link_libraries(trajectory_controller_wrapper
   trajectory_controller_solver
-)
-
-# The trajectory controller 2 wrapper
-add_library(trajectory_controller_wrapper_2
-  src/mpc_wrapper.cpp
-)
-target_link_libraries(trajectory_controller_wrapper_2
-  trajectory_controller_solver_2
 )
 
 ## Add cmake target dependencies of the library
@@ -286,19 +222,9 @@ add_executable(rate_controller
 add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(rate_controller
   ${catkin_LIBRARIES}
-  rate_controller_wrapper
-)
-
-# The rate controller_2, with full state constraints, no faults
-add_executable(rate_controller_2
-  src/rate_controller_2.cpp
-)
-add_dependencies(rate_controller_2 ${catkin_EXPORTED_TARGETS} )
-target_link_libraries(rate_controller_2
-  ${catkin_LIBRARIES}
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
-  rate_controller_wrapper_2
+  rate_controller_wrapper
 )
 
 # The trajectory controller
@@ -311,16 +237,6 @@ target_link_libraries(trajectory_controller
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
   trajectory_controller_wrapper
-)
-
-# The trajectory controller 2
-add_executable(trajectory_controller_2
-  src/trajectory_controller_2.cpp
-)
-add_dependencies(trajectory_controller_2 ${catkin_EXPORTED_TARGETS} )
-target_link_libraries(trajectory_controller_2
-  ${catkin_LIBRARIES}
-  trajectory_controller_wrapper_2
 )
 
 # The path controller
