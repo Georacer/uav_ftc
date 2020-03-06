@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2019
  * 
  */
-#include "rate_controller_2.hpp"
+#include "rate_controller.hpp"
 
 #include <cstdlib>
 #include <math.h>

@@ -138,7 +138,7 @@ int main()
   ocp.subjectTo(-deltar_max <= dr <= deltar_max);
 
   // Set Number of Online Data
-  ocp.setNOD(19); // TODO: Fix this number
+  ocp.setNOD(19); 
 
   if (!CODE_GEN)
   {
