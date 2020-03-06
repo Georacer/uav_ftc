@@ -244,7 +244,10 @@ add_executable(path_controller
   src/path_controller_node.cpp
   src/path_controller.cpp
 )
-add_dependencies(path_controller ${catkin_EXPORTED_TARGETS})
+add_dependencies(path_controller
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 target_link_libraries(path_controller
   ${catkin_LIBRARIES}
   nlopt
