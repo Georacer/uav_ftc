@@ -58,16 +58,18 @@ class FlightEnvelopeROS:
         fe.gamma_max = self.gamma_max_deg
         fe.gamma_min = self.gamma_min_deg
         fe.R_min = self.R_min
-        fe.el_A = ellipsoid_coeffs[0]
-        fe.el_B = ellipsoid_coeffs[1]
-        fe.el_C = ellipsoid_coeffs[2]
-        fe.el_D = ellipsoid_coeffs[3]
-        fe.el_E = ellipsoid_coeffs[4]
-        fe.el_F = ellipsoid_coeffs[5]
-        fe.el_G = ellipsoid_coeffs[6]
-        fe.el_H = ellipsoid_coeffs[7]
-        fe.el_I = ellipsoid_coeffs[8]
-        fe.el_J = ellipsoid_coeffs[9]
+        # Ellipsoid coefficients sign is set so as evaluating a point inside
+        # the ellipsoid results in negative value
+        fe.el_A = -ellipsoid_coeffs[0]
+        fe.el_B = -ellipsoid_coeffs[1]
+        fe.el_C = -ellipsoid_coeffs[2]
+        fe.el_D = -ellipsoid_coeffs[3]
+        fe.el_E = -ellipsoid_coeffs[4]
+        fe.el_F = -ellipsoid_coeffs[5]
+        fe.el_G = -ellipsoid_coeffs[6]
+        fe.el_H = -ellipsoid_coeffs[7]
+        fe.el_I = -ellipsoid_coeffs[8]
+        fe.el_J = -ellipsoid_coeffs[9]
         self._pub.publish(fe)
 
     def parameter_callback(self, msg):
