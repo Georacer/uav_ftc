@@ -119,37 +119,25 @@ void PathControllerROS::step()
 InputConstraints PathControllerROS::get_input_constraints(const ros::NodeHandle nh) const {
     ROS_INFO("Reading path controller constraints");
     InputConstraints input_constraints;
+    XmlRpc::XmlRpcValue listDouble;
 
-    if (!ros::param::getCached("constraint/Va/min", input_constraints.va_min))
+    if (!ros::param::getCached("referenceMin", listDouble))
     {
-        ROS_FATAL("Invalid parameters for -constraint/Va/min- in param server!");
+        ROS_FATAL("Invalid parameters for -referenceMin- in param server!");
         ros::shutdown();
     }
-    if (!ros::param::getCached("constraint/Va/max", input_constraints.va_max))
+    input_constraints.va_min = listDouble[0];
+    input_constraints.gamma_min = listDouble[1];
+    input_constraints.psi_dot_min = listDouble[2];
+
+    if (!ros::param::getCached("referenceMax", listDouble))
     {
-        ROS_FATAL("Invalid parameters for -constraint/Va/max- in param server!");
+        ROS_FATAL("Invalid parameters for -referenceMax- in param server!");
         ros::shutdown();
     }
-    if (!ros::param::getCached("constraint/gamma/min", input_constraints.gamma_min))
-    {
-        ROS_FATAL("Invalid parameters for -constraint/gamma/min- in param server!");
-        ros::shutdown();
-    }
-    if (!ros::param::getCached("constraint/gamma/max", input_constraints.gamma_max))
-    {
-        ROS_FATAL("Invalid parameters for -constraint/gamma/max- in param server!");
-        ros::shutdown();
-}
-    if (!ros::param::getCached("constraint/psi_dot/min", input_constraints.psi_dot_min))
-    {
-        ROS_FATAL("Invalid parameters for -constraint/psi_dot/min- in param server!");
-        ros::shutdown();
-    }
-    if (!ros::param::getCached("constraint/psi_dot/max", input_constraints.psi_dot_max))
-    {
-        ROS_FATAL("Invalid parameters for -constraint/psi_dot/max- in param server!");
-        ros::shutdown();
-    }
+    input_constraints.va_max = listDouble[0];
+    input_constraints.gamma_max = listDouble[1];
+    input_constraints.psi_dot_max = listDouble[2];
     return input_constraints;
 }
 
