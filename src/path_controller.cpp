@@ -233,7 +233,7 @@ VectorXd PathController::flight_envelope_constraints(const MatrixXd inputs)
         double gamma = inputs(1,i);
         double Va = inputs(2,i);
 
-        fe_evaluations(i) = -fe_ellipsoid_.evaluate(Va, gamma, psi_dot); // Shall evaluate <0 for points inside the ellipsoid
+        fe_evaluations(i) = fe_ellipsoid_.evaluate(Va, gamma, psi_dot); // Shall evaluate <0 for points inside the ellipsoid
     }
     return fe_evaluations;
 }

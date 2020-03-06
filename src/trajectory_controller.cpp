@@ -376,7 +376,7 @@ void TrajectoryController::getDefaultParameters(std::string uavName)
     {
         trimOnlineData_(i) = 0; // Set all to zero...
     }
-    trimOnlineData_(kOdSize) = -1;
+    trimOnlineData_(kOdSize-1) = -1;
     // ... and set constant term to negative
 }
 
@@ -406,7 +406,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "trajectoryControlNode");
     ros::NodeHandle n;
 
-    ros::WallDuration(1).sleep(); //wait for other nodes to get raised
+    // ros::WallDuration(1).sleep(); //wait for other nodes to get raised
     double ctrlRate;
     if (!ros::param::get("ctrlTrajectoryRate", ctrlRate)) //frame rate in Hz
     {

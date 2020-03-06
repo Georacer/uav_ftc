@@ -188,7 +188,7 @@ int main()
   ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
 
   // Flight Envelope constraint
-  ocp.subjectTo(0 <= fe_value );
+  ocp.subjectTo( fe_value <= 0 );
 
   // Other feasibility constraints
   // ocp.subjectTo(0 <= phi*psi_dot); // Force a positive-G maneuvera the end of the horizon
