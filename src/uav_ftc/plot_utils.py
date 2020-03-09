@@ -2,6 +2,8 @@ from math import sqrt, atan2, asin, cos, pi
 import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.collections import PatchCollection
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -38,17 +40,53 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 
 def plot_path(log_data_list):
 
-    fig = plt.figure()
+    fig = plt.figure(dpi=200)
 
     axh = fig.add_subplot('111')
     axh.set_prop_cycle(color=build_colorlist(len(log_data_list)))
 
+    log = log_data_list[0]
+    # Plot waypoints
+    waypoint_list = []
+    for waypoint in log.waypoints.T:
+        waypoint_list.append(mpatches.Circle(
+            (waypoint[1], waypoint[0]),
+            radius=waypoint[3],
+            alpha = 0.3,
+            # color = 'g',
+            # fill = False
+            ))
+    collection = PatchCollection(waypoint_list)
+    collection.set_edgecolor('g')
+    collection.set_facecolor('none')
+    axh.add_collection(collection)
+
+    # Plot obstacles
+    obstacle_list = []
+    for obstacle in log.obstacles.T:
+        obstacle_list.append(mpatches.Circle(
+            (obstacle[1], obstacle[0]),
+            radius=obstacle[3],
+            alpha = 0.3,
+            # color = 'r',
+            # fill = True
+            ))
+    collection = PatchCollection(obstacle_list)
+    collection.set_edgecolor('r')
+    collection.set_facecolor('r')
+    axh.add_collection(collection)
+
+    # Plot paths
     for i, log_data in enumerate(log_data_list):
         axh.plot(log_data.p_e, log_data.p_n)
         #axh.grid(True)
         #axh.set_xlim([-100, 2000])
         #axh.set_ylim([-100, 2000])
         axh.axis('equal')
+
+    axh.set_xlabel('East (m)')
+    axh.set_ylabel('North (m)')
+    axh.grid(True)
 
     return (fig, axh)
 
