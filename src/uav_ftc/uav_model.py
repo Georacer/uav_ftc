@@ -142,6 +142,25 @@ def eul_to_rot_mat(att):
     return R
 
 
+def quat2euler2(x, y, z, w):
+    q01 = w*x
+    q02 = w*y
+    q03 = w*z
+    q11 = x*x
+    q12 = x*y
+    q13 = x*z
+    q22 = y*y
+    q23 = y*z
+    q33 = z*z
+    psi = np.arctan2(2.0 * (q03 + q12), 1.0 - 2.0 * (q22 - q33))
+    if psi < 0.0:
+        psi += 2.0*np.pi
+
+    theta = np.arcsin(2.0 * (q02 - q13))
+    phi = np.arctan2(2.0 * (q01 + q23), 1.0 - 2.0 * (q11 + q22))
+
+    return (phi, theta, psi)
+
 def eul_to_e(att):
     # Create E matrix from Euler angle (roll, pitch, yaw) vector.
     # E matrix premultiplies angular rates to produce Euler angle derivatives
@@ -177,6 +196,23 @@ def airdata_to_s(alpha, beta):
     ])
     return S
 
+def u_to_airdata(body_vel):
+    u = body_vel.x
+    v = body_vel.y
+    w = body_vel.z
+
+    airspeed = np.sqrt(u**2+v**2+w**2)
+    alpha = np.arctan2(w, u)
+    if u == 0:
+        if v == 0:
+            beta = 0
+        else:
+            beta = np.arcsin(v/np.abs(v))
+    else:
+        beta = np.arctan2(v, u)
+
+    return Vector3(airspeed, alpha, beta)
+
 
 def airdata_to_u(airdata):
     # Convert airdata triplet to Body frame velocities
@@ -189,6 +225,22 @@ def airdata_to_u(airdata):
     w = Va*sin(alpha)*cos(beta)
 
     return Vector3(u, v, w)
+
+
+def get_turn_radius(va, psi_dot, gamma):
+    return va/psi_dot*np.cos(gamma)
+
+
+def calc_gamma(alpha, beta, phi, theta):
+    return np.arcsin(
+            np.cos(alpha)*np.cos(beta)*np.sin(theta)
+            -(np.sin(phi)*np.sin(beta)
+            + np.cos(phi)*np.sin(alpha)*np.cos(beta))*np.cos(theta)
+            )
+
+
+def calc_psi_dot(phi, theta, q, r):
+    return (q*np.sin(phi) + r*np.cos(phi))/np.cos(theta)
 
 
 def get_qbar(V_a):

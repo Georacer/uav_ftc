@@ -1,10 +1,19 @@
 from math import sqrt, atan2, asin, cos, pi
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
 
+from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
 
+
+def build_colorlist(num_lines):
+    c_map = plt.cm.get_cmap('jet')
+    colorlist = [c_map(1.*i/num_lines) for i in range(num_lines)]
+    return colorlist
+
+
+# Used by test_continuous_fe, deprecate at will
 def plot3_points(point_array, axes_names=['x', 'y', 'z']):
     x = point_array[:, 0]
     y = point_array[:, 1]
@@ -22,47 +31,220 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
     plt.show()
 
 
-def get_airdata(u, v, w):
-    airspeed = np.sqrt(u**2+v**2+w**2)
-    alpha = np.arctan2(w, u)
-    if u == 0:
-        if v == 0:
-            beta = 0
-        else:
-            beta = np.arcsin(v/np.abs(v))
-    else:
-        beta = np.arctan2(v, u)
+##########################
+# High-level plot commands
 
-    return (airspeed, alpha, beta)
+def plot_path(log_data_list):
+
+    fig = plt.figure()
+
+    axh = fig.add_subplot('111')
+    axh.set_prop_cycle(color=build_colorlist(len(log_data_list)))
+
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.p_e, log_data.p_n)
+        #axh.grid(True)
+        #axh.set_xlim([-100, 2000])
+        #axh.set_ylim([-100, 2000])
+        axh.axis('equal')
+
+    return (fig, axh)
 
 
-def get_turn_radius(va, psi_dot, gamma):
-    return va/psi_dot*np.cos(gamma)
+def plot_trajectories(log_data_list):
+    log_data = log_data_list[0]
+    log_data_nofe = log_data_list[1]
+
+    fig = plt.figure(dpi=400)
+
+    axh = fig.add_subplot('311')
+
+    axh.plot(log_data.time_refTrajectory, log_data.ref_Va, 'b--')
+    axh.plot(log_data.time_databus, log_data.airspeed, 'b')
+    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_Va, 'r--')
+    axh.plot(log_data_nofe.time_databus, log_data_nofe.airspeed, 'r')
+    axh.set_xlim([t_start,t_end])
+    axh.set_xticklabels([])
+    axh.set_ylabel('Airspeed (m/s)')
+    axh.grid(True)
+
+    axh = fig.add_subplot('312')
+    axh.plot(log_data.time_refTrajectory, log_data.ref_gamma, 'b--')
+    axh.plot(log_data.time_databus, log_data.gamma, 'b')
+    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_gamma, 'r--')
+    axh.plot(log_data_nofe.time_databus, log_data_nofe.gamma, 'r')
+    axh.set_xlim([t_start,t_end])
+    axh.set_xticklabels([])
+    axh.set_ylim([-0.4, 0.4])
+    axh.set_ylabel('$\gamma$ (rad)')
+    axh.grid(True)
+
+    axh = fig.add_subplot('313')
+    axh.plot(log_data.time_refTrajectory, log_data.ref_psi_dot, 'b--')
+    axh.plot(log_data.time_databus, log_data.psi_dot, 'b')
+    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_psi_dot, 'r--')
+    axh.plot(log_data_nofe.time_databus, log_data_nofe.psi_dot, 'r')
+    axh.set_xlim([t_start,t_end])
+    axh.set_ylim([-0.5, 0.5])
+    axh.set_ylabel('$\dot{\psi}$ (rad/s)')
+    axh.set_xlabel('Time (s)')
+    axh.grid(True)
+
+    plt.tight_layout()
+
+    return (fig, axh)
 
 
-def quat2euler2(x, y, z, w):
-    q01 = w*x
-    q02 = w*y
-    q03 = w*z
-    q11 = x*x
-    q12 = x*y
-    q13 = x*z
-    q22 = y*y
-    q23 = y*z
-    q33 = z*z
-    psi = atan2(2.0 * (q03 + q12), 1.0 - 2.0 * (q22 - q33))
-    if psi < 0.0:
-        psi += 2.0*pi
+def plot_euler(log_data_list):
+    fig = plt.figure()
 
-    theta = asin(2.0 * (q02 - q13))
-    phi = atan2(2.0 * (q01 + q23), 1.0 - 2.0 * (q11 + q22))
+    axh = fig.add_subplot('311')
+    for log_data in log_data_list:
+        axh.plot(log_data.time_databus, log_data.phi)
+        axh.set_ylabel('Phi')
 
-    return (phi, theta, psi)
+    axh = fig.add_subplot('312')
+    for log_data in log_data_list:
+        axh.plot(log_data.time_databus, log_data.theta)
+        axh.set_ylabel('Theta')
+
+    axh = fig.add_subplot('313')
+    for log_data in log_data_list:
+        axh.plot(log_data.time_databus, log_data.psi)
+        axh.set_ylabel('Psi')
+
+    return (fig, axh)
+
+
+def plot_flight_envelope(log_data_list, fe_params):
+    # Create a figure
+    fig = plt.figure(dpi=200)
+    # fig.suptitle('airspeed')
+    axh = fig.add_subplot('111', projection = '3d', proj_type="ortho")
+    
+    # Must have as many styles as the length of log_data_list
+    colorlist = build_colorlist(len(log_data_list))
+
+    num_logs = len(log_data_list)
+    log_cntr = 1
+
+    for i, log_data in enumerate(log_data_list):
+        # axh = fig.add_subplot('{}1{}'.format(num_logs, log_cntr), projection = '3d', proj_type="ortho")
+
+        # axh.axhspan(ymin=2, ymax=10, xmin=0.5, xmax=0.9, alpha=0.1)
+        # new_line = axh.plot(gamma, airspeed, label='airspeed', linewidth=2.0)
+        # plt.setp(new_line, color='r', linewidth=0.5, linestyle='--', marker='1') # Custom property setter
+
+        # Plot actual trajectory
+        airspeed = log_data.airspeed
+        gamma = log_data.gamma
+        psi_dot = log_data.psi_dot
+        lh = axh.scatter(airspeed, gamma, psi_dot, c=colorlist[i], s=1)
+
+        # Plot reference trajectory
+        airspeed = log_data.ref_Va
+        gamma = log_data.ref_gamma
+        psi_dot = log_data.ref_psi_dot
+        lh = axh.plot(airspeed, gamma, psi_dot, c=colorlist[i], linestyle='dashed')
+        # axh.axvline(x=100, ymin=0.1, ymax=1, ls='--', color='r')
+
+        axh.grid(True)
+        axh.set_xlabel('$V_a$ (m/s)')
+        axh.set_ylabel('$\gamma$')
+        axh.set_zlabel('$\dot{\psi}$')
+        # axh.set_title('')
+        # plt.legend()
+        # axh.annotate('point of interest', xy=(1, 1), xytext=(0.5, 2.5),
+        #          arrowprops=dict(facecolor='black', shrink=0.05),
+        #          )
+
+        log_cntr += 1
+    
+    center, evecs, radii = fe_params
+    el_fit.ellipsoid_plot(center, radii, evecs, axh, cage_color='g', cage_alpha=0.2)
+
+    plt.draw()
+    plt.pause(0.01)
+
+    return fig, axh
+
+
+#########################
+# Low-level plot commands
+
+def plot_3_errors(time_databus, time_ref, x, y, z, ref_x, ref_y, ref_z, axis_labels, y_lims=None):
+    fig = plt.figure()
+    # fig.suptitle('airspeed')
+    axh = fig.add_subplot(311)
+    # axh.axhspan(ymin=2, ymax=10, xmin=0.5, xmax=0.9, alpha=0.1)
+    # new_line = axh.plot(gamma, airspeed, label='airspeed', linewidth=2.0)
+    # plt.setp(new_line, color='r', linewidth=0.5, linestyle='--', marker='1') # Custom property setter
+    x_interp = np.interp(time_ref, time_databus, x)
+    new_line = axh.plot(time_ref, ref_x - x_interp, c='b')
+    # axh.axvline(x=100, ymin=0.1, ymax=1, ls='--', color='r')
+    if y_lims is not None:
+        axh.set_ylim(y_lims[0])
+    axh.grid(True)
+    axh.set_xlabel('Time (s)')
+    axh.set_ylabel(axis_labels[0])
+
+    axh = fig.add_subplot(312)
+    y_interp = np.interp(time_ref, time_databus, y)
+    new_line = axh.plot(time_ref, ref_y - y_interp, c='b')
+    if y_lims is not None:
+        axh.set_ylim(y_lims[1])
+    axh.grid(True)
+    axh.set_xlabel('Time (s)')
+    axh.set_ylabel(axis_labels[1])
+
+    axh = fig.add_subplot(313)
+    z_interp = np.interp(time_ref, time_databus, z)
+    new_line = axh.plot(time_ref, ref_z - z_interp, c='b')
+    if y_lims is not None:
+        axh.set_ylim(y_lims[2])
+    axh.grid(True)
+    axh.set_xlabel('Time (s)')
+    axh.set_ylabel(axis_labels[2])
+
+    plt.tight_layout()
+    plt.draw()
+    plt.pause(0.01)
+
+    return fig
+
+
+def save_figure_2d(img_name, fig):
+    # Save figures
+    fig.savefig('{}.png'.format(img_name), bbox_inches='tight')
+    plt.pause(0.01)
+
+
+def save_figure_3d(img_name, fig):
+    # Save figures
+    fig.savefig('{}.png'.format(img_name), bbox_inches='tight')
+    plt.pause(0.01)
+
+    axh = fig.get_axes()[0]
+
+    axh.view_init(0,0)
+    fig.savefig('{}_0_0.png'.format(img_name), bbox_inches='tight')
+    plt.pause(0.01)
+
+    axh.view_init(-90,0)
+    fig.savefig('{}_90_0.png'.format(img_name), bbox_inches='tight')
+    plt.pause(0.01)
+
+    axh.view_init(0,-90)
+    fig.savefig('{}_0_90.png'.format(img_name), bbox_inches='tight')
+    plt.pause(0.01)
 
 
 def rmse(x, y):
     return np.sqrt(np.mean(np.power(x-y, 2)))
 
+
+###########################
+# Used by polytope_utils.py
 
 def plot_points(ah, point_arr, style, color):
     x = point_arr[0, :]

@@ -11,15 +11,13 @@ mpc_models/*/Makefile
 mpc_models/*/*/qpoases
 mpc_models/rate_controller/rate_controller_mpc_solver/*
 !mpc_models/rate_controller/rate_controller_mpc_solver/acado_problem_definitions.h
-mpc_models/rate_controller_2/rate_controller_mpc_solver_2/*
-!mpc_models/rate_controller_2/rate_controller_mpc_solver_2/acado_problem_definitions.h
 mpc_models/trajectory_controller/trajectory_controller_mpc_solver/*
 !mpc_models/trajectory_controller/trajectory_controller_mpc_solver/acado_problem_definitions.h
-mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/*
-!mpc_models/trajectory_controller_2/trajectory_controller_mpc_solver_2/acado_problem_definitions.h
 
 utilities/*
+scrap_scripts/*
+plotting_scripts/figures/*
 
-logs/*/*/
+logs/*
 
 *.pyc

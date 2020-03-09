@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from uav_ftc.plot_utils import get_airdata, get_turn_radius, quat2euler2, rmse, plot_points, plot_line
+from uav_ftc.uav_model import Vector3, u_to_airdata, get_turn_radius, quat2euler2
+from uav_ftc.plot_utils import  rmse, plot_points, plot_line
 
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams.update({'font.size': 12})
@@ -156,7 +157,9 @@ def plot_scenario(folder_name):
     dt_cmd = throttle_df.loc[:, dt_name]
 
     # Convert data where needed
-    airdata = np.array(tuple(map(get_airdata, u, v, w)))
+    u_vec3 = map(Vector3, u, v, w)
+    airdata_iter = map(u_to_airdata, u_vec3)
+    airdata = np.array(tuple([airdata.to_array() for airdata in airdata_iter]))
     airspeed = airdata[:,0] # Build airspeed
     alpha = airdata[:, 1] # Build alpha
     beta = airdata[:,2] # Build beta

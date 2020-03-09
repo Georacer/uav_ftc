@@ -1,21 +1,20 @@
 #!/usr/bin/python
 
+# Read ROS .bag files, extract all required data series and save as Python
+# pickle file. This is done to avoid re-parsing the whole log file while
+# generating new code for log plotting.
+
 import os
 import pickle
 
 import numpy as np
-from scipy.spatial.transform import Rotation as Rot
 import click
 
 import rosbag
 from rospy import Time
 
-import uav_ftc.trim_traj_fe as fe
-from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
-
-from log_parsing import LogData
-from log_parsing import quat2euler2
-
+from uav_ftc.uav_model import quat2euler2
+from uav_ftc.log_parsing import LogData
 
 
 @click.command()
@@ -34,23 +33,33 @@ from log_parsing import quat2euler2
     "-e",
     "--export-path",
     default=None,
-    help="Currently unused"
+    help="Path to export pickle files at"
 )
 def test_code(log_file, model_name, export_path):
     
-    in_path = os.path.expanduser(log_file)
-    in_bag = rosbag.Bag(in_path)
+    in_filepath = os.path.expanduser(log_file)
+
+    if export_path is None:
+        out_path = in_filepath
+    else:
+        out_path = os.path.expanduser(export_path)
+
+    in_bag = rosbag.Bag(in_filepath)
     log_name = os.path.splitext(os.path.split(log_file)[1])[0]
 
+    # Construct topic names
     databus_name = '/{}/dataBus'.format(model_name)
     refRates_name = '/{}/refRates'.format(model_name)
     refTrajectory_name = '/{}/refTrajectory'.format(model_name)
+    flightEnvelope_name = '/{}/flight_envelope'.format(model_name)
     topics_of_interest = [
        databus_name,
        refTrajectory_name,
-       refRates_name
+       refRates_name,
+       flightEnvelope_name
     ]
 
+    # Allocate numpy arrays
     log_data = LogData()
 
     num_databus_msgs = in_bag.get_message_count(topic_filters = [databus_name])
@@ -83,6 +92,20 @@ def test_code(log_file, model_name, export_path):
     log_data.ref_gamma = np.zeros(num_refTrajectory_msgs)
     log_data.ref_psi_dot = np.zeros(num_refTrajectory_msgs)
 
+    num_Fe_msgs = in_bag.get_message_count(topic_filters=flightEnvelope_name)
+    print('Expecting {} flight_envelope msgs'.format(num_Fe_msgs))
+    log_data.time_fe = np.zeros(num_Fe_msgs)
+    log_data.el_A = np.zeros(num_Fe_msgs)
+    log_data.el_B = np.zeros(num_Fe_msgs)
+    log_data.el_C = np.zeros(num_Fe_msgs)
+    log_data.el_D = np.zeros(num_Fe_msgs)
+    log_data.el_E = np.zeros(num_Fe_msgs)
+    log_data.el_F = np.zeros(num_Fe_msgs)
+    log_data.el_G = np.zeros(num_Fe_msgs)
+    log_data.el_H = np.zeros(num_Fe_msgs)
+    log_data.el_I = np.zeros(num_Fe_msgs)
+    log_data.el_J = np.zeros(num_Fe_msgs)
+
     start_time = in_bag.get_start_time()
 
     ###########
@@ -90,6 +113,7 @@ def test_code(log_file, model_name, export_path):
     databus_msg_counter = 0
     refRates_msg_counter = 0
     refTrajectory_msg_counter = 0
+    fe_msg_counter = 0
     print('Reading bag file...')
     for topic, msg, t in in_bag.read_messages(topics=topics_of_interest):
 
@@ -102,15 +126,6 @@ def test_code(log_file, model_name, export_path):
             log_data.airspeed[databus_msg_counter] = msg.airspeed
             log_data.alpha[databus_msg_counter] = msg.angle_of_attack
             log_data.beta[databus_msg_counter] = msg.angle_of_sideslip
-            #rotation = Rot.from_quat([
-            #    msg.orientation.x,
-            #    msg.orientation.y,
-            #    msg.orientation.z,
-            #    msg.orientation.w,
-            #    ])
-            #euler_arr = rotation.as_euler('zyx', degrees=False)
-            # log_data.phi[databus_msg_counter] = euler_arr[2]
-            # log_data.theta[databus_msg_counter] = euler_arr[1]
             phi, theta, psi = quat2euler2(
                     msg.orientation.x,
                     msg.orientation.y,
@@ -143,13 +158,30 @@ def test_code(log_file, model_name, export_path):
             log_data.ref_psi_dot[refTrajectory_msg_counter] = msg.vector.z
 
             refTrajectory_msg_counter += 1
+
+        if topic.endswith('flight_envelope'):
+            msg_time = msg.header.stamp
+            log_data.time_fe[fe_msg_counter] = msg_time.secs + 1.0*msg_time.nsecs/10**9 - start_time
+            log_data.el_A[fe_msg_counter] = msg.el_A
+            log_data.el_B[fe_msg_counter] = msg.el_B
+            log_data.el_C[fe_msg_counter] = msg.el_C
+            log_data.el_D[fe_msg_counter] = msg.el_D
+            log_data.el_E[fe_msg_counter] = msg.el_E
+            log_data.el_F[fe_msg_counter] = msg.el_F
+            log_data.el_G[fe_msg_counter] = msg.el_G
+            log_data.el_H[fe_msg_counter] = msg.el_H
+            log_data.el_I[fe_msg_counter] = msg.el_I
+            log_data.el_J[fe_msg_counter] = msg.el_J
+
+            fe_msg_counter += 1
         
     print('Done reading bag file')
     print('Collected {} databus msgs'.format(databus_msg_counter))
     print('Collected {} refRates msgs'.format(refRates_msg_counter))
     print('Collected {} refTrajectory msgs'.format(refTrajectory_msg_counter))
-    print(dir(log_data))
+    print('Collected {} flight_envelope msgs'.format(fe_msg_counter))
 
+    # Construct additional, derived timeseries
     log_data.gamma = np.arcsin(
             np.cos(log_data.alpha)*np.cos(log_data.beta)*np.sin(log_data.theta)
             -(
@@ -164,12 +196,14 @@ def test_code(log_file, model_name, export_path):
             )/np.cos(log_data.theta)
             )
 
-    with open('{}.pickle'.format(log_name), 'wb') as f:
+    # Write pickle file
+    out_filename = '{}.pickle'.format(log_name)
+    out_filepath = os.path.join(out_path, out_filename)
+    with open(out_filepath, 'wb') as f:
         # Pickle the 'data' dictionary using the highest protocol available.
         pickle.dump(log_data, f, pickle.HIGHEST_PROTOCOL)
 
     return
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     test_code()
