@@ -3,6 +3,7 @@
 # Read ROS .bag files, extract all required data series and save as Python
 # pickle file. This is done to avoid re-parsing the whole log file while
 # generating new code for log plotting.
+# NOTE: Will capture only the first waypoints, obstacles and rrt_path message
 
 import os
 import pickle
@@ -52,11 +53,17 @@ def test_code(log_file, model_name, export_path):
     refRates_name = '/{}/refRates'.format(model_name)
     refTrajectory_name = '/{}/refTrajectory'.format(model_name)
     flightEnvelope_name = '/{}/flight_envelope'.format(model_name)
+    waypoints_name = '/{}/waypoints'.format(model_name)
+    obstacles_name = '/{}/obstacles'.format(model_name)
+    ref_path_name = '/{}/rrt_path'.format(model_name)
     topics_of_interest = [
        databus_name,
        refTrajectory_name,
        refRates_name,
-       flightEnvelope_name
+       flightEnvelope_name,
+       waypoints_name,
+       obstacles_name,
+       ref_path_name
     ]
 
     # Allocate numpy arrays
@@ -114,6 +121,14 @@ def test_code(log_file, model_name, export_path):
     refRates_msg_counter = 0
     refTrajectory_msg_counter = 0
     fe_msg_counter = 0
+    num_waypoints = 0
+    num_obstacles = 0
+    num_path_points = 0
+
+    parsed_waypoints = False
+    parsed_obstacles = False
+    parsed_path = False
+
     print('Reading bag file...')
     for topic, msg, t in in_bag.read_messages(topics=topics_of_interest):
 
@@ -174,12 +189,58 @@ def test_code(log_file, model_name, export_path):
             log_data.el_J[fe_msg_counter] = msg.el_J
 
             fe_msg_counter += 1
+
+        if topic.endswith('waypoints') and not parsed_waypoints:
+            num_waypoints = len(msg.markers)
+            print('Found {} waypoints'.format(num_waypoints))
+            log_data.waypoints = np.zeros((4, num_waypoints))
+            for i, marker in enumerate(msg.markers):
+                wp_info = np.array([[
+                    marker.pose.position.x,
+                    marker.pose.position.y,
+                    marker.pose.position.z,
+                    marker.scale.x/2  # Convert diameter to radius
+                ]]).T
+                log_data.waypoints[:, [i]] = wp_info
+            parsed_waypoints = True
+
+        if topic.endswith('obstacles') and not parsed_obstacles:
+            num_obstacles = len(msg.markers)
+            print('Found {} obstacles'.format(num_obstacles))
+            log_data.obstacles = np.zeros((4, num_obstacles))
+            for i, marker in enumerate(msg.markers):
+                obs_info = np.array([[
+                    marker.pose.position.x,
+                    marker.pose.position.y,
+                    marker.pose.position.z,
+                    marker.scale.x/2  # Convert diameter to radius
+                ]]).T
+                log_data.obstacles[:, [i]] = obs_info
+            parsed_obstacles = True
+
+        if topic.endswith('rrt_path') and not parsed_path:
+            num_path_points = len(msg.poses)
+            print(msg.poses)
+            print('Found {} path points'.format(num_path_points))
+            log_data.ref_path = np.zeros((4, num_path_points))
+            for i, pose in enumerate(msg.poses):
+                point_info = np.array([[
+                    pose.pose.position.x,
+                    pose.pose.position.y,
+                    pose.pose.position.z,
+                    30  # Taken from controller_params.yaml/waypointRadius
+                ]]).T
+                log_data.ref_path[:, [i]] = point_info
+            parsed_path = True
         
     print('Done reading bag file')
     print('Collected {} databus msgs'.format(databus_msg_counter))
     print('Collected {} refRates msgs'.format(refRates_msg_counter))
     print('Collected {} refTrajectory msgs'.format(refTrajectory_msg_counter))
     print('Collected {} flight_envelope msgs'.format(fe_msg_counter))
+    print('Collected {} waypoints'.format(num_waypoints))
+    print('Collected {} obstacles'.format(num_obstacles))
+    print('Collected {} path points'.format(num_path_points))
 
     # Construct additional, derived timeseries
     log_data.gamma = np.arcsin(

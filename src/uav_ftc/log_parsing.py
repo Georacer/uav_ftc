@@ -4,6 +4,7 @@ import numpy as np
 class LogData:
 
     def __init__(self):
+        # Databus information
         self.time_databus = None
         self.p_n = None
         self.p_e = None
@@ -20,16 +21,19 @@ class LogData:
         self.gamma = None
         self.psi_dot = None
 
+        # Reference angular rates
         self.time_refRates = None
         self.ref_p = None
         self.ref_q = None
         self.ref_r = None
 
+        # Reference Trajectory
         self.time_refTrajectory = None
         self.ref_Va = None
         self.ref_gamma = None
         self.ref_psi_dot = None
 
+        # Flight Envelope parameters
         self.el_A = None
         self.el_B = None
         self.el_C = None
@@ -40,6 +44,12 @@ class LogData:
         self.el_H = None
         self.el_I = None
         self.el_J = None
+
+        # Waypoint information
+        self.waypoints = None
+        self.obstacles = None
+        self.ref_path = None
+
 
 def filter_log_data(log_data, t_start, t_end):
     # log_attributes = [attr in dir(log_data) if not attr.startswith('__')]
