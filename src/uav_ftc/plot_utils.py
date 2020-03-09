@@ -1,5 +1,6 @@
 from math import sqrt, atan2, asin, cos, pi
 import numpy as np
+from scipy import interpolate
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
@@ -9,7 +10,7 @@ from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
 
 def build_colorlist(num_lines):
     c_map = plt.cm.get_cmap('jet')
-    colorlist = [c_map(1.*i/num_lines) for i in range(num_lines)]
+    colorlist = [c_map(1.*i/(num_lines-1)+0.001) for i in range(num_lines)]
     return colorlist
 
 
@@ -33,6 +34,7 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 
 ##########################
 # High-level plot commands
+# Typically operate on a list of log_parsing.LogData objects
 
 def plot_path(log_data_list):
 
@@ -51,40 +53,126 @@ def plot_path(log_data_list):
     return (fig, axh)
 
 
-def plot_trajectories(log_data_list):
-    log_data = log_data_list[0]
-    log_data_nofe = log_data_list[1]
-
+def plot_angular_rates(log_data_list):
     fig = plt.figure(dpi=400)
+    colorlist = build_colorlist(len(log_data_list))
 
     axh = fig.add_subplot('311')
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refRates, log_data.ref_p, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.p, color=colorlist[i])
+        # Edit these to enable plotting of corresponding command
+        # axh2 = axh.twinx()
+        # axh2.set_ylabel('control surface command')
+        # cmd_h = axh2.plot(t_cmd, cmd, color='k')
+        # proxy_state = mpl.patches.Patch(color='tab:red', label=rate_name)
+        # proxy_ref = mpl.patches.Patch(color='tab:blue', label=f'ref_{rate_name}')
+        # proxy_cmd = mpl.patches.Patch(color='k', label='ctrl_input')
+        # axh.legend(handles = [proxy_state, proxy_ref, proxy_cmd])
+    axh.set_xticklabels([])
+    axh.set_ylabel('Roll (rad/s)')
+    axh.grid(True)
 
-    axh.plot(log_data.time_refTrajectory, log_data.ref_Va, 'b--')
-    axh.plot(log_data.time_databus, log_data.airspeed, 'b')
-    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_Va, 'r--')
-    axh.plot(log_data_nofe.time_databus, log_data_nofe.airspeed, 'r')
-    axh.set_xlim([t_start,t_end])
+    axh = fig.add_subplot('312')
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refRates, log_data.ref_q, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.q, color=colorlist[i])
+    axh.set_xticklabels([])
+    axh.set_ylabel('Pitch (rad/s)')
+    axh.grid(True)
+
+    axh = fig.add_subplot('313')
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refRates, log_data.ref_r, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.r, color=colorlist[i])
+    axh.set_ylabel('Yaw (rad/s)')
+    axh.set_xlabel('Time (s)')
+    axh.grid(True)
+
+    plt.tight_layout()
+
+    return (fig, axh)
+
+
+def plot_angular_rates_errors(log_data_list):
+    fig = plt.figure(dpi=400)
+    colorlist = build_colorlist(len(log_data_list))
+
+    axh = fig.add_subplot('311')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        time_ref = log_data.time_refRates
+        interp_func = interpolate.interp1d(time_ref, log_data.ref_p, kind='previous', fill_value='extrapolate')
+        ref_p_interp = interp_func(time)
+        error = log_data.p - ref_p_interp
+        axh.plot(time, error, color=colorlist[i])
+        # Edit these to enable plotting of corresponding command
+        # axh2 = axh.twinx()
+        # axh2.set_ylabel('control surface command')
+        # cmd_h = axh2.plot(t_cmd, cmd, color='k')
+        # proxy_state = mpl.patches.Patch(color='tab:red', label=rate_name)
+        # proxy_ref = mpl.patches.Patch(color='tab:blue', label=f'ref_{rate_name}')
+        # proxy_cmd = mpl.patches.Patch(color='k', label='ctrl_input')
+        # axh.legend(handles = [proxy_state, proxy_ref, proxy_cmd])
+    axh.set_xticklabels([])
+    axh.set_ylabel('Roll (rad/s)')
+    axh.grid(True)
+
+    axh = fig.add_subplot('312')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        time_ref = log_data.time_refRates
+        interp_func = interpolate.interp1d(time_ref, log_data.ref_q, kind='previous', fill_value='extrapolate')
+        ref_q_interp = interp_func(time)
+        error = log_data.q - ref_q_interp
+        axh.plot(time, error, color=colorlist[i])
+    axh.set_xticklabels([])
+    axh.set_ylabel('Pitch (rad/s)')
+    axh.grid(True)
+
+    axh = fig.add_subplot('313')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        time_ref = log_data.time_refRates
+        interp_func = interpolate.interp1d(time_ref, log_data.ref_r, kind='previous', fill_value='extrapolate')
+        ref_r_interp = interp_func(time)
+        error = log_data.r - ref_r_interp
+        axh.plot(time, error, color=colorlist[i])
+    axh.set_ylabel('Yaw (rad/s)')
+    axh.set_xlabel('Time (s)')
+    axh.grid(True)
+
+    plt.tight_layout()
+
+    return (fig, axh)
+
+
+def plot_trajectories(log_data_list):
+    fig = plt.figure(dpi=400)
+    colorlist = build_colorlist(len(log_data_list))
+
+    axh = fig.add_subplot('311')
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refTrajectory, log_data.ref_Va, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.airspeed, color=colorlist[i])
+    # axh.set_xlim([t_start,t_end]) # Filter data themselves
     axh.set_xticklabels([])
     axh.set_ylabel('Airspeed (m/s)')
     axh.grid(True)
 
     axh = fig.add_subplot('312')
-    axh.plot(log_data.time_refTrajectory, log_data.ref_gamma, 'b--')
-    axh.plot(log_data.time_databus, log_data.gamma, 'b')
-    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_gamma, 'r--')
-    axh.plot(log_data_nofe.time_databus, log_data_nofe.gamma, 'r')
-    axh.set_xlim([t_start,t_end])
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refTrajectory, log_data.ref_gamma, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.gamma, color=colorlist[i])
     axh.set_xticklabels([])
     axh.set_ylim([-0.4, 0.4])
     axh.set_ylabel('$\gamma$ (rad)')
     axh.grid(True)
 
     axh = fig.add_subplot('313')
-    axh.plot(log_data.time_refTrajectory, log_data.ref_psi_dot, 'b--')
-    axh.plot(log_data.time_databus, log_data.psi_dot, 'b')
-    axh.plot(log_data_nofe.time_refTrajectory, log_data_nofe.ref_psi_dot, 'r--')
-    axh.plot(log_data_nofe.time_databus, log_data_nofe.psi_dot, 'r')
-    axh.set_xlim([t_start,t_end])
+    for i, log_data in enumerate(log_data_list):
+        axh.plot(log_data.time_refTrajectory, log_data.ref_psi_dot, color=colorlist[i], linestyle='dashed')
+        axh.plot(log_data.time_databus, log_data.psi_dot, color=colorlist[i])
     axh.set_ylim([-0.5, 0.5])
     axh.set_ylabel('$\dot{\psi}$ (rad/s)')
     axh.set_xlabel('Time (s)')
@@ -95,23 +183,85 @@ def plot_trajectories(log_data_list):
     return (fig, axh)
 
 
-def plot_euler(log_data_list):
-    fig = plt.figure()
+def plot_trajectories_errors(log_data_list):
+    fig = plt.figure(dpi=400)
+    colorlist = build_colorlist(len(log_data_list))
 
     axh = fig.add_subplot('311')
-    for log_data in log_data_list:
-        axh.plot(log_data.time_databus, log_data.phi)
-        axh.set_ylabel('Phi')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        airspeed = log_data.airspeed
+        time_ref = log_data.time_refTrajectory
+        airspeed_ref = log_data.ref_Va
+        interp_func = interpolate.interp1d(time_ref, airspeed_ref, kind='previous', fill_value='extrapolate')
+        airspeed_ref_interp = interp_func(time)
+        error = airspeed - airspeed_ref_interp
+        axh.plot(time, error, color=colorlist[i])
+    # axh.set_xlim([t_start,t_end]) # Filter data themselves
+    axh.set_xticklabels([])
+    axh.set_ylabel('Airspeed (m/s)')
+    axh.grid(True)
 
     axh = fig.add_subplot('312')
-    for log_data in log_data_list:
-        axh.plot(log_data.time_databus, log_data.theta)
-        axh.set_ylabel('Theta')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        gamma = log_data.gamma
+        time_ref = log_data.time_refTrajectory
+        gamma_ref = log_data.ref_gamma
+        interp_func = interpolate.interp1d(time_ref, gamma_ref, kind='previous', fill_value='extrapolate')
+        gamma_ref_interp = interp_func(time)
+        error = gamma - gamma_ref_interp
+        axh.plot(time, error, color=colorlist[i])
+    axh.set_xticklabels([])
+    axh.set_ylabel('$\gamma$ (rad)')
+    axh.grid(True)
 
     axh = fig.add_subplot('313')
+    for i, log_data in enumerate(log_data_list):
+        time = log_data.time_databus
+        psi_dot = log_data.psi_dot
+        time_ref = log_data.time_refTrajectory
+        psi_dot_ref = log_data.ref_psi_dot
+        interp_func = interpolate.interp1d(time_ref, psi_dot_ref, kind='previous', fill_value='extrapolate')
+        psi_dot_ref_interp = interp_func(time)
+        error = psi_dot - psi_dot_ref_interp
+        axh.plot(time, error, color=colorlist[i])
+    axh.set_ylabel('$\dot{\psi}$ (rad/s)')
+    axh.set_xlabel('Time (s)')
+    axh.grid(True)
+
+    plt.tight_layout()
+
+    return (fig, axh)
+
+
+def plot_euler(log_data_list):
+    fig = plt.figure(dpi=400)
+    colorlist = build_colorlist(len(log_data_list))
+
+    axh = fig.add_subplot('311')
+    axh.set_prop_cycle(color=colorlist)
     for log_data in log_data_list:
-        axh.plot(log_data.time_databus, log_data.psi)
-        axh.set_ylabel('Psi')
+        axh.plot(log_data.time_databus, np.rad2deg(log_data.phi))
+        axh.set_ylabel('Roll Angle (deg)')
+        axh.set_xticklabels([])
+        axh.grid(True)
+
+    axh = fig.add_subplot('312')
+    axh.set_prop_cycle(color=colorlist)
+    for log_data in log_data_list:
+        axh.plot(log_data.time_databus, np.rad2deg(log_data.theta))
+        axh.set_ylabel('Pitch Angle (deg)')
+        axh.set_xticklabels([])
+        axh.grid(True)
+
+    axh = fig.add_subplot('313')
+    axh.set_prop_cycle(color=colorlist)
+    for log_data in log_data_list:
+        axh.plot(log_data.time_databus, np.rad2deg(log_data.psi))
+        axh.set_xlabel('Time (s)')
+        axh.set_ylabel('Yaw Angle (deg)')
+        axh.grid(True)
 
     return (fig, axh)
 
@@ -216,7 +366,7 @@ def plot_3_errors(time_databus, time_ref, x, y, z, ref_x, ref_y, ref_z, axis_lab
 def save_figure_2d(img_name, fig):
     # Save figures
     fig.savefig('{}.png'.format(img_name), bbox_inches='tight')
-    plt.pause(0.01)
+    # plt.pause(0.01) # Not sure if needed
 
 
 def save_figure_3d(img_name, fig):

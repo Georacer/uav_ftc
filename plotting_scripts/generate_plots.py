@@ -201,6 +201,45 @@ def generate_flight_path(data_list, export_path):
         pu.save_figure_2d(export_path+'/uav_path', fig)
 
 
+def generate_flight_trajectories(data_list, export_path):
+    fig, axh = pu.plot_trajectories(data_list)
+    if export_path is not None:
+        pu.save_figure_2d(export_path+'/trajectory_components', fig)
+
+
+def generate_flight_trajectories_error(data_list, export_path):
+    fig, axh = pu.plot_trajectories_errors(data_list)
+    if export_path is not None:
+        pu.save_figure_2d(export_path+'/trajectory_error_components', fig)
+
+
+def generate_euler(data_list, export_path):
+    fig, axh = pu.plot_euler(data_list)
+    if export_path is not None:
+        pu.save_figure_2d(export_path+'/euler', fig)
+
+
+def generate_angular_rates(data_list, export_path):
+    fig, axh = pu.plot_angular_rates(data_list)
+    if export_path is not None:
+        pu.save_figure_2d(export_path+'/angular_rates', fig)
+
+
+def generate_angular_rates_error(data_list, export_path):
+    fig, axh = pu.plot_angular_rates_errors(data_list)
+    if export_path is not None:
+        pu.save_figure_2d(export_path+'/angular_rates_errors', fig)
+
+
+def generate_all_figures(data_list, export_path):
+    generate_flight_envelope(data_list, export_path)
+    generate_flight_path(data_list, export_path)
+    generate_flight_trajectories(data_list, export_path)
+    generate_flight_trajectories_error(data_list, export_path)
+    generate_euler(data_list, export_path)
+    generate_angular_rates(data_list, export_path)
+    generate_angular_rates_error(data_list, export_path)
+
 
 @click.command()
 @click.option(
@@ -259,13 +298,6 @@ def test_code(log_directory, model_name, plot_index, export_path):
     ###############
     # Plotting part
 
-
-    #fig, axh = plot_trajectories((log_data_nominal, log_data_nominal_nofe,))
-    #if export_path is not None:
-    #    save_figure_2d('trajectories', fault_idx, fig)
-    #fig, axh = plot_trajectories((log_data_fault, log_data_fault_nofe,))
-    #if export_path is not None:
-    #    save_figure_2d('trajectories_fault', fault_idx, fig)
 
     #fig, axh = plot_euler((log_data_fault, log_data_fault_nofe,))
     #if export_path is not None:
