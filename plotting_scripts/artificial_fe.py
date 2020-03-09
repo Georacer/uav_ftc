@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-
-import numpy as np
-import click
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-
-import uav_ftc.trim_traj_fe as fe
-
 parameters_for_randomization = [
     (3, 'm', 2.0),
     (3, 'j_x', 0.8244),
@@ -60,6 +51,7 @@ parameters_for_randomization = [
     (5, 'motor1/propDiam', 0.28),
 ]
 
+
 def randomize_parameter(fe, parameter_tuple):
     param_type, param_name, param_value = parameter_tuple
     sign = np.random.choice(np.array([-1, 1]))
@@ -82,27 +74,22 @@ def randomize_parameter_list(fe, parameter_list):
         randomize_parameter(fe, parameter_tuple)
 
 
-@click.command()
-@click.option(
-    "-m",
-    "--model-name",
-    default="skywalker_2013_mod",
-    help="last_letter_lib UAV model name"
-)
-@click.option(
-    "-f",
-    "--fault-idx",
-    default=0,
-    help="Select fault to simulate",
-)
-@click.option(
-    "-e",
-    "--export-path",
-    default=None,
-    help="Path to export relevant data in .csv files",
-)
-def test_code(model_name, fault_idx, export_path):
+def get_image_name(fault_idx):
+    if fault_idx == 0:
+        img_name = 'nominal'
+    if fault_idx == 1:
+        img_name = 'fault_motor'
+    if fault_idx == 2:
+        img_name = 'fault_aileron'
+    if fault_idx == 3:
+        img_name = 'fault_flap'
+    if fault_idx == 4:
+        img_name = 'param_variation'
+    return img_name
 
+
+# Currently unused. May be useful, but have yet to find its use.
+def get_flight_envelope(model_name, fault_idx):
     flight_envelope = fe.FlightEnvelope(model_name)
 
     # Set the limits of the search domain
@@ -111,10 +98,10 @@ def test_code(model_name, fault_idx, export_path):
     flight_envelope.set_R_min(100)
     flight_envelope.initialize(model_name)
 
-    flag_plot_points = False
+    flag_plot_points = True
+    img_name = get_image_name(fault_idx)
     if fault_idx == 0:
         print('Flight Envelope for the nominal model')
-        img_name = 'nominal'
     if fault_idx == 1:
         print('Inducing engine fault')
         # Set the model parameters. They will not take effect (be written)
@@ -135,7 +122,6 @@ def test_code(model_name, fault_idx, export_path):
             print("Failed")
         flight_envelope.update_model()  # Register model changes
         flag_plot_points = False  # FE too small and poitns hide it
-        img_name = 'fault_motor'
 
     elif fault_idx == 2:
         print('Inducing aileron fault')
@@ -145,11 +131,10 @@ def test_code(model_name, fault_idx, export_path):
         else:
             print("Failed")
         flight_envelope.update_model()  # Register model changes
-        img_name = 'fault_aileron'
 
     elif fault_idx == 3:
         print('Inducing flap fault')
-        result = flight_envelope.set_model_parameter( 4, "airfoil1/c_l_0", 0.09)
+        result = flight_envelope.set_model_parameter( 4, "airfoil1/c_l_0", 0.09)  
         if result:
             print("Succeeded")
         else:
@@ -161,89 +146,19 @@ def test_code(model_name, fault_idx, export_path):
             print("Failed")
         flight_envelope.update_model()  # Register model changes
         flag_plot_points = False  # FE too small and poitns hide it
-        img_name = 'fault_flap'
 
     elif fault_idx == 4:
         print('Inducing parameter variations')
         randomize_parameter_list(flight_envelope, parameters_for_randomization)  # Batch randomization
         flight_envelope.update_model()  # Register model changes
-        flag_plot_points = False  # FE too small and points hide it
-        img_name = 'param_variation'
-
+        flag_plot_points = True  # FE too small and points hide it
 
     # Calculate flight envelope
     safe_poly = flight_envelope.find_flight_envelope()
-    ##########################
-    # Approximate by ellipsoid
-    center, evecs, radii, v = safe_poly.ellipsoid_fit()
-    print("Fitted Ellipsoid coefficients:\n")
-    print('Center')
-    print(center)
-    print('EVecs')
-    print(evecs)
-    print('Radii')
-    print(radii)
-    print('Coeffs')
-    print(v)
 
-    safe_poly._plot_points = flag_plot_points
-    safe_poly.plot()
-    #safe_poly.plot_ellipsoid()
-
-    # Save figures
-    safe_poly._figure_handle.savefig('fe_{}.pdf'.format(img_name), bbox_inches='tight')
-    plt.pause(0.01)
-    # plt.waitforbuttonpress(timeout=-1)
-
-    safe_poly._axis_handle.view_init(0,0)
-    safe_poly._figure_handle.savefig('fe_{}_0_0.pdf'.format(img_name), bbox_inches='tight')
-    plt.pause(0.01)
-
-    safe_poly._axis_handle.view_init(-90,0)
-    safe_poly._figure_handle.savefig('fe_{}_90_0.pdf'.format(img_name), bbox_inches='tight')
-    plt.pause(0.01)
-
-    safe_poly._axis_handle.view_init(0,-90)
-    safe_poly._figure_handle.savefig('fe_{}_0_90.pdf'.format(img_name), bbox_inches='tight')
-    plt.pause(0.01)
-
-    ##########################
-    # Approximate by ellipsoid
-    center, evecs, radii, v = safe_poly.ellipsoid_fit()
-    print("Fitted Ellipsoid coefficients:\n")
-    print('Center')
-    print(center)
-    print('EVecs')
-    print(evecs)
-    print('Radii')
-    print(radii)
-    print('Coeffs')
-    print(v)
+    return safe_poly
 
 
-    ######################################################
-    # Approximate the safe convex polytope with k vertices
-    # print("Performing clustering")
-    # # cluster_num = 2 ** n_dim
-    # # cluster_num = 2 * (n_dim-3)
-    # if safe_poly._n_dim == 2:
-    #     cluster_num = 4
-    # elif safe_poly._n_dim == 3:
-    #     cluster_num = 12
-
-    # safe_poly.cluster(cluster_num)
-    # # if plot:
-    # #     safe_poly.plot()
-    # #     plt.show()
-    # safe_poly.display_constraints()
-
-    # print("C-type definition:")
-    # print(safe_poly.print_c_arrays())
-
-    # # Export polytope search results
-    # if export_path is not None:
-    #     safe_poly.export_csv(export_path)
-
-
-if __name__ == "__main__":
-    test_code()
+# Accepts a SafeConvexPolytope instance
+def get_fe_ellipsoid(flight_envelope):
+    return flight_envelope.ellipsoid_fit()

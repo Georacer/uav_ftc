@@ -114,6 +114,8 @@ def plot_angular_rates_errors(log_data_list):
         # proxy_ref = mpl.patches.Patch(color='tab:blue', label=f'ref_{rate_name}')
         # proxy_cmd = mpl.patches.Patch(color='k', label='ctrl_input')
         # axh.legend(handles = [proxy_state, proxy_ref, proxy_cmd])
+        # metric = rmse(airspeed, np.interp(t_states, t_ref, gamma_ref))
+        # axh.text(t_max/2, axh.get_ylim()[0], f'RMSE={metric:.3f}', va='bottom', ha='center')
     axh.set_xticklabels([])
     axh.set_ylabel('Roll (rad/s)')
     axh.grid(True)
