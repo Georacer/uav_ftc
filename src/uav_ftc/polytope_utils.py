@@ -844,17 +844,20 @@ class SafeConvexPolytope:
         face_list_sorted = []
         # Sort the points of each face to produce a closed, flat polygon 
         for face_points in face_list:
+            # print('face_points', len(face_points))
             # print('centerpoint', centerpoint.shape)
+            # print(centerpoint)
             points = np.array(face_points).T  # 3xN
             # Find their centroid
             centroid = self.get_centroid(points)  # 3x1
             # print('centroid', centroid.shape)
+            # print(centroid)
             vec1 = points[:, [0]] - centroid
             # print('vec1', vec1.shape)
             vec1_array = np.repeat(vec1, points.shape[1], axis=1)  # 3xN
             # print('vec1_array', vec1_array.shape)
             vec_array = points - centroid
-            look = vg.normalize(centerpoint - centroid).reshape((3,))  # Inwards to the polytope, 3x1
+            look = vg.normalize(centerpoint.T - centroid.T).reshape((3,))  # Inwards to the polytope, 3x1
             # print('look', look.shape)
             # look_array = np.repeat(look, points.shape[1], axis=1)
             angles = vg.signed_angle(vec1_array.T, vec_array.T, look, units='rad')
