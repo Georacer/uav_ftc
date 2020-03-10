@@ -19,6 +19,9 @@ import uav_ftc.trim_traj_fe as fe
 from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
 from uav_ftc.log_parsing import LogData, filter_log_data
 
+
+uav_name = 'skywalker_2013_mod'  # UAV name to use for FE extraction
+
 # Add do python paths because Pickle does not loot at ROS ws includes
 sys.path.append('/home/george/ros_workspaces/uav_ftc/src/uav_ftc/src/uav_ftc')
 
@@ -95,10 +98,173 @@ def get_fe_params(log_data, index=0):
     return (center, evecs, radii)
 
 
-# Plot Flight envelope
-def generate_flight_envelope(data_list, export_path):
+parameters_for_randomization = [
+    (3, 'm', 2.0),
+    (3, 'j_x', 0.8244),
+    (3, 'j_y', 1.135),
+    (3, 'j_z', 1.759),
+    (3, 'j_xz', 0.1204),
+
+    (4, 'airfoil1/s', 0.45),
+    (4, 'airfoil1/b', 1.88),
+    (4, 'airfoil1/c', 0.24),
+    (4, 'airfoil1/c_L_0', 0.4),
+    (4, 'airfoil1/c_L_deltae', 0.0),
+    (4, 'airfoil1/c_L_alpha', 6.5),
+    (4, 'airfoil1/c_L_qn', 0),
+    (4, 'airfoil1/mcoeff', 50),
+    (4, 'airfoil1/oswald', 0.9),
+    (4, 'airfoil1/alpha_stall', 0.4712),
+    (4, 'airfoil1/c_D_qn', 0),
+    (4, 'airfoil1/c_D_deltae', 0.0),
+    (4, 'airfoil1/c_D_0', 0.09),
+    (4, 'airfoil1/c_D_alpha', 0.14),
+    (4, 'airfoil1/c_Y_0', 0),
+    (4, 'airfoil1/c_Y_beta', -0.98),
+    (4, 'airfoil1/c_Y_pn', 0),
+    (4, 'airfoil1/c_Y_rn', 0),
+    (4, 'airfoil1/c_Y_deltaa', 0),
+    (4, 'airfoil1/c_Y_deltar', -0.2), #opposite sign than c_n_deltar
+    (4, 'airfoil1/c_l_0', 0),
+    (4, 'airfoil1/c_l_pn', -1.0),
+    (4, 'airfoil1/c_l_beta', -0.12),
+    (4, 'airfoil1/c_l_rn', 0.14),
+    (4, 'airfoil1/c_l_deltaa', 0.25),
+    (4, 'airfoil1/c_l_deltar', -0.037),
+    (4, 'airfoil1/c_m_0', 0.01),
+    (4, 'airfoil1/c_m_alpha', -1.3),
+    (4, 'airfoil1/c_m_qn', -20),
+    (4, 'airfoil1/c_m_deltae', 1.0),
+    (4, 'airfoil1/c_n_0', 0),
+    (4, 'airfoil1/c_n_beta', 0.25),
+    (4, 'airfoil1/c_n_pn', 0.022),
+    (4, 'airfoil1/c_n_rn', -1),
+    (4, 'airfoil1/c_n_deltaa', 0.00),
+    (4, 'airfoil1/c_n_deltar', 0.1), #opposite sign than c_y_deltar
+    (4, 'airfoil1/deltaa_max', 0.3491),
+    (4, 'airfoil1/deltae_max', 0.3491),
+    (4, 'airfoil1/deltar_max', 0.3491),
+    (4, 'airfoil1/deltaa_max_nominal', 0.3491),
+    (4, 'airfoil1/deltae_max_nominal', 0.3491),
+    (4, 'airfoil1/deltar_max_nominal', 0.3491),
+
+    (5, 'motor1/propDiam', 0.28),
+]
+
+
+def randomize_parameter(fe, parameter_tuple):
+    param_type, param_name, param_value = parameter_tuple
+    sign = np.random.choice(np.array([-1, 1]))
+
+    change_prct = 0.05
+    if param_value == 0:
+        new_value = sign*0.05
+    else:
+        new_value = param_value + sign*param_value*change_prct
+
+    result = fe.set_model_parameter( param_type, param_name, new_value)  
+    if result:
+        print("Succeeded changing {}".format(param_name))
+    else:
+        print("Failed changing {}".format(param_name))
+
+
+def randomize_parameter_list(fe, parameter_list):
+    for parameter_tuple in parameter_list:
+        randomize_parameter(fe, parameter_tuple)
+
+
+def get_flight_envelope(model_name, fault_idx=0):
+    # TODO: Deprecate fault_idx argument
+    flight_envelope = fe.FlightEnvelope(model_name)
+
+    # Set the limits of the search domain
+    flight_envelope.set_domain_Va((5, 25))
+    flight_envelope.set_domain_gamma((-30, 30))
+    flight_envelope.set_R_min(100)
+    flight_envelope.initialize(model_name)
+
+    flag_plot_points = True
+    if fault_idx == 0:
+        print('Flight Envelope for the nominal model')
+    if fault_idx == 1:
+        print('Inducing engine fault')
+        # Set the model parameters. They will not take effect (be written)
+        # param_type defined as:
+        # typedef enum {
+        #     PARAM_TYPE_WORLD = 0,
+        #     PARAM_TYPE_ENV,
+        #     PARAM_TYPE_INIT,
+        #     PARAM_TYPE_INERTIAL,
+        #     PARAM_TYPE_AERO,
+        #     PARAM_TYPE_PROP,
+        #     PARAM_TYPE_GROUND
+        # } ParamType_t;
+        result = flight_envelope.set_model_parameter( 5, "motor1/omega_max", 10)  # Zero-out propeller efficiency
+        if result:
+            print("Succeeded")
+        else:
+            print("Failed")
+        flight_envelope.update_model()  # Register model changes
+        flag_plot_points = False  # FE too small and poitns hide it
+
+    elif fault_idx == 2:
+        print('Inducing aileron fault')
+        result = flight_envelope.set_model_parameter( 4, "airfoil1/c_l_deltaa", 0.125)  # 50% of the original  
+        if result:
+            print("Succeeded")
+        else:
+            print("Failed")
+        flight_envelope.update_model()  # Register model changes
+
+    elif fault_idx == 3:
+        print('Inducing flap fault')
+        result = flight_envelope.set_model_parameter( 4, "airfoil1/c_l_0", 0.09)  
+        if result:
+            print("Succeeded")
+        else:
+            print("Failed")
+        result = flight_envelope.set_model_parameter( 4, "airfoil1/c_n_0", 0.02)
+        if result:
+            print("Succeeded")
+        else:
+            print("Failed")
+        flight_envelope.update_model()  # Register model changes
+        flag_plot_points = False  # FE too small and poitns hide it
+
+    elif fault_idx == 4:
+        print('Inducing parameter variations')
+        randomize_parameter_list(flight_envelope, parameters_for_randomization)  # Batch randomization
+        flight_envelope.update_model()  # Register model changes
+        flag_plot_points = True  # FE too small and points hide it
+
+    # Calculate flight envelope
+    safe_poly = flight_envelope.find_flight_envelope()
+
+    return safe_poly
+
+
+# Accepts a SafeConvexPolytope instance
+def get_fe_ellipsoid(flight_envelope):
+    return flight_envelope.ellipsoid_fit()
+
+
+# Plot Flight envelope as freshly calculated offline
+def generate_theoretical_flight_envelope(data_list, export_path):
     # Get the FE parameters (center, evecs, radii)
-    print('Generating flight envelope plot.')
+    print('Generating theoretical flight envelope plot.')
+    safe_poly = get_flight_envelope(uav_name)
+    center, evecs, radii, _ = get_fe_ellipsoid(safe_poly)
+    fe_params = (center, evecs, radii)
+    fig, axh = pu.plot_flight_envelope(data_list, fe_params)
+    if export_path is not None:
+        pu.save_figure_3d(export_path+'/flight_envelope', fig)
+
+
+# Plot Flight envelope as logged
+def generate_logged_flight_envelope(data_list, export_path):
+    # Get the FE parameters (center, evecs, radii)
+    print('Generating logged flight envelope plot.')
     fe_params = get_fe_params(data_list[0]) # Get fe based on first ellipsoid message
     fig, axh = pu.plot_flight_envelope(data_list, fe_params)
     if export_path is not None:
@@ -142,13 +308,28 @@ def generate_angular_rates_error(data_list, export_path):
 
 
 def generate_all_figures(data_list, export_path):
-    generate_flight_envelope(data_list, export_path)
-    generate_flight_path(data_list, export_path)
-    generate_flight_trajectories(data_list, export_path)
-    generate_flight_trajectories_error(data_list, export_path)
-    generate_euler(data_list, export_path)
-    generate_angular_rates(data_list, export_path)
-    generate_angular_rates_error(data_list, export_path)
+    for func in plot_functions_list:
+        func(data_list, export_path)
+
+
+plot_functions_list = [
+    generate_all_figures,
+    generate_theoretical_flight_envelope,
+    generate_logged_flight_envelope,
+    generate_flight_path,
+    generate_flight_trajectories,
+    generate_flight_trajectories_error,
+    generate_euler,
+    generate_angular_rates,
+    generate_angular_rates_error,
+]
+
+def plot_functions_help_msg():
+    msg = ''
+    for i, func in enumerate(plot_functions_list):
+        new_str = '{}: {}\n'.format(i, func.__name__)
+        msg += new_str
+    return msg
 
 
 @click.command()
@@ -168,7 +349,7 @@ def generate_all_figures(data_list, export_path):
     '--plot-index',
     default=None,
     type=click.INT,
-    help='Index number of figure to generate. Set to 0 to generate all figures.'
+    help='Index number of figure to generate:\n'+plot_functions_help_msg()
 )
 @click.option(
     "-e",
@@ -184,23 +365,7 @@ def test_code(log_directory, model_name, plot_index, export_path):
     data_list = build_data_list(log_directory)
 
     print('Selecting plot for plot_index {}...'.format(plot_index))
-    if plot_index == 0:
-        generate_all_figures(data_list, export_path)
-    elif plot_index == 1:
-        generate_flight_envelope(data_list, export_path)
-    elif plot_index == 2:
-        generate_flight_path(data_list, export_path)
-    elif plot_index == 3:
-        generate_flight_trajectories(data_list, export_path)
-    elif plot_index == 4:
-        generate_flight_trajectories_error(data_list, export_path)
-    elif plot_index == 5:
-        generate_euler(data_list, export_path)
-    elif plot_index == 6:
-        generate_angular_rates(data_list, export_path)
-    elif plot_index == 7:
-        generate_angular_rates_error(data_list, export_path)
-
+    plot_functions_list[plot_index](data_list, export_path)
     print('Done generating ')
     
 
