@@ -53,7 +53,7 @@ def load_pickle_data(log_name, log_dir=None):
     return log_data
 
 
-def build_data_list(log_directory):
+def build_dataset(log_directory):
 
     # Collect all available log files
     name_nominal = 'nominal'
@@ -68,7 +68,7 @@ def build_data_list(log_directory):
         name_faulty_nofe
     ]
 
-    data_list = list()
+    dataset = dict()
 
     for filename in file_names:
         log_path = os.path.join(log_directory, filename + '.pickle')
@@ -76,9 +76,9 @@ def build_data_list(log_directory):
             print('Adding {} log file.'.format(log_path))
             log_file = load_pickle_data(log_path)
             log_file = filter_log_data(log_file, t_start, t_end)
-            data_list.append(log_file)
+            dataset[filename] = log_file
 
-    return data_list
+    return dataset
 
 
 def get_fe_params(log_data, index=0):
@@ -250,66 +250,66 @@ def get_fe_ellipsoid(flight_envelope):
 
 
 # Plot Flight envelope as freshly calculated offline
-def generate_theoretical_flight_envelope(data_list, export_path):
+def generate_theoretical_flight_envelope(dataset, export_path):
     # Get the FE parameters (center, evecs, radii)
     print('Generating theoretical flight envelope plot.')
     safe_poly = get_flight_envelope(uav_name)
     center, evecs, radii, _ = get_fe_ellipsoid(safe_poly)
     fe_params = (center, evecs, radii)
-    fig, axh = pu.plot_flight_envelope(data_list, fe_params)
+    fig, axh = pu.plot_flight_envelope(dataset, (fe_params,))
     if export_path is not None:
-        pu.save_figure_3d(export_path+'/flight_envelope', fig)
+        pu.save_figure_3d(export_path+'/flight_envelope_theoretical', fig)
 
 
 # Plot Flight envelope as logged
-def generate_logged_flight_envelope(data_list, export_path):
+def generate_logged_flight_envelope(dataset, export_path):
     # Get the FE parameters (center, evecs, radii)
     print('Generating logged flight envelope plot.')
-    fe_params = get_fe_params(data_list[0]) # Get fe based on first ellipsoid message
-    fig, axh = pu.plot_flight_envelope(data_list, fe_params)
+    fe_params = get_fe_params(dataset['nominal']) # Get fe based on first ellipsoid message
+    fig, _ = pu.plot_flight_envelope(dataset, (fe_params,))
     if export_path is not None:
-        pu.save_figure_3d(export_path+'/flight_envelope', fig)
+        pu.save_figure_3d(export_path+'/flight_envelope_logged', fig)
 
 
-def generate_flight_path(data_list, export_path):
-    fig, axh = pu.plot_path(data_list)
+def generate_flight_path(dataset, export_path):
+    fig, _ = pu.plot_path(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/uav_path', fig)
 
 
-def generate_flight_trajectories(data_list, export_path):
-    fig, axh = pu.plot_trajectories(data_list)
+def generate_flight_trajectories(dataset, export_path):
+    fig, _ = pu.plot_trajectories(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/trajectory_components', fig)
 
 
-def generate_flight_trajectories_error(data_list, export_path):
-    fig, axh = pu.plot_trajectories_errors(data_list)
+def generate_flight_trajectories_error(dataset, export_path):
+    fig, _ = pu.plot_trajectories_errors(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/trajectory_error_components', fig)
 
 
-def generate_euler(data_list, export_path):
-    fig, axh = pu.plot_euler(data_list)
+def generate_euler(dataset, export_path):
+    fig, _ = pu.plot_euler(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/euler', fig)
 
 
-def generate_angular_rates(data_list, export_path):
-    fig, axh = pu.plot_angular_rates(data_list)
+def generate_angular_rates(dataset, export_path):
+    fig, _ = pu.plot_angular_rates(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/angular_rates', fig)
 
 
-def generate_angular_rates_error(data_list, export_path):
-    fig, axh = pu.plot_angular_rates_errors(data_list)
+def generate_angular_rates_error(dataset, export_path):
+    fig, _ = pu.plot_angular_rates_errors(dataset)
     if export_path is not None:
         pu.save_figure_2d(export_path+'/angular_rates_errors', fig)
 
 
-def generate_all_figures(data_list, export_path):
+def generate_all_figures(dataset, export_path):
     for func in plot_functions_list:
-        func(data_list, export_path)
+        func(dataset, export_path)
 
 
 plot_functions_list = [
@@ -362,37 +362,12 @@ def test_code(log_directory, model_name, plot_index, export_path):
     log_directory = os.path.expanduser(log_directory)
     export_path = os.path.expanduser(export_path)
 
-    data_list = build_data_list(log_directory)
+    dataset = build_dataset(log_directory)
 
     print('Selecting plot for plot_index {}...'.format(plot_index))
-    plot_functions_list[plot_index](data_list, export_path)
+    plot_functions_list[plot_index](dataset, export_path)
     print('Done generating ')
     
-
-
-    ###############
-    # Plotting part
-
-
-    #fig, axh = plot_euler((log_data_fault, log_data_fault_nofe,))
-    #if export_path is not None:
-    #    save_figure_2d('euler_fault', fault_idx, fig)
-
-    # Plot rate control error
-    # axis_labels = ['$p$ error', '$q$ error', '$r$ error']
-    # fig = plot_3_errors(time_databus, time_refRates, p, q, r, ref_p, ref_q, ref_r, axis_labels)
-    # if export_path is not None:
-    #     save_figure_2d('rate_error', log_file, fault_idx, fig)
-
-    # Plot trajectory control error
-    # axis_labels = ['$V_a$ error', '$\gamma$ error', '$\dot{\psi}$ error']
-    # y_lims = [(-1, 1), (-1, 1), (-1, 1)]
-    # fig = plot_3_errors(time_databus, time_refTrajectory, airspeed, gamma, psi_dot, ref_Va, ref_gamma, ref_psi_dot, axis_labels, y_lims)
-    # if export_path is not None:
-    #     save_figure_2d('traj_error', log_file, fault_idx, fig)
-    #     
-    # return
-
 
 if __name__ == "__main__":
     test_code()

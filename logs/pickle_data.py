@@ -220,7 +220,6 @@ def test_code(log_file, model_name, export_path):
 
         if topic.endswith('rrt_path') and not parsed_path:
             num_path_points = len(msg.poses)
-            print(msg.poses)
             print('Found {} path points'.format(num_path_points))
             log_data.ref_path = np.zeros((4, num_path_points))
             for i, pose in enumerate(msg.poses):
