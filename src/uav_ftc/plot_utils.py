@@ -1,19 +1,30 @@
 from math import sqrt, atan2, asin, cos, pi
 import numpy as np
 from scipy import interpolate
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
+import re
 
 from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
 
 
 def build_colorlist(num_lines):
-    c_map = plt.cm.get_cmap('jet')
-    colorlist = [c_map(1.*i/(num_lines-1)+0.001) for i in range(num_lines)]
-    return colorlist
+    if num_lines <= 1:
+        return ['b']
+    else:
+        c_map = plt.cm.get_cmap('jet')
+        colorlist = [c_map(1.*i/(num_lines-1)+0.001) for i in range(num_lines)]
+        return colorlist
+
+
+def sanitize_textext(string):
+    # Remove underscores from plaintext string
+    underscore_regex = re.compile(r'_')
+    return underscore_regex.sub(' ', string)
 
 
 # Used by test_continuous_fe, deprecate at will
@@ -97,10 +108,14 @@ def plot_angular_rates(log_dataset):
     colorlist = build_colorlist(len(log_dataset.keys()))
 
     axh = fig.add_subplot('311')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refRates, log_data.ref_p, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.p, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
         # Edit these to enable plotting of corresponding command
         # axh2 = axh.twinx()
         # axh2.set_ylabel('control surface command')
@@ -112,24 +127,35 @@ def plot_angular_rates(log_dataset):
     axh.set_xticklabels([])
     axh.set_ylabel('Roll (rad/s)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh = fig.add_subplot('312')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refRates, log_data.ref_q, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.q, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     axh.set_xticklabels([])
     axh.set_ylabel('Pitch (rad/s)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh = fig.add_subplot('313')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refRates, log_data.ref_r, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.r, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     axh.set_ylabel('Yaw (rad/s)')
     axh.set_xlabel('Time (s)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     plt.tight_layout()
 
@@ -142,6 +168,7 @@ def plot_angular_rates_errors(log_dataset):
 
     axh = fig.add_subplot('311')
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         time = log_data.time_databus
         time_ref = log_data.time_refRates
@@ -199,34 +226,49 @@ def plot_trajectories(log_dataset):
     colorlist = build_colorlist(len(log_dataset.keys()))
 
     axh = fig.add_subplot('311')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refTrajectory, log_data.ref_Va, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.airspeed, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     # axh.set_xlim([t_start,t_end]) # Filter data themselves
     axh.set_xticklabels([])
     axh.set_ylabel('Airspeed (m/s)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh = fig.add_subplot('312')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refTrajectory, log_data.ref_gamma, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.gamma, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     axh.set_xticklabels([])
     axh.set_ylim([-0.4, 0.4])
     axh.set_ylabel('$\gamma$ (rad)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh = fig.add_subplot('313')
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
+        log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.time_refTrajectory, log_data.ref_psi_dot, color=colorlist[i], linestyle='dashed')
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.psi_dot, color=colorlist[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     axh.set_ylim([-0.5, 0.5])
     axh.set_ylabel('$\dot{\psi}$ (rad/s)')
     axh.set_xlabel('Time (s)')
     axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     plt.tight_layout()
 
@@ -327,6 +369,7 @@ def plot_fe_subfigure(axh, log_dataset, log_names, fe_params, plot_ref=True):
     # new_line = axh.plot(gamma, airspeed, label='airspeed', linewidth=2.0)
     # plt.setp(new_line, color='r', linewidth=0.5, linestyle='--', marker='1') # Custom property setter
     colorlist = build_colorlist(len(log_names))
+    legend_handles = []
 
     for i, log_data_name in enumerate(log_names):
         log_data = log_dataset[log_data_name]
@@ -335,41 +378,50 @@ def plot_fe_subfigure(axh, log_dataset, log_names, fe_params, plot_ref=True):
         gamma = log_data.gamma
         psi_dot = log_data.psi_dot
         lh = axh.scatter(airspeed, gamma, psi_dot, c=colorlist[i], s=1)
+        log_name = sanitize_textext(log_names[i])
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
 
         # Plot reference trajectory
         if plot_ref:
             airspeed = log_data.ref_Va
             gamma = log_data.ref_gamma
             psi_dot = log_data.ref_psi_dot
-            lh = axh.plot(airspeed, gamma, psi_dot, c=colorlist[i], linestyle='dashed')
+            # lh = axh.plot(airspeed, gamma, psi_dot, c=colorlist[i], linestyle='dashed', linewidth=0.5)
+            lh = axh.scatter(airspeed, gamma, psi_dot, marker='x', c=colorlist[i], s=5)
+            legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         # axh.axvline(x=100, ymin=0.1, ymax=1, ls='--', color='r')
 
-        axh.grid(True)
-        axh.set_xlabel('$V_a$ (m/s)')
-        axh.set_ylabel('$\gamma$')
-        axh.set_zlabel('$\dot{\psi}$')
-        # axh.set_title('')
-        # plt.legend()
-        # axh.annotate('point of interest', xy=(1, 1), xytext=(0.5, 2.5),
-        #          arrowprops=dict(facecolor='black', shrink=0.05),
-        #          )
+    # axh.set_title('')
+    # plt.legend()
+    # axh.annotate('point of interest', xy=(1, 1), xytext=(0.5, 2.5),
+    #          arrowprops=dict(facecolor='black', shrink=0.05),
+    #          )
+    axh.grid(True)
+    axh.set_xlabel('$V_a$ (m/s)')
+    axh.set_ylabel('$\gamma$')
+    axh.set_zlabel('$\dot{\psi}$')
 
+    axh.legend(handles = legend_handles, fontsize='x-small')
     center, evecs, radii = fe_params
     el_fit.ellipsoid_plot(center, radii, evecs, axh, cage_color='g', cage_alpha=0.2)
 
 
 def plot_flight_envelope(log_dataset, fe_params_sets, log_names_sets=None):
     # Create a figure
-    fig = plt.figure(dpi=200)
+    fig = plt.figure(dpi=200, figsize=(8,16))
     # fig.suptitle('airspeed')
 
     num_plots = len(fe_params_sets)
 
+    subfig_cntr = 1
     for i in range(len(fe_params_sets)):
-        axh = fig.add_subplot('{}11'.format(num_plots), projection = '3d', proj_type="ortho")
+        axh = fig.add_subplot('{}1{}'.format(num_plots, subfig_cntr), projection = '3d', proj_type="ortho")
         if log_names_sets is None:
             log_names = log_dataset.keys()
+        else:
+            log_names = log_names_sets[i]
         plot_fe_subfigure(axh, log_dataset, log_names, fe_params_sets[i])
+        subfig_cntr += 1
 
     return fig, axh
 

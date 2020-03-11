@@ -33,8 +33,8 @@ mpl.rcParams['path.simplify'] = True
 mpl.rcParams['path.simplify_threshold'] = 1.0
 
 
-t_start = 0
-t_end = 250
+t_start = 10
+t_end = 140
 # For fault FE
 #t_start = 0
 #t_end = 50
@@ -265,8 +265,15 @@ def generate_theoretical_flight_envelope(dataset, export_path):
 def generate_logged_flight_envelope(dataset, export_path):
     # Get the FE parameters (center, evecs, radii)
     print('Generating logged flight envelope plot.')
-    fe_params = get_fe_params(dataset['nominal']) # Get fe based on first ellipsoid message
-    fig, _ = pu.plot_flight_envelope(dataset, (fe_params,))
+    fe_params_iter = [
+        get_fe_params(dataset['nominal']), # Get fe based on first ellipsoid message
+        get_fe_params(dataset['faulty'])
+    ]
+    log_names_iter = [
+        ['nominal', 'nominal_nofe'],
+        ['faulty']
+    ]
+    fig, _ = pu.plot_flight_envelope(dataset, fe_params_iter, log_names_iter)
     if export_path is not None:
         pu.save_figure_3d(export_path+'/flight_envelope_logged', fig)
 
