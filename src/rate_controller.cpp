@@ -75,8 +75,8 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     mpcController_.resetController();
     mpcController_.prepare();
 
-    ROS_INFO("Initial rate MPC solver state:\n");
-    mpcController_.printSolverState();
+    // ROS_INFO("Initial rate MPC solver state:\n");
+    // mpcController_.printSolverState();
 
     //Subscribe and advertize
     subState = n.subscribe("dataBus", 1, &RateController::getStates, this);

@@ -177,15 +177,15 @@ int main()
   // Add constraints
   // Input constraints
   ocp.subjectTo(0.0 <= deltaF <= Fmax);
-  ocp.subjectTo(-1.0 <= p <= 1.0); // Constraining p to help with solution feasibility
+  ocp.subjectTo(-1.5 <= p <= 1.5); // Constraining p to help with solution feasibility
   ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
   ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility
 
   // State constraints
-  ocp.subjectTo(-5.0*M_PI/180.0 <= alpha <= 15.0*M_PI/180.0); // Stall protection
-  ocp.subjectTo(-10.0*M_PI/180.0 <= beta <= 10.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
-  ocp.subjectTo(-60.0*M_PI/180.0 <= phi <= 60.0*M_PI/180.0); // Constraining phi to help with solution feasibility
-  ocp.subjectTo(-30.0*M_PI/180.0 <= theta <= 45.0*M_PI/180.0); // Constraining theta to help with solution feasibility
+  ocp.subjectTo(-45.0*M_PI/180.0 <= alpha <= 45.0*M_PI/180.0); // Stall protection
+  ocp.subjectTo(-45.0*M_PI/180.0 <= beta <= 45.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
+  ocp.subjectTo(-90.0*M_PI/180.0 <= phi <= 90.0*M_PI/180.0); // Constraining phi to help with solution feasibility
+  ocp.subjectTo(-90.0*M_PI/180.0 <= theta <= 90.0*M_PI/180.0); // Constraining theta to help with solution feasibility
 
   // Flight Envelope constraint
   ocp.subjectTo( fe_value <= 0 );
