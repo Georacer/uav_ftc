@@ -51,6 +51,7 @@ class FlightEnvelopeROS:
 
     def send_fe_params(self):
         fe = FlightEnvelopeEllipsoid()
+        fe.header.stamp = rospy.Time.now()
 
         ellipsoid_coeffs = self.safe_poly._el_v
         fe.Va_max = self.Va_max

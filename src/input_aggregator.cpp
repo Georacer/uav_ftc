@@ -21,6 +21,7 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
     rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
     surfaceSub_ = n.subscribe("ctrlSurfaceCmds", 1, &InputAggregator::surfaceCtrlsCallback, this);
     throttleSub_ = n.subscribe("throttleCmd", 1, &InputAggregator::throttleCtrlsCallback, this);
+    clockSub_ = n.subscribe("/clock", 100, &InputAggregator::clockCallback, this);
 
     pub_ = n.advertise<last_letter_msgs::SimPWM>("ctrlPWM", 10);
 
@@ -35,10 +36,10 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
 void InputAggregator::rawCtrlsCallback(last_letter_msgs::SimPWM msg)
 {
     rawCtrls_ = msg;
-    if (ctrlMode_ == 0) // Direct passthrough, trigger with raw controls
-    {
-        publishCtrls();
-    }
+    // if (ctrlMode_ == 0) // Direct passthrough, trigger with raw controls
+    // {
+    //     publishCtrls();
+    // }
 }
 
 /**
@@ -52,13 +53,13 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     surfaceCtrls_.vector.y = msg.vector.y;
     surfaceCtrls_.vector.z = msg.vector.z;
 
-    if (ctrlMode_ == 1 || 
-        ctrlMode_ == 2 ||
-        ctrlMode_ == 3
-       ) // Publish as fast as you have control surface inputs
-    {
-        publishCtrls();
-    }
+    // if (ctrlMode_ == 1 || 
+    //     ctrlMode_ == 2 ||
+    //     ctrlMode_ == 3
+    //    ) // Publish as fast as you have control surface inputs
+    // {
+    //     publishCtrls();
+    // }
 }
 
 /**
@@ -70,6 +71,18 @@ void InputAggregator::throttleCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
     throttleCtrls_ = msg;
 }
+
+
+/**
+ * @brief Publish the last controls message every time a new clock pulse is received
+ * 
+ * @param msg 
+ */
+void InputAggregator::clockCallback(rosgraph_msgs::Clock msg)
+{
+    publishCtrls();
+}
+
 
 /**
  * @brief Performs the input mixing. Relies on the ctrlMode parameter to pick a strategy.
@@ -128,7 +141,7 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     InputAggregator input_aggregator(n);
-    ros::WallDuration(3).sleep(); //wait for other nodes to get raised
+    // ros::WallDuration(3).sleep(); //wait for other nodes to get raised
     ROS_INFO("Input Aggregator node up");
 
     while (ros::ok())
