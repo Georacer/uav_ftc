@@ -8,17 +8,31 @@
     <arg name="scenario" default="none"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
 
-    <!-- Launch the scenario player -->
     <group ns="$(arg uav_name)">
+        <!-- Launch the minidaq client -->
+        <node pkg="minidaq" name="minidaq" type="minidaq_peripherals.py" output="screen">
+            <param name="port" value="/dev/minidaq"/>
+        </node>
+
+        <!-- Launch ROSFlight client -->
+        <node pkg="rosflight" type="rosflight_io" name="rosflight" output="screen">
+            <param name="port" value="/dev/rosflight"/>
+        </node>
+
+        <!--  Launch GPS driver -->
+        <include file="$(find uav_ftc)/launch/gps.launch" />
+
+        <!-- Launch the databus -->
         <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
         <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
-            <param name="data_source" value="1"/>
+            <param name="data_source" value="0"/>
         </node>
     </group>
-    <node name="EKF_plotter"
+
+    <!-- <node name="EKF_plotter"
           pkg="rqt_plot"
           type="rqt_plot"
           args="/$(arg uav_name)/dataBus/wind/y /$(arg uav_name)/ekf/wind/y /$(arg uav_name)/ekf/airspeed /$(arg uav_name)/dataBus/airspeed"
-    />
+    /> -->
 
 </launch>
