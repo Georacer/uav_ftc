@@ -177,6 +177,10 @@ void DataBus::ekf_step()
     WE = ekf_->x(4);
     WD = ekf_->x(5);
 
+    bus_data_.wind.x = WN;
+    bus_data_.wind.y = WE;
+    bus_data_.wind.z = WD;
+
     ekf_data_.airspeed = airdata(0);
     ekf_data_.angle_of_attack = airdata(1);
     ekf_data_.angle_of_sideslip = airdata(2);

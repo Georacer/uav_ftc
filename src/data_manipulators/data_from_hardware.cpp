@@ -3,6 +3,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/Temperature.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <geometry_msgs/TwistWithCovarianceStamped.h>
 #include <geometry_msgs/Point.h>
 
 #include <rosflight_msgs/RCRaw.h>
@@ -28,6 +29,7 @@ class SubHandlerHW : public SubHandler
     ros::Subscriber sub_attitude;
     ros::Subscriber sub_minidaq;
     ros::Subscriber sub_gps;
+    ros::Subscriber sub_gps_vel;
     ros::Subscriber sub_input;
     ros::Subscriber sub_output;
 
@@ -37,12 +39,14 @@ class SubHandlerHW : public SubHandler
     private:
     Vector3d home_coords_;
     bool did_set_home_{false};
+    double offset_qbar_;
 
     void cb_imu(sensor_msgs::Imu msg);
     void cb_imu_temp(sensor_msgs::Temperature msg);
     void cb_attitude(rosflight_msgs::Attitude msg);
     void cb_minidaq(minidaq::minidaq_peripherals msg);
     void cb_gps(sensor_msgs::NavSatFix msg);
+    void cb_gps_velocity(geometry_msgs::TwistWithCovarianceStamped msg);
     void cb_input(rosflight_msgs::RCRaw msg);
     void cb_output(rosflight_msgs::OutputRaw msg);
     Vector3d coords_to_ned(Vector3d coords, Vector3d coords_init);
@@ -55,9 +59,12 @@ SubHandlerHW::SubHandlerHW(ros::NodeHandle n) : SubHandler()
     sub_imu_temp = n.subscribe("imu/temperature", 1, &SubHandlerHW::cb_imu_temp, this);
     sub_attitude = n.subscribe("attitude", 1, &SubHandlerHW::cb_attitude, this);
     sub_minidaq = n.subscribe("minidaq_peripherals", 1, &SubHandlerHW::cb_minidaq, this); // MiniDAQ subscriber
-	sub_input = n.subscribe("gps",1,&SubHandlerHW::cb_gps, this); // GPS subscriber
+	sub_gps = n.subscribe("gps/fix",1,&SubHandlerHW::cb_gps, this); // GPS subscriber
+	sub_gps_vel = n.subscribe("gps/fix_velocity",1,&SubHandlerHW::cb_gps_velocity, this); // GPS velocity subscriber
 	sub_input = n.subscribe("rc_raw",1,&SubHandlerHW::cb_input, this); // Input subscriber
 	sub_output = n.subscribe("output_raw",1,&SubHandlerHW::cb_output, this); // Output subscriber
+
+    n.param("offset_qbar", offset_qbar_, 0.0);
 
     bus_data.g = 9.81; // Hard-set gravity, since no other source exists;
 
@@ -83,13 +90,19 @@ void SubHandlerHW::cb_attitude(rosflight_msgs::Attitude msg)
 
 void SubHandlerHW::cb_minidaq(minidaq::minidaq_peripherals msg)
 {
-    bus_data.qbar = msg.press_diff;
+    double press_diff_mbar = double(msg.press_diff-0x666)/0x6ccc*25;
+    bus_data.qbar = press_diff_mbar*100 - offset_qbar_; // Convert to Pascal and store
+    double qbar_sign = 1;
+    if (bus_data.qbar < 0) { qbar_sign = -1; }
     bus_data.rho = 1.225; // Air density
-    bus_data.airspeed = sqrt(2*msg.press_diff/bus_data.rho);
-    bus_data.angle_of_attack = msg.aoa;
-    bus_data.angle_of_sideslip = msg.aos;
-    bus_data.temperature_air = msg.temperature;
-    bus_data.pressure_absolute = msg.press_abs;
+    bus_data.airspeed = qbar_sign*sqrt(2*fabs(bus_data.qbar)/bus_data.rho);
+
+    bus_data.angle_of_attack = double(msg.aoa-2048.0)/4096.0*(2*M_PI);
+    bus_data.angle_of_sideslip = double(msg.aos-2048.0)/4096.0*(2*M_PI);
+    bus_data.temperature_air = msg.temperature*0.01;
+    double press_abs_normalized = double(msg.press_abs-0x666)/0x6ccc;
+    double press_abs_mbar = press_abs_normalized*(1100-600)+600;
+    bus_data.pressure_absolute = press_abs_mbar*100; // Convert to Pascal
     bus_data.rps_motor = msg.rps; // Currently only for first motor
     // Disregard RC output information, available through ROSFlight topics
 
@@ -109,6 +122,10 @@ void SubHandlerHW::cb_gps(sensor_msgs::NavSatFix msg)
             geodetic_converter.initialiseReference(msg.latitude, msg.longitude, msg.altitude);
             did_set_home_ = true;
         }
+        bus_data.coordinates.x = msg.latitude;
+        bus_data.coordinates.y = msg.longitude;
+        bus_data.coordinates.z = msg.altitude;
+
         double n, e, d;
         geodetic_converter.geodetic2Ned(msg.latitude, msg.longitude, msg.altitude,
                                         &n, &e, &d);
@@ -124,11 +141,28 @@ void SubHandlerHW::cb_gps(sensor_msgs::NavSatFix msg)
         // bus_data.inertial_velocity.y = msg.pose.position.y;// NED frame
         // bus_data.inertial_velocity.z = msg.pose.position.z;// NED frame
 
-        flag_got_gps = true;
+        // flag_got_gps = true; // EKF doesn't need GPS position
     }
     else
     {
-        ROS_WARN("GPS didn't achieve 3D fix yet");
+        ROS_WARN_THROTTLE(10, "GPS didn't achieve 3D fix yet");
+    }
+
+}
+
+void SubHandlerHW::cb_gps_velocity(geometry_msgs::TwistWithCovarianceStamped msg)
+{
+    if (did_set_home_)
+    {
+        bus_data.inertial_velocity.x = msg.twist.twist.linear.x;
+        bus_data.inertial_velocity.y = msg.twist.twist.linear.y;
+        bus_data.inertial_velocity.z = msg.twist.twist.linear.z;
+
+        flag_got_gps = true;  // Let EKF know a new GPS velocity measurement is available
+    }
+    else
+    {
+        ROS_WARN_THROTTLE(10, "GPS didn't set home yet");
     }
 
 }
