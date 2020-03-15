@@ -9,3 +9,6 @@ ekf/cov_meas_vel_vert: 0.05
 ekf/cov_meas_qbar: 30.198
 ekf/cov_meas_alpha: 0.0028
 ekf/cov_meas_beta: 0.0035
+
+# Calibration offsets
+offset_qbar: -11.0

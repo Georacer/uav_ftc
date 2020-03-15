@@ -52,10 +52,12 @@ DataBus::DataBus(ros::NodeHandle par_n, uint data_source)
     n = par_n; // Store nodehandle
     if (data_source == DATA_SOURCE_LL)
     {
+        ROS_INFO("Creating new SITL databus");
         sub_handler_ = new SubHandlerLL(n);
     }
     if (data_source == DATA_SOURCE_HW)
     {
+        ROS_INFO("Creating new HW databus");
         sub_handler_ = new SubHandlerHW(n);
     }
     data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 100);
