@@ -11,7 +11,8 @@ constexpr int k_mpc_number_of_samples = 4;
 
 
 PathControllerROS::PathControllerROS(ros::NodeHandle nh)
-    : path_controller{get_controller_settings(nh)} {
+    : fe_ellipsoid_(default_fe_coeffs_), // Assign very large coeffs on squares to force always valid
+    path_controller{get_controller_settings(nh)} {
 
     double wp_radius;
     ros::param::param<double>("waypointRadius", wp_radius, 10);
@@ -87,7 +88,8 @@ void PathControllerROS::cb_update_flight_envelope(const uav_ftc::FlightEnvelopeE
         fe_msg->el_I,
         fe_msg->el_J,
     };
-    path_controller.set_fe_ellipsoid(coeffs);
+    path_controller.set_fe_ellipsoid(coeffs); 
+    fe_ellipsoid_.update_coeffs(coeffs);
     // TODO: could also pass box constraints provided in fe_msg
 }
 
@@ -110,6 +112,9 @@ void PathControllerROS::step()
         msg.vector.x = input.z(); // Copy over airspeed
         msg.vector.y = input.y(); // Copy over gamma
         msg.vector.z = input.x(); // Copy over psi_dot
+
+        double ellipsoid_value = fe_ellipsoid_.evaluate(input.z(), input.y(), input.x());
+        ROS_INFO("***Ellipsoid value: %f", ellipsoid_value);
 
         pub_uav_cmd_.publish(msg);
     }
@@ -223,7 +228,7 @@ int main (int argc, char **argv)
         // missing start time
         ros::Time t_end =ros::Time::now();
         ros::Duration t_calc = t_end-t_start;
-        printf("Path Controller calculations dt:%lf\n", t_calc.toSec());
+        // printf("Path Controller calculations dt:%lf\n", t_calc.toSec());
         //ROS Rate
         spinner.sleep();
     }

@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <math_utils.hpp>
 #include <uav_ftc/BusData.h>
 #include <uav_ftc/FlightEnvelopeEllipsoid.h>
 #include "path_controller.hpp"
@@ -19,6 +20,8 @@ class PathControllerROS {
     PathControllerSettings get_controller_settings(ros::NodeHandle) const;
     PathController path_controller;
     WaypointMngr waypoint_mngr_;
+    Ellipsoid3DCoefficients_t default_fe_coeffs_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0};  // Assign coeffs which always evaluate true
+    Ellipsoid3D fe_ellipsoid_;
     ros::Publisher pub_uav_cmd_;
     ros::Subscriber sub_uav_state_;
     ros::Subscriber sub_uav_path_;
