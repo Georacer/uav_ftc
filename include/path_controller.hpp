@@ -48,6 +48,7 @@ class PathController {
     PathController(const PathControllerSettings& s);
     ~PathController();
     VectorXd uav_model(Vector4d state, Vector3d inputs);
+    void set_wind(double w_n, double w_e, double w_d);
     void set_fe_ellipsoid(const Ellipsoid3DCoefficients_t);
     MatrixXd propagate_model(MatrixXd inputs);
     double cost_function(unsigned int n, const double* x, double* grad);
@@ -62,6 +63,7 @@ class PathController {
     Ellipsoid3DCoefficients_t default_fe_coeffs_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0};  // Assign coeffs which always evaluate true
     Ellipsoid3D fe_ellipsoid_;
     Vector4d uav_state_;
+    double wind_n_{0}, wind_e_{0}, wind_d_{0}; // Wind components, NED frame
     Vector4d state_target_;
     Vector3d input_target_;
     nlopt_opt opt;

@@ -85,20 +85,24 @@ PathController::~PathController(){
     nlopt_destroy(opt); 
 }
 
-VectorXd PathController::uav_model(Vector4d state, Vector3d inputs) {    
-    double wn = 0.0;
-    double we = 0.0;
-    double wd = 0.0;
-    
-    double pndot = inputs(2)*cos(state(3))*cos(inputs(1)) + wn ;
-    double pedot = inputs(2)*sin(state(3))*cos(inputs(1)) + we ;
-    double hdot =  -inputs(2)*sin(inputs(1)) - wd;
+VectorXd PathController::uav_model(Vector4d state, Vector3d inputs)
+{    
+    double pndot = inputs(2)*cos(state(3))*cos(inputs(1)) + wind_n_ ;
+    double pedot = inputs(2)*sin(state(3))*cos(inputs(1)) + wind_e_ ;
+    double hdot =  -inputs(2)*sin(inputs(1)) - wind_d_;
     double psidot = inputs(0);
     
     VectorXd ndot(pc_settings_.num_states);
     ndot << pndot, pedot, hdot, psidot;
 
     return ndot;
+}
+
+void PathController::set_wind(double w_n, double w_e, double w_d)
+{
+    wind_n_ = w_n;
+    wind_e_ = w_e;
+    wind_d_ = w_d;
 }
 
 // Set the flight envelope ellipsoid coeffients anew

@@ -34,16 +34,25 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
  * @param nav_msg 
  */
 void PathControllerROS::cb_update_uav_states(const uav_ftc::BusData::ConstPtr& nav_msg){
+    // Update position
     uav_state_(0)= nav_msg->position.x;
     uav_state_(1)= nav_msg->position.y;
     uav_state_(2)= nav_msg->position.z;
 
+    // Update orientation
     geometry_msgs::Quaternion quat;
     quat = nav_msg->orientation;
     Quaterniond rot_quat(quat.w, quat.x, quat.y, quat.z);
     Vector3d rot_euler = quat2euler(rot_quat);
-    
     uav_state_(3) = rot_euler.z();
+
+    // Update wind
+    path_controller.set_wind(
+        nav_msg->wind.x,
+        nav_msg->wind.y,
+        nav_msg->wind.z
+    );
+
     did_receive_state = true;
     
     return;
