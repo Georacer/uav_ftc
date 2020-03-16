@@ -1,8 +1,18 @@
+<!-- Does not run, needs updating -->
 <launch>
 
     <arg name="uav_name" default="skywalker_2013_mod"/>
 
     <group ns="$(arg uav_name)">
+        <param name="uav_name" value="$(arg uav_name)"/>
+
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
+        <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+            <param name="data_source" value="1"/>
+        </node>
+
+        <node pkg="aerodynamic_pi" name="aero_coeff_estimator" type="online_estimator.py" output="screen"/>
+
         <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
         <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
             <param name="uav_name" value="$(arg uav_name)"/>

@@ -10,36 +10,13 @@
     <arg name="scenario" default="none"/>
     <arg name="shutdownOnScenarioEnd" default="false"/>
 
-	<!-- External optional arguments -->
-	<arg name="home" default="nan"/>
-	<arg name="simRate" default="nan"/>
-	<arg name="deltaT" default="nan"/>
-
-	<!-- Launch the last_letter simulator components-->
-	<!-- Enable simulation clock -->
-	<param name="use_sim_time" type="bool" value="true" />
-
-	<!-- Launch the simulator /-->
-	<include file="$(find last_letter)/launch/simulation.launch" >
-		<arg name="uav_name" value="$(arg uav_name)"/>
-		<arg name="log" value="$(arg log)"/>
-		<arg name="home" value="$(arg home)"/>
-		<arg name="simRate" value="$(arg simRate)"/>
-		<arg name="deltaT" value="$(arg deltaT)"/>
-	</include>
-
-	<!-- Launch the input and control nodes -->
-	<include file="$(find last_letter)/launch/controls.launch" >
-		<arg name="manualMode" value="$(arg manualMode)"/>
-		<arg name="autoMode" value="$(arg autoMode)"/>
-		<arg name="uav_name" value="$(arg uav_name)"/>
-	</include>
-
-	<!-- Launch the visualizers /-->
-	<include file="$(find last_letter)/launch/visualization.launch" >
-		<arg name="uav_name" value="$(arg uav_name)" />
-		<!-- <arg name="groundCam" value="$(arg groundCam" /> -->
-	</include>
+    <!-- Launch last-letter simulation nodes -->
+    <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
+        <param name="manualMode" value="$(arg manualMode)"/>
+        <param name="autoMode" value="$(arg autoMode)"/>
+        <param name="uav_name" value="$(arg uav_name)"/>
+        <param name="log" value="$(arg log)"/>
+    </include>
     
     <!-- Launch uav_ftc-related nodes -->
     <group ns="$(arg uav_name)">
@@ -48,15 +25,9 @@
         <!-- <node pkg="aerodynamic_pi" name="aero_coeff_estimator" type="online_estimator.py" output="screen">
         </node> -->
 
-        <!-- Launch the flight envelope estimator -->
-        <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
-        <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
+        <include file="$(find uav_ftc)/launch/flight_envelope.launch" >
             <param name="uav_name" value="$(arg uav_name)"/>
-        </node> 
-        <!-- Alternatively, launch static FE publisher -->
-        <!-- <node pkg="uav_ftc" name="fe_publisher" type="fe_publisher.py" output="screen">
-            <param name="fe" value="slow_turn_right"/>
-        </node> -->
+        </include>
 
         <!-- Visualization nodes -->
         <!-- Wind estimates-->
@@ -73,30 +44,30 @@
         </node>
 
         <!--  -->
-        <!-- Launch controllers -->
+        <!-- Launch planner information -->
         <!--  -->
-        <!-- Load controller parameters -->
-        <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
+
         <!-- Load planner parameters -->
         <rosparam command="load" file="$(find uav_planner)data/parameters/params.yaml" />
         <!-- Load map -->
         <rosparam command="load" file="$(find uav_planner)data/parameters/map_sparse.yaml" />
         <!-- <rosparam command="load" file="$(find uav_planner)data/parameters/map_mountains.yaml" /> -->
-        
-        <!-- Raise rate controller -->
-        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>
-        <!-- Raise velocity controller -->
-        <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
-        <!-- Raise path controller -->
-        <!-- <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>  -->
-        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
-
-        <!-- Raise input aggreggator node -->
-        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
 
         <!-- Playback waypoints broadcasting from log file-->
         <node pkg="rosbag" name="replayer" type="play" args="-d 2 $(find uav_ftc)logs/waypoints_sparse_filtered_synched.bag"/>
         <!-- <node pkg="rosbag" name="replayer" type="play" args="-d 2 waypoints_mountain_filtered_synched.bag"/> -->
+
+        <!--  -->
+        <!-- Launch controllers -->
+        <!--  -->
+        <include file="$(find last_letter)/launch/controller.launch" />
+
+        <!--  -->
+        <!-- Launch logger -->
+        <!--  -->
+        <group if="$(arg log)">
+            <include file="$(find last_letter)/launch/logger.launch" />
+        </group>
 
     </group>
 

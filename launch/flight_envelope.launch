@@ -1,0 +1,21 @@
+<launch>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+
+    <group ns="$(arg uav_name)">
+
+        <!-- Launch the online estimator -->
+        <!-- <node pkg="aerodynamic_pi" name="aero_coeff_estimator" type="online_estimator.py" output="screen">
+        </node> -->
+
+        <!-- Launch the flight envelope estimator -->
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/fe_generator.yaml" />
+        <node pkg="uav_ftc" type="flight_envelope_generator_ros.py" name="flight_envelope_generator" output="screen">
+            <param name="uav_name" value="$(arg uav_name)"/>
+        </node> 
+        <!-- Alternatively, launch static FE publisher -->
+        <!-- <node pkg="uav_ftc" name="fe_publisher" type="fe_publisher.py" output="screen">
+            <param name="fe" value="slow_turn_right"/>
+        </node> -->
+    </group>
+
+</launch>

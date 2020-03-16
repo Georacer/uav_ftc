@@ -1,29 +1,18 @@
 <launch>
 
-    <!-- UNUSED, Connect model input with joystick -->
-    <arg name="manualMode"/>
-    <!-- UNUSED, Connect model input with a controller node -->
-    <arg name="autoMode"/>
-    <!-- uav_name parameter which selects aircraft namespace -->
-    <arg name="uav_name"/>
-	<!-- launch the default or the fault-tolerant controller -->
-	<arg name="ftc"/>
+    <!-- Load controller parameters -->
+    <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
+    
+    <!-- Raise rate controller -->
+    <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>
+    <!-- Raise velocity controller -->
+    <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
+    <!-- Raise path controller -->
+    <!-- <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>  -->
+    <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
 
-    <group ns="$(arg uav_name)">
-        <rosparam command="load" file="$(find uav_ftc)data/parameters/controller_params.yaml" />
-        <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen">
-            <!-- <remap from="refCmds" to="refTrajectory"/> -->
-            <remap from="refCmds" to="refRates"/>
-        </node>
-		<group if="$(arg ftc)">
-            <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller_2" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/> -->
-            <node pkg="uav_ftc" name="rate_controller_2" type="rate_controller_2" respawn="true" output="screen"/>
-            <!-- <node pkg="uav_ftc" name="trajectory_controller_2" type="trajectory_controller_2" respawn="true" output="screen"/> -->
-        </group>
-        <group unless="$(arg ftc)">
-            <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen"/>
-            <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
-        </group>
-        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
-    </group>
+    <!-- Raise input aggreggator node -->
+    <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
+
+
 </launch>

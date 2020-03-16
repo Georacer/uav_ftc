@@ -1,0 +1,33 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="false"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="false"/>
+
+
+    <!-- Enable detailed topic statistics, available @/statistics topic -->
+    <!-- CAUTOIN! May incur severe CPU load and timing inconsistencies  -->
+    <param name="enable_statistics" value="false"/>
+
+    <!-- Launch uav_ftc-related nodes -->
+    <group ns="$(arg uav_name)">
+
+        <!--  -->
+        <!-- Launch data sources -->
+        <!--  -->
+        <include file="$(find uav_ftc)/launch/data_sources.launch" />
+
+        <!--  -->
+        <!-- Launch logger -->
+        <!--  -->
+        <include if="$(arg log)" file="$(find uav_ftc)/launch/logger.launch" />
+
+    </group>
+
+</launch>

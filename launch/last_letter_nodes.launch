@@ -1,0 +1,42 @@
+<!-- Launch file to raise last-letter related simulation nodes -->
+
+<launch>
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="false"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+
+	<!-- External optional arguments -->
+	<arg name="home" default="nan"/>
+	<arg name="simRate" default="nan"/>
+	<arg name="deltaT" default="nan"/>
+
+	<!-- Launch the last_letter simulator components-->
+	<!-- Enable simulation clock -->
+	<param name="use_sim_time" type="bool" value="true" />
+
+	<!-- Launch the simulator /-->
+	<include file="$(find last_letter)/launch/simulation.launch" >
+		<arg name="uav_name" value="$(arg uav_name)"/>
+		<arg name="log" value="$(arg log)"/>
+		<arg name="home" value="$(arg home)"/>
+		<arg name="simRate" value="$(arg simRate)"/>
+		<arg name="deltaT" value="$(arg deltaT)"/>
+	</include>
+
+	<!-- Launch the input and control nodes -->
+	<include file="$(find last_letter)/launch/controls.launch" >
+		<arg name="manualMode" value="$(arg manualMode)"/>
+		<arg name="autoMode" value="$(arg autoMode)"/>
+		<arg name="uav_name" value="$(arg uav_name)"/>
+	</include>
+
+	<!-- Launch the visualizers /-->
+	<include file="$(find last_letter)/launch/visualization.launch" >
+		<arg name="uav_name" value="$(arg uav_name)" />
+		<!-- <arg name="groundCam" value="$(arg groundCam" /> -->
+	</include>
+
+</launch

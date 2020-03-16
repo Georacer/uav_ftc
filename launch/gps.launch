@@ -5,7 +5,7 @@
   <arg name="param_file_name" default="uav_ftc" doc="name of param file, e.g. rover" />
   <arg name="output" default="screen" />
   <arg name="respawn" default="true" />
-  <arg name="respawn_delay" default="5" />
+  <arg name="respawn_delay" default="1" />
   <arg name="clear_params" default="false" />
 
   <node pkg="ublox_gps" type="ublox_gps" name="$(arg node_name)"
