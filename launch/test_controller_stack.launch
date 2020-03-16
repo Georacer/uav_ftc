@@ -12,10 +12,9 @@
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
-        <param name="manualMode" value="$(arg manualMode)"/>
-        <param name="autoMode" value="$(arg autoMode)"/>
-        <param name="uav_name" value="$(arg uav_name)"/>
-        <param name="log" value="$(arg log)"/>
+        <arg name="manualMode" value="$(arg manualMode)"/>
+        <arg name="autoMode" value="$(arg autoMode)"/>
+        <arg name="uav_name" value="$(arg uav_name)"/>
     </include>
     
     <!-- Launch uav_ftc-related nodes -->
@@ -26,7 +25,7 @@
         </node> -->
 
         <include file="$(find uav_ftc)/launch/flight_envelope.launch" >
-            <param name="uav_name" value="$(arg uav_name)"/>
+            <arg name="uav_name" value="$(arg uav_name)"/>
         </include>
 
         <!-- Visualization nodes -->
@@ -60,7 +59,7 @@
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
-        <include file="$(find last_letter)/launch/controller.launch" />
+        <include file="$(find uav_ftc)/launch/controller.launch" />
 
         <!--  -->
         <!-- Launch logger -->
