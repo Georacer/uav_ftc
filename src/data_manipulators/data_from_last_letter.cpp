@@ -115,7 +115,7 @@ void SubHandlerLL::cb_environment(last_letter_msgs::Environment msg)
     wind_body.z() = msg.wind.z;
     bus_data.temperature_air = msg.temperature;
     bus_data.temperature_imu = msg.temperature;
-    bus_data.pressure_absolute = msg.pressure;
+    bus_data.pressure_absolute = msg.pressure*100; // Message pressure in mBar, convert to Pascal
     bus_data.rho = msg.density; // Air density
     bus_data.g = msg.gravity; // Gravity acceleration
 }

@@ -15,8 +15,8 @@ geometry_msgs/Vector3 wind # NED frame
 geometry_msgs/Wrench propulsion
 float64 temperature_air
 float64 temperature_imu
-float64 pressure_absolute
-float64 qbar # Differential (Dynamic) pressure
+float64 pressure_absolute # in Pascal
+float64 qbar # Differential (Dynamic) pressure, in Pascal
 float64 rho # Air density
 float64 g # Gravity acceleration
 float64[8] rc_in
