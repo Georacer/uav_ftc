@@ -119,8 +119,8 @@ void RateController::step()
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
     if (airdata(0) < 1)
     {
-        // ROS_WARN("Read airspeed: %f, setting to 1m/s", airdata_(0));
-        airdata(0) = 1;
+        ROS_WARN_THROTTLE(1, "Read airspeed: %f, setting to 5m/s", airdata_(0));
+        airdata(0) = 5;
     }
     // refRates are already saved in the controller
 
