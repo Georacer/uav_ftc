@@ -266,17 +266,20 @@ void RateController::getDefaultParameters(std::string uavName)
 ///////////////
 //Main function
 ///////////////
+// Node parameters
+// uav_name: name of the UAV, to access last_letter_models folder
+// ~rate: Rate at which to publish actuator control inputs
 int main(int argc, char **argv)
 {
 
     ros::init(argc, argv, "controlNode");
     ros::NodeHandle n;
+    ros::NodeHandle pnh("~");
 
-    // ros::WallDuration(0).sleep(); //wait for other nodes to get raised
     double ctrlRate;
-    if (!ros::param::get("ctrlRateRate", ctrlRate)) //frame rate in Hz
+    if (!pnh.getParam("rate", ctrlRate)) //frame rate in Hz
     {
-        ROS_ERROR("Could not find ctrlRateRate parameter");
+        ROS_ERROR("Could not find -rate- parameter");
         ros::shutdown();
     }
     ros::Rate spinner(ctrlRate);

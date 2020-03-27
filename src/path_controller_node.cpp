@@ -123,7 +123,7 @@ void PathControllerROS::step()
         msg.vector.z = input.x(); // Copy over psi_dot
 
         double ellipsoid_value = fe_ellipsoid_.evaluate(input.z(), input.y(), input.x());
-        ROS_INFO("***Ellipsoid value: %f", ellipsoid_value);
+        // ROS_INFO("***Ellipsoid value: %f", ellipsoid_value);
 
         pub_uav_cmd_.publish(msg);
     }
@@ -169,8 +169,8 @@ MatrixXd PathControllerROS::get_obstacles(ros::NodeHandle n) const {
     int obstacles_num;
     if (!ros::param::getCached("obstacle/obs_num", obstacles_num))
     {
-        ROS_FATAL("Invalid parameters for -obs_num- in param server!");
-        ros::shutdown();
+        ROS_WARN("No parameter -obs_num- in param server, setting to 0");
+        obstacles_num = 0;
     }
     obstacle_array.setZero(obstacles_num, 4);
 
