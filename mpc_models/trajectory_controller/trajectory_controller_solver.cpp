@@ -58,12 +58,12 @@ int main()
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
-  const double t_end = 4.0;        // Time horizon [s]
-  const double dt = 0.2;          // Discretization time [s]
+  const double t_end = 0.6;        // Time horizon [s]
+  const double dt = 0.2;           // Discretization time [s]
   const int N = round(t_end / dt); // Number of computation nodes
   const double g0 = 9.81;          // Gravity acceleration [m/s^2]
   const double rho = 1.225;        // Air density [kg/m^3]
-  const double Fmax = 300.0/10;               // Maximum motor thrust
+  const double Fmax = 1.2*g0;      // Maximum motor thrust (N)
 
   // Desired trajectory parameters, used for simulation
   double R = 100; // turn radius in meters
@@ -149,22 +149,22 @@ int main()
   // Running cost weight matrix
   DMatrix Q(h.getDim(), h.getDim());
   Q.setIdentity();
-  Q(0, 0) = 10; // Va
-  Q(1, 1) = 10000; // Flight path angle
-  Q(2, 2) = 1000; // turn rate
+  Q(0, 0) = 0.5; // Va
+  Q(1, 1) = 1000; // Flight path angle
+  Q(2, 2) = 10000; // turn rate
   Q(3, 3) = 0.01;  // alpha
   Q(4, 4) = 10;  // beta
   Q(5, 5) = 1;   // p
-  Q(6, 6) = 5;   // q
+  Q(6, 6) = 0.5;   // q
   Q(7, 7) = 10;   // r
-  Q(8, 8) = 0.1;   // throttle
+  Q(8, 8) = 0.001;   // throttle
 
   // End cost weight matrix
   DMatrix QN(hN.getDim(), hN.getDim());
   QN.setIdentity();
   QN(0, 0) = Q(0, 0);
   QN(1, 1) = Q(1, 1);
-  QN(2, 2) = 10;
+  QN(2, 2) = 100;
 
   ////////////////////////////////////
   // Define an optimal control problem
@@ -176,15 +176,15 @@ int main()
 
   // Add constraints
   // Input constraints
-  ocp.subjectTo(0.0 <= deltaF <= Fmax);
   ocp.subjectTo(-1.5 <= p <= 1.5); // Constraining p to help with solution feasibility
   ocp.subjectTo(-1.5 <= q <= 1.5); // Constraining q to help with solution feasibility
   ocp.subjectTo(-0.5 <= r <= 0.5); // Constraining r to help with solution feasibility
+  ocp.subjectTo(0.0 <= deltaF <= Fmax);
 
   // State constraints
   ocp.subjectTo(-45.0*M_PI/180.0 <= alpha <= 45.0*M_PI/180.0); // Stall protection
   ocp.subjectTo(-45.0*M_PI/180.0 <= beta <= 45.0*M_PI/180.0); // Constraining beta to help with solution feasibility 
-  ocp.subjectTo(-90.0*M_PI/180.0 <= phi <= 90.0*M_PI/180.0); // Constraining phi to help with solution feasibility
+  ocp.subjectTo(-120.0*M_PI/180.0 <= phi <= 120.0*M_PI/180.0); // Constraining phi to help with solution feasibility
   ocp.subjectTo(-90.0*M_PI/180.0 <= theta <= 90.0*M_PI/180.0); // Constraining theta to help with solution feasibility
 
   // Flight Envelope constraint
@@ -344,7 +344,7 @@ int main()
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                   // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, YES);   // Currently we do no plan to alter the constraints
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);    // Allow for variable constraints 
     mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // only used for time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
