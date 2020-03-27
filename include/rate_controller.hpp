@@ -71,7 +71,7 @@ private:
     ros::Subscriber subState, subRef, subParam;
     ros::Publisher pubCtrl;
     float dt_ = 0.02;
-    int numConstraints_ = 3;
+    int numConstraints_ = 0; // Do not update constraint bounds externally
     bool statesReceivedStatus_ = false;
 
     //////////

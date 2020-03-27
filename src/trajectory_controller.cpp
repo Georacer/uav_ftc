@@ -26,8 +26,9 @@ using Eigen::Vector3f;
  * @brief Construct a new Trajectory Controller:: Rate Controller object
  * 
  * @param n The ROS NodeHandle of the calling ROS node
+ * @param pnh The private ROS NodeHandle of the calling ROS node
  */
-TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(dt_, numConstraints_)
+TrajectoryController::TrajectoryController(ros::NodeHandle n, ros::NodeHandle pnh) : mpcController_(dt_, numConstraints_)
 {
     // Initialize default reference
     float inf = std::numeric_limits<float>::infinity();
@@ -67,6 +68,9 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n) : mpcController_(d
     mpcController_.setDefaultRunningReference(reference_);
     endReference_ << trimState(0), trimState(1), 0.0f;
     mpcController_.setDefaultEndReference(endReference_);
+
+    // Initialize default variable bounds
+    getDefaultBounds(pnh);
 
     // Capture trim/default online data values
 	std::string uavName;
@@ -380,6 +384,72 @@ void TrajectoryController::getDefaultParameters(std::string uavName)
     // ... and set constant term to negative
 }
 
+bool TrajectoryController::getDefaultBounds(ros::NodeHandle pnh) // Read default state and input bounds
+{
+    // Input constraints
+    double deltaF_min;
+    double p_min;
+    double q_min;
+    double r_min;
+    double deltaF_max;
+    double p_max;
+    double q_max;
+    double r_max;
+    pnh.param("pMin", p_min, -1.5);
+    pnh.param("qMin", q_min, -1.5);
+    pnh.param("rMin", r_min, -0.5);
+    pnh.param("deltaFMin", deltaF_min, 0.0);
+    pnh.param("pMax", p_max, 1.5);
+    pnh.param("qMax", q_max, 1.5);
+    pnh.param("rMax", r_max, 0.5);
+    pnh.param("deltaFMax", deltaF_max, 12.0);
+
+    // // State constraints
+    // double alpha_min;
+    // double beta_min;
+    // double phi_min;
+    // double theta_min;
+    // double alpha_max;
+    // double beta_max;
+    // double phi_max;
+    // double theta_max;
+    // //TODO: Convert defaults to radians
+    // pnh.param("alphaMin", alpha_min, -45.0);
+    // pnh.param("betaMin", beta_min, -45.0);
+    // pnh.param("phiMin", phi_min, -120.0);
+    // pnh.param("thetaMin", theta_min, -120.0);
+    // pnh.param("alphaMax", alpha_max, 45.0);
+    // pnh.param("betaMax", beta_max, 45.0);
+    // pnh.param("phiMax", phi_max, 120.0);
+    // pnh.param("thetaMax", theta_max, 120.0);
+
+    defaultBoundsMin_.resize(numConstraints_, Eigen::NoChange);
+    defaultBoundsMin_ <<
+        p_min,
+        q_min,
+        r_min,
+        deltaF_min
+        // alpha_min,
+        // beta_min,
+        // phi_min,
+        // theta_min
+    ;
+    mpcController_.setDefaultBoundsLower(defaultBoundsMin_);
+
+    defaultBoundsMax_.resize(numConstraints_, Eigen::NoChange);
+    defaultBoundsMax_ <<
+        p_max,
+        q_max,
+        r_max,
+        deltaF_max
+        // alpha_max,
+        // beta_max,
+        // phi_max,
+        // theta_max
+    ;
+    mpcController_.setDefaultBoundsUpper(defaultBoundsMax_);
+}
+
 void TrajectoryController::getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
 {
     ROS_INFO("Received new Flight Envelope");
@@ -405,17 +475,18 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "trajectoryControlNode");
     ros::NodeHandle n;
+    ros::NodeHandle pnh("~");
 
     // ros::WallDuration(1).sleep(); //wait for other nodes to get raised
     double ctrlRate;
-    if (!ros::param::get("ctrlTrajectoryRate", ctrlRate)) //frame rate in Hz
+    if (!pnh.getParam("rate", ctrlRate)) //frame rate in Hz
     {
-        ROS_ERROR("Could not find ctrlTrajectoryRate parameter");
+        ROS_ERROR("Could not find -~rate- parameter");
         ros::shutdown();
     }
     ros::Rate spinner(ctrlRate);
 
-    TrajectoryController rate_ctrl(n);
+    TrajectoryController rate_ctrl(n, pnh);
     spinner.sleep();
     ROS_INFO("trajectoryControlNode up");
 

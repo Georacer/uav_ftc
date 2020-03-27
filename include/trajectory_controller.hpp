@@ -41,6 +41,7 @@ enum class Parameter {
     el_J
 };
 
+
 // Vector containing the corresponding names of the Online Data components
 // Starts with UAV parameters and end with Flight Envelope parameters
 std::vector<std::string> online_data_names {
@@ -66,6 +67,24 @@ std::vector<std::string> online_data_names {
     "el_J"
 };
 
+
+// Declare the order of constraints in the solver code
+// Used to easily access and set the constraint limits
+// WARNING: enumerator order must be the same as declared in the solver code
+enum class Constraint {
+    // Input constraints
+    deltaF = 0,
+    p,
+    q,
+    r,
+    // State constraints
+    alpha,
+    beta,
+    phi,
+    theta
+};
+
+
 class TrajectoryController
 {
 private:
@@ -74,6 +93,8 @@ private:
     uav_ftc::BusData bus_data_; // Complete aircraft state
     Eigen::Matrix<float, kStateSize, 1> states_; // Va, alpha, beta, phi, theta
     Eigen::Matrix<real_t, kOdSize, 1> trimOnlineData_; // Vector holding default Online Data values
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1> defaultBoundsMin_; // Vector holding default min bounds
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1> defaultBoundsMax_; // Vector holding default max bounds
     Eigen::Vector3f airdata_;
     Eigen::Vector3d wind_body_;
     Eigen::Matrix<float, kRefSize, 1> reference_; // Va, gamma, psi_dot, alpha, beta
@@ -85,7 +106,7 @@ private:
     ros::Subscriber subState, subRef, subEnvironment, subParam, subFE;
     ros::Publisher pubCmdRates, pubCmdThrottle;
     float dt_ = 0.2;
-    int numConstraints_ = 4;
+    int numConstraints_ = 4;  // Number of input constraints
     bool statesReceivedStatus_ = false;
     float propD; // Propeller diameter
     float rho = 1.225; // Air density
@@ -108,10 +129,11 @@ public:
     void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
     void writeOutput();                                         // Send control signals to the control inputs aggregator
     void getDefaultParameters(std::string uavName);             // Read necessary UAV parameters
+    bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
     float calcOmega(const float thrust);                        // Calculate required RPM from desired thrust
 
     // Constructor
-    TrajectoryController(ros::NodeHandle n);
+    TrajectoryController(ros::NodeHandle nh, ros::NodeHandle pnh);
     // Destructor
     ~TrajectoryController();
 };

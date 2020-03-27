@@ -8,7 +8,25 @@
         <remap from="~rate" to="ctrlRateRate"/>
     </node>
     <!-- Raise velocity controller -->
-    <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen"/>
+    <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen">
+        <remap from="~rate" to="ctrlTrajectoryRate"/>
+        <remap from="~deltaFMin" to="deltaFMin"/>
+        <remap from="~pMin" to="pMin"/>
+        <remap from="~qMin" to="qMin"/>
+        <remap from="~rMin" to="rMin"/>
+        <remap from="~deltaFMax" to="deltaFMax"/>
+        <remap from="~pMax" to="pMax"/>
+        <remap from="~qMax" to="qMax"/>
+        <remap from="~rMax" to="rMax"/>
+        <remap from="~alphaMin" to="alphaMin"/>
+        <remap from="~betaMin" to="betaMin"/>
+        <remap from="~phiMin" to="phiMin"/>
+        <remap from="~thetaMin" to="thetaMin"/>
+        <remap from="~alphaMax" to="alphaMax"/>
+        <remap from="~betaMax" to="betaMax"/>
+        <remap from="~phiMax" to="phiMax"/>
+        <remap from="~thetaMax" to="thetaMax"/>
+    </node>
     <!-- Raise path controller -->
     <!-- <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>  -->
     <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
