@@ -27,10 +27,15 @@ public:
     bool setTrimState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setTrimInput(const Eigen::Ref<const Eigen::Matrix<T, kInputSize, 1>> input);
     bool setTrimOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
+    bool setDefaultBoundsLower(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> boundsLow);
+    bool setDefaultBoundsUpper(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> boundsHight);
     bool setDefaultRunningReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
     bool setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference);
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
     bool setOnlineDataSingle(const uint index, const T singleData); // Copy over a single online datum
+    bool setConstraintBoundsLower(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> constraintBounds);
+    bool setConstraintBoundsUpper(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> constraintBounds);
+    bool setConstraintBoundsSingle(const uint index, const T boundLow, const T boundHigh); // Copy over a single constraint limits pair
     bool setInitialState(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
     bool setReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference,
                       const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> referenceEnd);
@@ -82,23 +87,27 @@ private:
     // ACADO common.h does not define the number of constraints.
     // It shall be passed by the calling program and initialized at runtime
     #ifdef ACADO_HAS_CONSTRAINTS
-    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_lower_bounds_;
-    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples>> acado_upper_bounds_;
+    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples, Eigen::ColMajor>> acado_lower_bounds_;
+    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, kSamples, Eigen::ColMajor>> acado_upper_bounds_;
     #else
-    Eigen::Map<Eigen::Matrix<float, 1, 1>> acado_lower_bounds_;
-    Eigen::Map<Eigen::Matrix<float, 1, 1>> acado_upper_bounds_;
+    Eigen::Map<Eigen::Matrix<float, 1, 1, Eigen::ColMajor>> acado_lower_bounds_;
+    Eigen::Map<Eigen::Matrix<float, 1, 1, Eigen::ColMajor>> acado_upper_bounds_;
     #endif
 
     bool acado_is_prepared_{false};
+    bool external_lbounds_set_{false};
+    bool external_ubounds_set_{false};
     bool controller_is_reset_{false};
     T dt_; // Currently unused
-    int kConstraintSize_;
+    int kConstraintSize_{0};
     Eigen::Matrix<T, kInputSize, 1> kTrimInput_ =
         Eigen::Matrix<T, kInputSize, 1>::Zero();
     Eigen::Matrix<T, kStateSize, 1> kTrimState_ =
         Eigen::Matrix<T, kStateSize, 1>::Zero();
     Eigen::Matrix<T, kOdSize, 1> kTrimOnlineData_ =
         Eigen::Matrix<T, kOdSize, 1>::Zero();
+    Eigen::Matrix<T, Eigen::Dynamic, 1> defaultBoundsLower_;
+    Eigen::Matrix<T, Eigen::Dynamic, 1> defaultBoundsUpper_;
     Eigen::Matrix<T, kRefSize, 1> defaultReference_ =
         Eigen::Matrix<T, kRefSize, 1>::Zero();
     Eigen::Matrix<T, kEndRefSize, 1> defaultEndReference_ =

@@ -48,17 +48,7 @@ MpcWrapper<T>::MpcWrapper(T dt, int numConstraints) :
     dt_ = dt;
     kConstraintSize_ = numConstraints;
 
-    // Sanity check for corrent passing of bound values
-    // std::cout << "Upper limits:\n" << acado_upper_bounds_ << std::endl;
-    // std::cout << "Lower limits:\n" << acado_lower_bounds_ << std::endl;
     resetController();
-
-    ROS_INFO("Raised an MPC with attributes:");
-    ROS_INFO("# States: %d", kStateSize);
-    ROS_INFO("# Inputs: %d", kInputSize);
-    ROS_INFO("# OnlineData: %d", kOdSize);
-    ROS_INFO("# Running reference states: %d", kRefSize);
-    ROS_INFO("# End reference states: %d", kEndRefSize);
 }
 
 template <typename T>
@@ -79,6 +69,23 @@ template <typename T>
 bool MpcWrapper<T>::setTrimOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData)
 {
     kTrimOnlineData_ = onlineData;
+    return true;
+}
+
+template <typename T>
+bool MpcWrapper<T>::setDefaultBoundsLower(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> boundsLow)
+{
+    defaultBoundsLower_ = boundsLow;
+    // std::cout << "Set defaultBoundsLower_ to \n" << defaultBoundsLower_.transpose();
+    external_lbounds_set_ = true;
+    return true;
+}
+
+template <typename T>
+bool MpcWrapper<T>::setDefaultBoundsUpper(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> boundsHigh)
+{
+    defaultBoundsUpper_ = boundsHigh;
+    external_ubounds_set_ = true;
     return true;
 }
 
@@ -109,7 +116,7 @@ bool MpcWrapper<T>::setOnlineData(
     const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data)
 {
     // Copy over online data
-    acado_online_data_.block(0, 0, kOdSize, ACADO_N + 1) = online_data.replicate(1, ACADO_N + 1).template cast<float>();
+    acado_online_data_.block(0, 0, kOdSize, kSamples + 1) = online_data.replicate(1, kSamples + 1).template cast<float>();
 
     return true;
 }
@@ -127,7 +134,79 @@ template <typename T>
 bool MpcWrapper<T>::setOnlineDataSingle(const uint index, const T singleData)
 {
     // Copy over online data
-    acado_online_data_.block(index, 0, 1, ACADO_N + 1) = Eigen::MatrixXf::Constant(1, ACADO_N+1, singleData);
+    acado_online_data_.block(index, 0, 1, kSamples + 1) = Eigen::MatrixXf::Constant(1, kSamples+1, singleData);
+
+    return true;
+}
+
+/**
+ * @brief Set the lower bounds of the optimization constraints
+ * 
+ * @tparam T Data Type
+ * @param constraintBounds a kConstraintSize_ x 1 Eigen matrix, with min bounds
+ * @return true 
+ * @return false 
+ */
+template <typename T>
+bool MpcWrapper<T>::setConstraintBoundsLower(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> constraintBounds)
+{
+    // Copy over online data
+    // acado_lower_bounds_.block(0, 0, kConstraintSize_, kSamples) = m_tmp; // Cannot get this to run, getting SIGABRT
+    for (int i=0; i<kConstraintSize_; i++)
+    {
+        for (int j=0; j<kSamples; j++)
+        {
+            acado_lower_bounds_(i,j) = constraintBounds(i);
+        }
+    }
+    // std::cout << "Set acado_lower_bounds_ to \n" << acado_lower_bounds_;
+    external_lbounds_set_ = true;
+
+    return true;
+}
+
+/**
+ * @brief Set the upper bounds of the optimization constraints
+ * 
+ * @tparam T Data Type
+ * @param constraintBounds a kConstraintSize_ x 1 Eigen matrix, with max bounds
+ * @return true 
+ * @return false 
+ */
+template <typename T>
+bool MpcWrapper<T>::setConstraintBoundsUpper(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> constraintBounds)
+{
+    // Copy over online data
+    // acado_upper_bounds_ = constraintBounds.replicate(1, kSamples).template cast<float>();
+    for (int i=0; i<kConstraintSize_; i++)
+    {
+        for (int j=0; j<kSamples; j++)
+        {
+            acado_upper_bounds_(i,j) = constraintBounds(i);
+        }
+    }
+    external_ubounds_set_ = true;
+
+    return true;
+}
+
+/**
+ * @brief Set the Constraint Bounds Single object
+ * 
+ * @tparam T Data Type
+ * @param constraintBounds a kConstraintSize_ x 1 Eigen matrix, with max bounds
+ * @param index The data index in the constraints array (referring to the solver object)
+ * @param boundLow The lower bound value
+ * @param boundHigh Theu upper bound value
+ * @return true 
+ * @return false 
+ */
+template <typename T>
+bool MpcWrapper<T>::setConstraintBoundsSingle(const uint index, const T boundLow, const T boundHigh) // Copy over a single constraint limits pair
+{
+    // Copy over bound data
+    acado_lower_bounds_.block(index, 0, 1, kSamples) = Eigen::MatrixXf::Constant(1, kSamples, boundLow);
+    acado_upper_bounds_.block(index, 0, 1, kSamples) = Eigen::MatrixXf::Constant(1, kSamples, boundHigh);
 
     return true;
 }
@@ -388,12 +467,34 @@ bool MpcWrapper<T>::resetController()
         setOnlineData(kTrimOnlineData_);
     }
 
+    // TODO: Initialize constraints
+
     // Initialize the states and controls.
     setReference(defaultReference_, defaultEndReference_);
+    // Initialize constarints, if applicable
+    if (
+        (kConstraintSize_ > 0)
+        && external_lbounds_set_
+        && external_ubounds_set_
+        )
+    {
+        setConstraintBoundsLower(defaultBoundsLower_);
+        setConstraintBoundsUpper(defaultBoundsUpper_);
+    }
 
     // Initialize solver.
     // prepare();
     controller_is_reset_ = true;
+
+    ROS_INFO("Set/Reset an MPC with attributes:");
+    ROS_INFO("# States: %d", kStateSize);
+    ROS_INFO("# Inputs: %d", kInputSize);
+    ROS_INFO("# OnlineData: %d", kOdSize);
+    ROS_INFO("# Running reference states: %d", kRefSize);
+    ROS_INFO("# End reference states: %d", kEndRefSize);
+    // Sanity check for corrent passing of bound values
+    std::cout << "# Upper limits:\n" << acado_upper_bounds_ << std::endl;
+    std::cout << "# Lower limits:\n" << acado_lower_bounds_ << std::endl;
 }
 
 /**
