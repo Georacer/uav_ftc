@@ -12,7 +12,9 @@
     <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen"/>
 
     <!-- Raise input aggreggator node -->
-    <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen"/>
+    <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
+        <remap from="~rate" to="/world/simRate"/>
+    </node>
 
 
 </launch>

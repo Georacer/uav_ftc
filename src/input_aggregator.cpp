@@ -21,7 +21,6 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
     rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
     surfaceSub_ = n.subscribe("ctrlSurfaceCmds", 1, &InputAggregator::surfaceCtrlsCallback, this);
     throttleSub_ = n.subscribe("throttleCmd", 1, &InputAggregator::throttleCtrlsCallback, this);
-    clockSub_ = n.subscribe("/clock", 100, &InputAggregator::clockCallback, this);
 
     pub_ = n.advertise<last_letter_msgs::SimPWM>("ctrlPWM", 10);
 
@@ -53,10 +52,11 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     surfaceCtrls_.vector.y = msg.vector.y;
     surfaceCtrls_.vector.z = msg.vector.z;
 
+    // // If controllers are enabled, publish as fast as you have control surface inputs and not faster
     // if (ctrlMode_ == 1 || 
     //     ctrlMode_ == 2 ||
     //     ctrlMode_ == 3
-    //    ) // Publish as fast as you have control surface inputs
+    //    )
     // {
     //     publishCtrls();
     // }
@@ -70,17 +70,6 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 void InputAggregator::throttleCtrlsCallback(geometry_msgs::Vector3Stamped msg)
 {
     throttleCtrls_ = msg;
-}
-
-
-/**
- * @brief Publish the last controls message every time a new clock pulse is received
- * 
- * @param msg 
- */
-void InputAggregator::clockCallback(rosgraph_msgs::Clock msg)
-{
-    publishCtrls();
 }
 
 
@@ -139,14 +128,33 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "input_aggregator");
     ros::NodeHandle n;
+    ros::NodeHandle pnh("~");
+    int spin_rate;
+    if (!pnh.getParam("rate", spin_rate))
+    {
+        ROS_ERROR("Could not find -rate- parameter");
+        ros::shutdown();
+    }
+    else {
+        ROS_INFO("Publishing control inputs at %dHz", spin_rate);
+    }
+	ros::Rate spinner(spin_rate); 
 
     InputAggregator input_aggregator(n);
-    // ros::WallDuration(3).sleep(); //wait for other nodes to get raised
     ROS_INFO("Input Aggregator node up");
 
     while (ros::ok())
     {
-        ros::spin();
+        ros::spinOnce();
+        spinner.sleep();
+        if (!input_aggregator.ctrl_stale)
+        {
+            input_aggregator.publishCtrls();
+        }
+        else
+        {
+            ROS_WARN("Control is stale and will not publish");
+        }
     }
 
     return 0;

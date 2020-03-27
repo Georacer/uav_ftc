@@ -11,7 +11,7 @@ class InputAggregator
 private:
 ///////////
 //Variables
-ros::Subscriber rawSub_, surfaceSub_, throttleSub_, clockSub_;
+ros::Subscriber rawSub_, surfaceSub_, throttleSub_;
 ros::Publisher pub_;
 int ctrlMode_ = 0;
 last_letter_msgs::SimPWM rawCtrls_;
@@ -19,6 +19,10 @@ geometry_msgs::Vector3Stamped surfaceCtrls_, throttleCtrls_;
 last_letter_msgs::SimPWM mixedCtrls_;
 
 public:
+////////////
+// Variables
+bool ctrl_stale{false}; // TODO: for future feature
+
 ////////// 
 // Methods
 
