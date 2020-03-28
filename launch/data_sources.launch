@@ -1,12 +1,12 @@
 <launch>
 
     <!-- Launch the minidaq client -->
-    <node pkg="minidaq" name="minidaq" type="minidaq_peripherals.py" output="screen">
+    <node pkg="minidaq" name="minidaq" type="minidaq_peripherals.py" respawn="true" output="screen">
         <param name="port" value="/dev/minidaq"/>
     </node>
 
     <!-- Launch ROSFlight client -->
-    <node pkg="rosflight" type="rosflight_io" name="rosflight" output="screen">
+    <node pkg="rosflight" type="rosflight_io" name="rosflight" respawn="true" output="screen">
         <param name="port" value="/dev/rosflight"/>
     </node>
 
@@ -15,7 +15,7 @@
 
     <!-- Launch the databus -->
     <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
-    <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+    <node pkg="uav_ftc" name="data_bus" type="data_bus" respawn="true" output="screen">
         <param name="data_source" value="0"/>
     </node>
 

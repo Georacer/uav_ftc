@@ -15,8 +15,10 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh)
     path_controller{get_controller_settings(nh)} {
 
     double wp_radius;
+    // TODO: place under private variable
     ros::param::param<double>("waypointRadius", wp_radius, 10);
     waypoint_mngr_.set_goal_radius(wp_radius);
+    // TODO: set lookahead num waypoints
 
     //Create Publishers
     pub_uav_cmd_ = nh.advertise<geometry_msgs::Vector3Stamped>("refTrajectory", 10);
@@ -219,13 +221,14 @@ int main (int argc, char **argv)
 {       
     ros::init (argc, argv, "uav_mpc_node");
     ros::NodeHandle nh;
+    ros::NodeHandle pnh("~");
 
     PathControllerROS path_controller_ros(nh);
 
     double ctrlRate;
-    if (!ros::param::get("ctrlPathRate", ctrlRate)) //frame rate in Hz
+    if (!pnh.getParam("rate", ctrlRate)) //frame rate in Hz
     {
-        ROS_ERROR("Could not find ctrlPathRate parameter");
+        ROS_ERROR("Could not find -~rate- parameter");
         ros::shutdown();
     }
     ros::Rate spinner(ctrlRate);
