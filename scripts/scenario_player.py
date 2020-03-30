@@ -23,7 +23,8 @@ class Scheduler:
 
     def __init__(self, scenario_file):
         self.start_time = rospy.Time.now()  # Store initialization instance
-        self.ref_pub = rospy.Publisher('refTrajectory', Vector3Stamped, queue_size=10) # Setup reference publisher
+        self.ref_rates_pub = rospy.Publisher('refRates', Vector3Stamped, queue_size=10) # Setup rates reference publisher
+        self.ref_traj_pub = rospy.Publisher('refTrajectory', Vector3Stamped, queue_size=10) # Setup trajectory reference publisher
         # Setup fault publisher
         self.fg = fg.FaultGenerator()
         self.fault_pub = rospy.Publisher('parameter_changes', Parameter, queue_size=100)
@@ -77,6 +78,23 @@ class Scheduler:
                 self.timestamp = rospy.Time.now()
                 continue
 
+            if attribute == 'angular_rates':
+            # Read and publish a new reference rates tuple
+                rospy.loginfo('Publishing new reference rates')
+                for ref_type, ref_value in value.iteritems():
+                    if ref_type == 'p':
+                        v_attr_name = 'x'
+                    elif ref_type == 'q':
+                        v_attr_name = 'y'
+                    elif ref_type == 'r':
+                        v_attr_name = 'z'
+                    else:
+                        raise AttributeError('Invalid reference attribute {}'.format(attribute))
+                    setattr(self.reference.vector, v_attr_name, ref_value)
+                rospy.loginfo("New reference:\n {}".format(self.reference))
+                self.reference.header.stamp = self.timestamp
+                self.ref_rates_pub.publish(self.reference)
+
             if attribute == 'trajectory':
             # Read and publish a new reference trajectory
                 rospy.loginfo('Publishing new reference trajectory')
@@ -85,14 +103,14 @@ class Scheduler:
                         v_attr_name = 'x'
                     elif ref_type == 'gamma':
                         v_attr_name = 'y'
-                    elif ref_type == 'turn_radius':
+                    elif ref_type == 'psi_dot':
                         v_attr_name = 'z'
                     else:
                         raise AttributeError('Invalid reference attribute {}'.format(attribute))
                     setattr(self.reference.vector, v_attr_name, ref_value)
                 rospy.loginfo("New reference:\n {}".format(self.reference))
                 self.reference.header.stamp = self.timestamp
-                self.ref_pub.publish(self.reference)
+                self.ref_traj_pub.publish(self.reference)
 
             if attribute == 'fault':
             # Signal a new fault from a predetermined set of faults

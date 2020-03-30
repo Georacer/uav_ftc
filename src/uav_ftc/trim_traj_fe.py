@@ -362,7 +362,7 @@ class FlightEnvelope:
     "-v",
     "--verbose",
     is_flag=True,
-    default=True,
+    default=False,
     help="Enable verbose output",
 )
 def test_code(model_name, plot, interactive, export_path, verbose):

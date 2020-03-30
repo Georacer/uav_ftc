@@ -1,0 +1,51 @@
+{
+    "relative_time": false,
+    "point_1": {
+        "time": 5,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": 0,
+            "psi_dot": 0
+        }
+    },
+    "point_2": {
+        "time": 10,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": 0.52,
+            "psi_dot": 0.5
+        }
+    },
+    "point_3": {
+        "time": 15,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": 0,
+            "psi_dot": 0
+        }
+    },
+    "point_4": {
+        "time": 20,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": -0.52,
+            "psi_dot": -0.5
+        }
+    },
+    "point_5": {
+        "time": 25,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": 0,
+            "psi_dot": 0
+        }
+    },
+    "point_6": {
+        "time": 30,
+        "trajectory": {
+            "airspeed": 18,
+            "gamma": 0,
+            "psi_dot": 0
+        }
+    }
+}

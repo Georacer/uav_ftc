@@ -221,7 +221,7 @@ def plot_angular_rates_errors(log_dataset):
     return (fig, axh)
 
 
-def plot_trajectories(log_dataset):
+def plot_trajectories(log_dataset, x_lims=None, y_lims=None):
     fig = plt.figure(dpi=400)
     colorlist = build_colorlist(len(log_dataset.keys()))
 
@@ -230,12 +230,16 @@ def plot_trajectories(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refTrajectory, log_data.ref_Va, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refTrajectory, log_data.ref_Va, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.airspeed, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    # axh.set_xlim([t_start,t_end]) # Filter data themselves
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
     axh.set_xticklabels([])
+    if y_lims is not None:
+        if y_lims[0] is not None:
+            axh.set_ylim(y_lims[0])
     axh.set_ylabel('Airspeed (m/s)')
     axh.grid(True)
     axh.legend(handles = legend_handles, fontsize='xx-small')
@@ -245,12 +249,16 @@ def plot_trajectories(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refTrajectory, log_data.ref_gamma, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refTrajectory, log_data.ref_gamma, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.gamma, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
     axh.set_xticklabels([])
-    axh.set_ylim([-0.4, 0.4])
+    if y_lims is not None:
+        if y_lims[1] is not None:
+            axh.set_ylim(y_lims[1])
     axh.set_ylabel('$\gamma$ (rad)')
     axh.grid(True)
     axh.legend(handles = legend_handles, fontsize='xx-small')
@@ -260,11 +268,15 @@ def plot_trajectories(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refTrajectory, log_data.ref_psi_dot, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refTrajectory, log_data.ref_psi_dot, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.psi_dot, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    axh.set_ylim([-0.5, 0.5])
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
+    if y_lims is not None:
+        if y_lims[2] is not None:
+            axh.set_ylim(y_lims[2])
     axh.set_ylabel('$\dot{\psi}$ (rad/s)')
     axh.set_xlabel('Time (s)')
     axh.grid(True)
@@ -406,7 +418,7 @@ def plot_fe_subfigure(axh, log_dataset, log_names, fe_params, plot_ref=True):
     el_fit.ellipsoid_plot(center, radii, evecs, axh, cage_color='g', cage_alpha=0.2)
 
 
-def plot_flight_envelope(log_dataset, fe_params_sets, log_names_sets=None):
+def plot_flight_envelope(log_dataset, fe_params_sets, log_names_sets=None, plot_ref=True):
     # Create a figure
     fig = plt.figure(dpi=200, figsize=(8,16))
     # fig.suptitle('airspeed')
@@ -420,7 +432,7 @@ def plot_flight_envelope(log_dataset, fe_params_sets, log_names_sets=None):
             log_names = log_dataset.keys()
         else:
             log_names = log_names_sets[i]
-        plot_fe_subfigure(axh, log_dataset, log_names, fe_params_sets[i])
+        plot_fe_subfigure(axh, log_dataset, log_names, fe_params_sets[i], plot_ref)
         subfig_cntr += 1
 
     return fig, axh

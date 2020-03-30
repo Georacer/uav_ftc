@@ -58,7 +58,7 @@ int main()
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
-  const double t_end = 0.6;        // Time horizon [s]
+  const double t_end = 4.0;        // Time horizon [s]
   const double dt = 0.2;           // Discretization time [s]
   const int N = round(t_end / dt); // Number of computation nodes
   const double g0 = 9.81;          // Gravity acceleration [m/s^2]
@@ -138,7 +138,8 @@ int main()
     << psi_dot // Prescribed turn rate
     << alpha << beta // Minimize alpha and beta
     << p << q << r // Prescribed angular rates
-    << deltaF; // Minimize throttle
+    << deltaF // Minimize throttle
+    << phi;
 
   // End cost vector, cannot depend on controls, only on state
   hN << Va // Presribed airspeed 
@@ -153,11 +154,12 @@ int main()
   Q(1, 1) = 1000; // Flight path angle
   Q(2, 2) = 10000; // turn rate
   Q(3, 3) = 0.01;  // alpha
-  Q(4, 4) = 10;  // beta
+  Q(4, 4) = 100;  // beta
   Q(5, 5) = 1;   // p
   Q(6, 6) = 0.5;   // q
   Q(7, 7) = 10;   // r
   Q(8, 8) = 0.001;   // throttle
+  Q(9, 9) = 0.01;   // bank angle
 
   // End cost weight matrix
   DMatrix QN(hN.getDim(), hN.getDim());

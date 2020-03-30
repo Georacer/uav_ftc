@@ -8,6 +8,7 @@
 #include <uav_ftc/FlightEnvelopeEllipsoid.h>
 #include <last_letter_msgs/Environment.h>
 #include <last_letter_msgs/Parameter.h>
+#include <math_utils.hpp>
 
 // Declare the order of OnlineData in the solver code
 // Used to easily access the online data array elements
@@ -102,6 +103,8 @@ private:
     Eigen::Vector3f referenceTrajectory_; // Va, gamma, R
     Eigen::Vector4f refInputs_; // Stores reference inputs
     Eigen::Vector4f predictedControls_; // Stores control outputs
+    Ellipsoid3DCoefficients_t default_fe_coeffs_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0};  // Assign coeffs which always evaluate true
+    Ellipsoid3D fe_ellipsoid_;
     ros::Time tprev;
     ros::Subscriber subState, subRef, subEnvironment, subParam, subFE;
     ros::Publisher pubCmdRates, pubCmdThrottle;

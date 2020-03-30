@@ -6,6 +6,7 @@
 	<arg name="manualMode" default="false"/>
 	<arg name="autoMode" default="false"/>
 	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="visuals" default="true"/>
 	<arg name="log" default="false"/>
 
 	<!-- External optional arguments -->
@@ -34,7 +35,7 @@
 	</include>
 
 	<!-- Launch the visualizers /-->
-	<include file="$(find last_letter)/launch/visualization.launch" >
+	<include if="$(arg visuals)" file="$(find last_letter)/launch/visualization.launch" >
 		<arg name="uav_name" value="$(arg uav_name)" />
 		<!-- <arg name="groundCam" value="$(arg groundCam" /> -->
 	</include>

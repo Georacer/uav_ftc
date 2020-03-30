@@ -1,10 +1,13 @@
 <!-- Launch file for logging of relevant topics -->
 <launch>
 
+	<arg name="custom_name" default="false"/>
+	<arg name="log_name" default="UAV_recording"/>
     <!-- Record all topics related to uav_ftc experiment -->
     <!-- <node pkg="rosbag" name="recorder" type="record" args="-o UAV_recording refTrajectory refRates minidaq_peripherals gps/fix gps/fix_velocity dataBus attitude imu/data imu/temperature rc_raw output_raw command status"/>  -->
 
     <!-- Record all topics -->
-    <node pkg="rosbag" name="recorder" type="record" args="-o UAV_recording -a"/> 
+    <node unless="$(arg custom_name)" pkg="rosbag" name="recorder" type="record" args="-o UAV_recording -a"/> 
+    <node if="$(arg custom_name)" pkg="rosbag" name="recorder" type="record" args="-O $(arg log_name) -a"/> 
 
 </launch>

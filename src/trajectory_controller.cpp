@@ -28,7 +28,9 @@ using Eigen::Vector3f;
  * @param n The ROS NodeHandle of the calling ROS node
  * @param pnh The private ROS NodeHandle of the calling ROS node
  */
-TrajectoryController::TrajectoryController(ros::NodeHandle n, ros::NodeHandle pnh) : mpcController_(dt_, numConstraints_)
+TrajectoryController::TrajectoryController(ros::NodeHandle n, ros::NodeHandle pnh) 
+    : mpcController_(dt_, numConstraints_)
+    , fe_ellipsoid_(default_fe_coeffs_)  // Assign very large coeffs on squares to force always valid
 {
     // Initialize default reference
     float inf = std::numeric_limits<float>::infinity();
@@ -183,10 +185,25 @@ void TrajectoryController::getStates(uav_ftc::BusData bus_data)
     double r = bus_data_.velocity_angular.z;
     double psi_dot = (q*sin(euler.x()) + r*cos(euler.x()))/cos(euler.y());
     // std::cout req/act: " <<  reference_(2) << "/\t" << psi_dot << std::endl;
+    // Calculate gamma
+    double sa = sin(states_(1));
+    double ca = cos(states_(1));
+    double sb = sin(states_(2));
+    double cb = cos(states_(2));
+    double sph = sin(euler.x());
+    double cph = cos(euler.x());
+    double sth = sin(euler.y());
+    double cth = cos(euler.y());
+    double gamma = asin((ca*cb)*sth - (sph*sb + cph*sa*cb)*cth); // Stevens-Lewis 2003 3.4-2
 
     wind_body_.x() = bus_data.wind.x;
     wind_body_.y() = bus_data.wind.y;
     wind_body_.z() = bus_data.wind.z;
+
+    // Calculate FE ellipsoid value
+    double ellipsoid_value = fe_ellipsoid_.evaluate(states_(0), gamma, psi_dot);
+    // ROS_INFO("***Ellipsoid value: %f", ellipsoid_value);
+    // mpcController_.printSolverState();
 
     statesReceivedStatus_ = true;
 }
@@ -258,23 +275,40 @@ float TrajectoryController::calcOmega(const float thrust)
  */
 void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajectory)
 {
-    Eigen::Vector3f tempTrajectory;
-    tempTrajectory << (float)pRefTrajectory.vector.x,
-                                      (float)pRefTrajectory.vector.y,
-                                      (float)pRefTrajectory.vector.z;
+    Vector3d setpoint, projected_setpoint;
+    setpoint << pRefTrajectory.vector.x,
+                pRefTrajectory.vector.y,
+                pRefTrajectory.vector.z;
+
+    // Evaluate setpoint
+    double point_value = fe_ellipsoid_.evaluate(setpoint.x(), setpoint.y(), setpoint.z());
+    if (point_value>0)
+    {
+        // Project setpoint onto ellipsoid
+        projected_setpoint = fe_ellipsoid_.project_point(setpoint);
+        // std::cout << "*** Projected point " << setpoint.transpose() << " onto " << projected_setpoint.transpose() << std::endl;
+    }
+    else
+    {
+        projected_setpoint = setpoint;
+        // std::cout << "Reference " << projected_setpoint << " already valid" << std::endl;
+    }
+    Eigen::Vector3f tempTrajectory = projected_setpoint.cast<float>();
+    // Calculate an estimate for the final roll angle
+    float g = 9.81;
+    float endPhi = atan(reference_(2)*reference_(0)/g);
+
     reference_(0) = tempTrajectory(0); // Copy over airspeed
     reference_(1) = tempTrajectory(1); // Copy over gamma   
     // float psiDotDes = calcPsiDotDes(tempTrajectory); // Calculate desired psi_dot // Not needed anymore, reference is passed as psi_dot
     reference_(2) = tempTrajectory(2);
     reference_(3) = 0.0f;
     reference_(4) = 0.0f;
+    reference_(9) = endPhi;
     reference_.segment(kStateSize, refInputs_.size()) = refInputs_;
 
     endReference_(0) = tempTrajectory(0);
     endReference_(1) = tempTrajectory(1);
-    // Calculate an estimate for the final roll angle
-    float g = 9.81;
-    float endPhi = atan(reference_(2)*reference_(0)/g);
     endReference_(2) = endPhi;
 }
 
@@ -456,14 +490,28 @@ void TrajectoryController::getFlightEnvelope(const uav_ftc::FlightEnvelopeEllips
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_A, fe_msg->el_A);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_B, fe_msg->el_B);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_C, fe_msg->el_C);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_D, fe_msg->el_E);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_E, fe_msg->el_D);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_D, fe_msg->el_D);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_E, fe_msg->el_E);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_F, fe_msg->el_F);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_G, fe_msg->el_G);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_H, fe_msg->el_H);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_I, fe_msg->el_I);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_J, fe_msg->el_J);
     // TODO: could also pass box constraints provided in fe_msg
+    // Update the ellipsoid coefficients for debugging purposes
+    Ellipsoid3DCoefficients_t coeffs = {
+        fe_msg->el_A,
+        fe_msg->el_B,
+        fe_msg->el_C,
+        fe_msg->el_D,
+        fe_msg->el_E,
+        fe_msg->el_F,
+        fe_msg->el_G,
+        fe_msg->el_H,
+        fe_msg->el_I,
+        fe_msg->el_J,
+    };
+    fe_ellipsoid_.update_coeffs(coeffs);
 }
 
 

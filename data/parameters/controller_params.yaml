@@ -12,6 +12,24 @@ ctrlRateRate: 50 # Frequency of the rate controller
 ctrlTrajectoryRate: 5 # Frequency of the rate controller
 ctrlPathRate: 2 # Frequency of the rate controller
 
+# MPC bounds
+deltaFMin: 0.0
+pMin: -1.5
+qMin: -1.5
+rMin: -0.25
+deltaFMax: 12.0
+pMax: 1.5
+qMax: 1.5
+rMax: 0.25
+# alphaMin: -0.785 # 45 degrees
+# betaMin: -0.785 # 45 degrees
+# phiMin: -2.09 # 120 degrees
+# thetaMin: -1.57 # 90 degrees
+# alphaMax: 0.785
+# betaMax: 0.785
+# phiMax: 2.09
+# thetaMax: 1.57
+
 # # Reference generator parameters for trajectory input
 referenceMin: [10.0, -0.52, -0.5] # Minimum trajectory limits
 referenceMax: [20.0,  0.52,  0.5] # Scaling factor of reference commands
@@ -20,4 +38,4 @@ referenceMax: [20.0,  0.52,  0.5] # Scaling factor of reference commands
 # referenceMin: [-1.0, -1.0, -0.5] # Minimum rate limits
 # referenceMax: [ 1.0,  1.0,  0.5] # Maximum rate limits
 
-waypointRadius: 30
+waypointRadius: 30.0
