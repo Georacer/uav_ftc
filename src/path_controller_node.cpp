@@ -10,9 +10,9 @@ constexpr int k_number_of_inputs = 3;
 constexpr int k_mpc_number_of_samples = 4;
 
 
-PathControllerROS::PathControllerROS(ros::NodeHandle nh)
+PathControllerROS::PathControllerROS(ros::NodeHandle nh, ros::NodeHandle pnh)
     : fe_ellipsoid_(default_fe_coeffs_), // Assign very large coeffs on squares to force always valid
-    path_controller{get_controller_settings(nh)} {
+    path_controller{get_controller_settings(nh, pnh)} {
 
     double wp_radius;
     // TODO: place under private variable
@@ -194,7 +194,7 @@ MatrixXd PathControllerROS::get_obstacles(ros::NodeHandle n) const {
     return obstacle_array;
 }
 
-PathControllerSettings PathControllerROS::get_controller_settings(ros::NodeHandle nh) const {
+PathControllerSettings PathControllerROS::get_controller_settings(ros::NodeHandle nh, ros::NodeHandle pnh) const {
     ROS_INFO("Reading path controller settings");
     PathControllerSettings controller_settings;
 
@@ -203,9 +203,9 @@ PathControllerSettings PathControllerROS::get_controller_settings(ros::NodeHandl
     controller_settings.num_samples = k_mpc_number_of_samples;
 
     double ctrl_path_rate;
-    if (!ros::param::getCached("ctrlPathRate", ctrl_path_rate))
+    if (!pnh.getParam("rate", ctrl_path_rate))
     {
-        ROS_FATAL("Invalid parameters for -ctrlPathRate- in param server!");
+        ROS_FATAL("Invalid parameters for -~rate- in param server!");
         ros::shutdown();
     }
     controller_settings.dt = 1.0/ctrl_path_rate;
@@ -223,7 +223,7 @@ int main (int argc, char **argv)
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
 
-    PathControllerROS path_controller_ros(nh);
+    PathControllerROS path_controller_ros(nh, pnh);
 
     double ctrlRate;
     if (!pnh.getParam("rate", ctrlRate)) //frame rate in Hz
