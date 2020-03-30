@@ -345,6 +345,7 @@ void PathController::step(Vector4d state, Vector3d waypoint){
 void WaypointMngr::set_waypoints(const Matrix<double, Dynamic, 3>& waypoints)
 {
     waypoints_ = waypoints;
+    std::cout << "path_controller: Received waypoints " << waypoints_ << std::endl;
     did_receive_waypoints_ = true;
 }
 
@@ -392,17 +393,7 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
         throw err;
     }
 
-    // Check if we have arrived at the current waypoint
-    Vector2d wp_next = waypoints_.row(wp_counter_).transpose().segment<2>(0);
-    double distance_to_wp = get_distance_from_target(pos.segment<2>(0), wp_next);
-    // if yes, increase the counter
-    if (distance_to_wp < goal_radius_){
-        if (wp_counter_-1<waypoints_.rows()){
-            wp_counter_ += 1;
-            std::cout << "Got near enough current waypoint\n";
-        }
-    }
-    // Also check if we have flown past the current waypoint
+    // Preemptively obtain the previous waypoint
     Vector2d wp_prev;
     if (wp_counter_==0) {
         wp_prev = pos.segment<2>(0); 
@@ -410,10 +401,39 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     else {
         wp_prev = waypoints_.row(wp_counter_-1).transpose().segment<2>(0);
     }
+    
+    // Obtain the desired waypoint
+    Vector2d wp_next = waypoints_.row(wp_counter_).transpose().segment<2>(0);
+
+    // Calculate distance to desired waypoint
+    double distance_to_wp = get_distance_from_target(pos.segment<2>(0), wp_next);
+    // Calculate distance to finish line
     double distance_to_finish_line = get_distance_from_target(pos.segment<2>(0), wp_prev, wp_next);
-    if (distance_to_finish_line < 0) {
+
+    // Check if we are close to the desired waypoint
+    if (distance_to_wp < goal_radius_) // if yes, increase the counter
+    {
+        if (wp_counter_-1 < waypoints_.rows())
+        {
+            wp_counter_ += 1;
+            std::cout << "Got near enough current waypoint\n";
+        }
+        else // We have reached the final waypoint
+        {
+            wp_counter_ = 0;
+        }
+    }
+    // Check if we have gone past the desired waypoint
+    else if (distance_to_finish_line < 0) // If yes, increase the wp counter
+    {
         wp_counter_ += 1;
         std::cout << "Got past current waypoint\n";
+    }
+    // Check if all waypoints have been visited
+    if (wp_counter_ == waypoints_.rows())
+    {
+        wp_counter_ = 0;
+        std::cout << "All waypoints reached, starting mission anew" << std::endl;
     }
 
     // Update the waypoint in case the wp_counter_ has increased
@@ -421,7 +441,6 @@ Vector3d WaypointMngr::next_waypoint(const Vector3d& pos)
     // std::cout << "Desired waypoint: " << wp_next.transpose() <<  " with idx " << wp_counter_ << std::endl;
 
     // Obtain the leading tracking waypoint (which is ahead of the current wp) 
-    // int wp_idx = get_current_wp_idx(pos);
     int wp_idx = wp_counter_ + num_wp_lookahead_;
 
     Vector3d tracking_wp = waypoints_.row(wp_idx).transpose();

@@ -24,6 +24,8 @@
     <!-- <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen" launch-prefix="gdb -ex run -args"/>  -->
     <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen">
         <remap from="~rate" to="ctrlPathRate"/>
+        <remap from="~waypointRadius" to="waypointRadius"/>
+        <remap from="~numWpLookahead" to="numWpLookahead"/>
     </node>
 
     <!-- Raise input aggreggator node -->

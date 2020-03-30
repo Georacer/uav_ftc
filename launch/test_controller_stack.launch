@@ -65,7 +65,7 @@
         <!-- Launch logger -->
         <!--  -->
         <group if="$(arg log)">
-            <include file="$(find last_letter)/launch/logger.launch" />
+            <include file="$(find uav_ftc)/launch/logger.launch" />
         </group>
 
     </group>

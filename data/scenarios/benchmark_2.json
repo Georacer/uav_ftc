@@ -1,0 +1,31 @@
+{
+    "relative_time": false,
+    "point_1": {
+        "time": 5,
+        "waypoint": {
+            "n": 0.0,
+            "e": 0.0,
+            "d": -100.0,
+            "r": 30.0,
+            "flush" : false
+        }
+    },
+    "point_2": {
+        "time": 5,
+        "waypoint": {
+            "n": 200.0,
+            "e": 0.0,
+            "d": -150.0,
+            "r": 30.0,
+            "flush" : true
+        }
+    },
+    "point_3": {
+        "time": 60,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    }
+}

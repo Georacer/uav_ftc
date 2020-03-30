@@ -7,10 +7,10 @@
 	<arg name="uav_name" default="nominal"/>
 	<arg name="visuals" default="false"/>
 	<arg name="log" default="true"/>
-    <arg name="scenario" default="benchmark_1"/>
+    <arg name="scenario" default="benchmark_2"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
     <arg name="fe_name" default="nominal"/>
-    <arg name="log_name" default="02"/>
+    <arg name="log_name" default="03"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -22,6 +22,22 @@
     
     <!-- Launch uav_ftc-related nodes -->
     <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 3
+            deltaFMin: 0.0
+            pMin: -1.5
+            qMin: -1.5
+            rMin: -0.25
+            deltaFMax: 12.0
+            pMax: 1.5
+            qMax: 1.5
+            rMax: 0.25
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
+            waypointRadius: 20
+            numWpLookahead: 0
+        </rosparam>
 
         <!--  -->
         <!-- Launch logger -->
@@ -38,7 +54,10 @@
             <param name="scenario" value="$(arg scenario)"/>
         </node>
 
-        <!-- No Flight Envelope -->
+        <!-- Launch static FE publisher -->
+        <node pkg="uav_ftc" name="fe_publisher" type="fe_publisher.py" output="screen">
+            <param name="fe" value="$(arg fe_name)"/>
+        </node>
 
         <!-- Launch the databus generator -->
         <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
@@ -49,20 +68,6 @@
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
-        <!-- Load controller parameters -->
-        <rosparam>
-            ctrlMode: 2
-            deltaFMin: 0.0
-            pMin: -1.5
-            qMin: -1.5
-            rMin: -0.25
-            deltaFMax: 12.0
-            pMax: 1.5
-            qMax: 1.5
-            rMax: 0.25
-            referenceMin: [10.0, -0.52, -0.5]
-            referenceMax: [20.0,  0.52,  0.5]
-        </rosparam>
         
         <!-- Raise rate controller -->
         <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
@@ -81,10 +86,18 @@
             <remap from="~rMax" to="rMax"/>
         </node>
 
+        <!-- Raise path controller -->
+        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen">
+            <param name="~rate" value="2"/>
+            <remap from="~waypointRadius" to="waypointRadius"/>
+            <remap from="~numWpLookahead" to="numWpLookahead"/>
+        </node>
+
         <!-- Raise input aggreggator node -->
         <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
             <remap from="~rate" to="/world/simRate"/>
         </node>
+
     </group>
 
 </launch>

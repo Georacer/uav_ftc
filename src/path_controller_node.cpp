@@ -15,10 +15,11 @@ PathControllerROS::PathControllerROS(ros::NodeHandle nh, ros::NodeHandle pnh)
     path_controller{get_controller_settings(nh, pnh)} {
 
     double wp_radius;
-    // TODO: place under private variable
-    ros::param::param<double>("waypointRadius", wp_radius, 10);
+    pnh.param("waypointRadius", wp_radius, 10.0);
     waypoint_mngr_.set_goal_radius(wp_radius);
-    // TODO: set lookahead num waypoints
+    int num_wp_lookahead;
+    pnh.param("numWpLookahead", num_wp_lookahead, 5);
+    waypoint_mngr_.set_num_wp_lookahead(num_wp_lookahead);
 
     //Create Publishers
     pub_uav_cmd_ = nh.advertise<geometry_msgs::Vector3Stamped>("refTrajectory", 10);
@@ -86,7 +87,7 @@ void PathControllerROS::cb_update_path(const visualization_msgs::MarkerArray::Co
 
 void PathControllerROS::cb_update_flight_envelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
 {
-    ROS_INFO("Received new Flight Envelope");
+    // ROS_INFO("Received new Flight Envelope");
     Ellipsoid3DCoefficients_t coeffs = {
         fe_msg->el_A,
         fe_msg->el_B,

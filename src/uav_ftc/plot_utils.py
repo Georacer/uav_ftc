@@ -52,42 +52,47 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 def plot_path(log_dataset):
 
     fig = plt.figure(dpi=200)
+    colorlist = build_colorlist(len(log_dataset.keys()))
+    plot_order = log_dataset.keys()
 
     axh = fig.add_subplot('111')
     axh.set_prop_cycle(color=build_colorlist(len(log_dataset.keys())))
 
-    log = log_dataset['nominal']
+    reference_log = log_dataset[plot_order[0]]
     # Plot waypoints
-    waypoint_list = []
-    for waypoint in log.waypoints.T:
-        waypoint_list.append(mpatches.Circle(
-            (waypoint[1], waypoint[0]),
-            radius=waypoint[3],
-            alpha = 0.3,
-            # color = 'g',
-            # fill = False
-            ))
-    collection = PatchCollection(waypoint_list)
-    collection.set_edgecolor('g')
-    collection.set_facecolor('none')
-    axh.add_collection(collection)
+    if reference_log.waypoints is not None:
+        waypoint_list = []
+        for waypoint in reference_log.waypoints.T:
+            waypoint_list.append(mpatches.Circle(
+                (waypoint[1], waypoint[0]),
+                radius=waypoint[3],
+                alpha = 0.3,
+                # color = 'g',
+                # fill = False
+                ))
+        collection = PatchCollection(waypoint_list)
+        collection.set_edgecolor('g')
+        collection.set_facecolor('none')
+        axh.add_collection(collection)
 
     # Plot obstacles
-    obstacle_list = []
-    for obstacle in log.obstacles.T:
-        obstacle_list.append(mpatches.Circle(
-            (obstacle[1], obstacle[0]),
-            radius=obstacle[3],
-            alpha = 0.3,
-            # color = 'r',
-            # fill = True
-            ))
-    collection = PatchCollection(obstacle_list)
-    collection.set_edgecolor('r')
-    collection.set_facecolor('r')
-    axh.add_collection(collection)
+    if reference_log.obstacles is not None:
+        obstacle_list = []
+        for obstacle in reference_log.obstacles.T:
+            obstacle_list.append(mpatches.Circle(
+                (obstacle[1], obstacle[0]),
+                radius=obstacle[3],
+                alpha = 0.3,
+                # color = 'r',
+                # fill = True
+                ))
+        collection = PatchCollection(obstacle_list)
+        collection.set_edgecolor('r')
+        collection.set_facecolor('r')
+        axh.add_collection(collection)
 
     # Plot paths
+    legend_handles = []
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.p_e, log_data.p_n)
@@ -95,6 +100,9 @@ def plot_path(log_dataset):
         #axh.set_xlim([-100, 2000])
         #axh.set_ylim([-100, 2000])
         axh.axis('equal')
+        log_name = sanitize_textext(log_data_name)
+        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+    axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh.set_xlabel('East (m)')
     axh.set_ylabel('North (m)')
@@ -421,10 +429,8 @@ def plot_fe_subfigure(axh, log_dataset, log_names, fe_params, plot_ref=True):
 def plot_flight_envelope(log_dataset, fe_params_sets, log_names_sets=None, plot_ref=True):
     # Create a figure
     fig = plt.figure(dpi=200, figsize=(8,16))
-    # fig.suptitle('airspeed')
 
     num_plots = len(fe_params_sets)
-
     subfig_cntr = 1
     for i in range(len(fe_params_sets)):
         axh = fig.add_subplot('{}1{}'.format(num_plots, subfig_cntr), projection = '3d', proj_type="ortho")

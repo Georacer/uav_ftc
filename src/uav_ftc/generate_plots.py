@@ -33,7 +33,7 @@ mpl.rcParams['path.simplify'] = True
 mpl.rcParams['path.simplify_threshold'] = 1.0
 
 
-t_start = 10
+t_start = 0
 t_end = 140
 # For fault FE
 #t_start = 0
@@ -53,20 +53,21 @@ def load_pickle_data(log_name, log_dir=None):
     return log_data
 
 
-def build_dataset(log_directory):
+def build_dataset(log_directory, file_names=None):
 
-    # Collect all available log files
-    name_nominal = 'nominal'
-    name_nominal_nofe = 'nominal_nofe'
-    name_faulty = 'faulty'
-    name_faulty_nofe = 'faulty_nofe'
+    if file_names is None:
+        # Collect all available log files
+        name_nominal = 'nominal'
+        name_nominal_nofe = 'nominal_nofe'
+        name_faulty = 'faulty'
+        name_faulty_nofe = 'faulty_nofe'
 
-    file_names = [
-        name_nominal,
-        name_nominal_nofe,
-        name_faulty,
-        name_faulty_nofe
-    ]
+        file_names = [
+            name_nominal,
+            name_nominal_nofe,
+            name_faulty,
+            name_faulty_nofe
+        ]
 
     dataset = dict()
 
@@ -83,16 +84,16 @@ def build_dataset(log_directory):
 
 def get_fe_params(log_data, index=0):
     v = [
-        log_data.el_A[index],
-        log_data.el_B[index],
-        log_data.el_C[index],
-        log_data.el_D[index],
-        log_data.el_E[index],
-        log_data.el_F[index],
-        log_data.el_G[index],
-        log_data.el_H[index],
-        log_data.el_I[index],
-        log_data.el_J[index]
+        -log_data.el_A[index],
+        -log_data.el_B[index],
+        -log_data.el_C[index],
+        -log_data.el_D[index],
+        -log_data.el_E[index],
+        -log_data.el_F[index],
+        -log_data.el_G[index],
+        -log_data.el_H[index],
+        -log_data.el_I[index],
+        -log_data.el_J[index]
     ]
     center, evecs, radii = el_fit.calculate_ellipsoid_parameters(v)
     return (center, evecs, radii)
@@ -266,11 +267,11 @@ def generate_logged_flight_envelope(dataset, export_path):
     # Get the FE parameters (center, evecs, radii)
     print('Generating logged flight envelope plot.')
     fe_params_iter = [
-        get_fe_params(dataset['nominal']), # Get fe based on first ellipsoid message
+        # get_fe_params(dataset['nominal']), # Get fe based on first ellipsoid message
         get_fe_params(dataset['faulty'])
     ]
     log_names_iter = [
-        ['nominal', 'nominal_nofe'],
+        # ['nominal', 'nominal_nofe'],
         ['faulty']
     ]
     fig, _ = pu.plot_flight_envelope(dataset, fe_params_iter, log_names_iter)

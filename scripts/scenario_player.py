@@ -7,6 +7,7 @@ import json
 import rospy
 import rospkg
 from geometry_msgs.msg import Vector3Stamped
+from visualization_msgs.msg import Marker, MarkerArray
 
 from last_letter_msgs.msg import Parameter
 import uav_ftc.fault_generator as fg
@@ -16,7 +17,9 @@ class Scheduler:
     scenario = None
     pending_item = None
     reference = None
-    timestmap = None
+    wp_list = None
+    wp_count = 0
+    timestamp = None
     end_reached = False
     start_time = None
     relative_time = False
@@ -25,6 +28,7 @@ class Scheduler:
         self.start_time = rospy.Time.now()  # Store initialization instance
         self.ref_rates_pub = rospy.Publisher('refRates', Vector3Stamped, queue_size=10) # Setup rates reference publisher
         self.ref_traj_pub = rospy.Publisher('refTrajectory', Vector3Stamped, queue_size=10) # Setup trajectory reference publisher
+        self.ref_wp_pub = rospy.Publisher('waypoints', MarkerArray, queue_size=10) # Setup waypoint reference publisher
         # Setup fault publisher
         self.fg = fg.FaultGenerator()
         self.fault_pub = rospy.Publisher('parameter_changes', Parameter, queue_size=100)
@@ -36,6 +40,7 @@ class Scheduler:
                 rospy.logerr('Malformed json scenario file')
 
             self.reference = Vector3Stamped()
+            self.wp_list = MarkerArray()
 
             self.scenario = json_dict
             # Read if there is a relative_time specification
@@ -89,7 +94,7 @@ class Scheduler:
                     elif ref_type == 'r':
                         v_attr_name = 'z'
                     else:
-                        raise AttributeError('Invalid reference attribute {}'.format(attribute))
+                        raise AttributeError('Invalid reference attribute {}'.format(ref_type))
                     setattr(self.reference.vector, v_attr_name, ref_value)
                 rospy.loginfo("New reference:\n {}".format(self.reference))
                 self.reference.header.stamp = self.timestamp
@@ -106,11 +111,52 @@ class Scheduler:
                     elif ref_type == 'psi_dot':
                         v_attr_name = 'z'
                     else:
-                        raise AttributeError('Invalid reference attribute {}'.format(attribute))
+                        raise AttributeError('Invalid reference attribute {}'.format(ref_type))
                     setattr(self.reference.vector, v_attr_name, ref_value)
                 rospy.loginfo("New reference:\n {}".format(self.reference))
                 self.reference.header.stamp = self.timestamp
                 self.ref_traj_pub.publish(self.reference)
+
+            if attribute == 'waypoint':
+            # Read and a new reference waypoint
+                rospy.loginfo('Reading new reference waypoint')
+                flush = False
+
+                new_wp = Marker()
+                new_wp.header.stamp = self.timestamp
+                new_wp.header.frame_id = 'map'
+                new_wp.action = new_wp.ADD
+                new_wp.type = new_wp.SPHERE
+                new_wp.id = self.wp_count
+                new_wp.pose.orientation.x = 0
+                new_wp.pose.orientation.y = 0
+                new_wp.pose.orientation.z = 0
+                new_wp.pose.orientation.w = 1
+                new_wp.color.r = 0
+                new_wp.color.g = 1
+                new_wp.color.b = 0
+                new_wp.color.a = 1
+
+                self.wp_count += 1
+                for ref_type, ref_value in value.iteritems():
+                    if ref_type == 'n':
+                        new_wp.pose.position.x = ref_value
+                    elif ref_type == 'e':
+                        new_wp.pose.position.y = ref_value
+                    elif ref_type == 'd':
+                        new_wp.pose.position.z = ref_value
+                    elif ref_type == 'r':
+                        new_wp.scale.x = 2*ref_value
+                        new_wp.scale.y = 2*ref_value
+                        new_wp.scale.z = 2*ref_value
+                    elif ref_type == 'flush':
+                        flush = ref_value
+                    else:
+                        raise AttributeError('Invalid reference attribute {}'.format(ref_type))
+                rospy.loginfo("New waypoint reference:\n {}".format(new_wp))
+                self.wp_list.markers.append(new_wp)
+                if flush:
+                    self.ref_wp_pub.publish(self.wp_list)
 
             if attribute == 'fault':
             # Signal a new fault from a predetermined set of faults

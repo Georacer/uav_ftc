@@ -10,6 +10,7 @@
     <arg name="scenario" default="benchmark_1"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
     <arg name="fe_name" default="nominal"/>
+    <arg name="log_name" default="01"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -18,9 +19,23 @@
         <arg name="uav_name" value="$(arg uav_name)"/>
         <arg name="visuals" value="$(arg visuals)"/>
     </include>
-    
+
     <!-- Launch uav_ftc-related nodes -->
     <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 2
+            deltaFMin: 0.0
+            pMin: -1.5
+            qMin: -1.5
+            rMin: -0.25
+            deltaFMax: 12.0
+            pMax: 1.5
+            qMax: 1.5
+            rMax: 0.25
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
+        </rosparam>
 
         <!--  -->
         <!-- Launch logger -->
@@ -28,7 +43,7 @@
         <group if="$(arg log)">
             <include file="$(find uav_ftc)/launch/logger.launch">
                 <arg name="custom_name" value="true"/>
-                <arg name="log_name" value="01"/>
+                <arg name="log_name" value="$(arg log_name)"/>
             </include>
         </group>
 
@@ -51,25 +66,12 @@
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
-        <!-- Load controller parameters -->
-        <rosparam>
-            ctrlMode: 2
-            deltaFMin: 0.0
-            pMin: -1.5
-            qMin: -1.5
-            rMin: -0.25
-            deltaFMax: 12.0
-            pMax: 1.5
-            qMax: 1.5
-            rMax: 0.25
-            referenceMin: [10.0, -0.52, -0.5]
-            referenceMax: [20.0,  0.52,  0.5]
-        </rosparam>
-        
+
         <!-- Raise rate controller -->
         <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
             <param name="~rate" value="50"/>
         </node>
+
         <!-- Raise velocity controller -->
         <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen">
             <param name="~rate" value="5"/>

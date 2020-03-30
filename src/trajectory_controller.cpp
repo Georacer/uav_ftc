@@ -486,7 +486,7 @@ bool TrajectoryController::getDefaultBounds(ros::NodeHandle pnh) // Read default
 
 void TrajectoryController::getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
 {
-    ROS_INFO("Received new Flight Envelope");
+    // ROS_INFO("Received new Flight Envelope");
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_A, fe_msg->el_A);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_B, fe_msg->el_B);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_C, fe_msg->el_C);
