@@ -31,6 +31,6 @@ INCLUDE_DIRECTORIES( . ${ACADO_INCLUDE_DIRS} )
 #
 # Build executables
 #
-ADD_EXECUTABLE(        rate_controller_codegen rate_controller_solver.cpp )
-TARGET_LINK_LIBRARIES( rate_controller_codegen ${ACADO_SHARED_LIBRARIES} )
-SET_TARGET_PROPERTIES( rate_controller_codegen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} )
+ADD_EXECUTABLE(        trajectory_controller_codegen trajectory_controller_solver.cpp )
+TARGET_LINK_LIBRARIES( trajectory_controller_codegen ${ACADO_SHARED_LIBRARIES} )
+SET_TARGET_PROPERTIES( trajectory_controller_codegen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} )
