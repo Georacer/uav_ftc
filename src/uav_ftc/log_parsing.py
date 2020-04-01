@@ -111,12 +111,13 @@ def filter_log_data(log_data, t_start, t_end):
     log_data.ref_q = log_data.ref_q[refRates_start_idx:refRates_end_idx+1]
     log_data.ref_r = log_data.ref_r[refRates_start_idx:refRates_end_idx+1]
 
-    refTrajectory_start_idx = np.where(log_data.time_refTrajectory > t_start)[0][0]
-    refTrajectory_end_idx = np.where(log_data.time_refTrajectory < t_end)[0][-1]
-    log_data.time_refTrajectory = log_data.time_refTrajectory[refTrajectory_start_idx:refTrajectory_end_idx+1]
-    log_data.ref_Va = log_data.ref_Va[refTrajectory_start_idx:refTrajectory_end_idx+1]
-    log_data.ref_gamma = log_data.ref_gamma[refTrajectory_start_idx:refTrajectory_end_idx+1]
-    log_data.ref_psi_dot = log_data.ref_psi_dot[refTrajectory_start_idx:refTrajectory_end_idx+1]
+    if len(log_data.time_refTrajectory)>0:
+        refTrajectory_start_idx = np.where(log_data.time_refTrajectory > t_start)[0][0]
+        refTrajectory_end_idx = np.where(log_data.time_refTrajectory < t_end)[0][-1]
+        log_data.time_refTrajectory = log_data.time_refTrajectory[refTrajectory_start_idx:refTrajectory_end_idx+1]
+        log_data.ref_Va = log_data.ref_Va[refTrajectory_start_idx:refTrajectory_end_idx+1]
+        log_data.ref_gamma = log_data.ref_gamma[refTrajectory_start_idx:refTrajectory_end_idx+1]
+        log_data.ref_psi_dot = log_data.ref_psi_dot[refTrajectory_start_idx:refTrajectory_end_idx+1]
 
     # if len(log_data.time_fe)>0:
     #     fe_start_idx = np.where(log_data.time_fe > t_start)[0][0]

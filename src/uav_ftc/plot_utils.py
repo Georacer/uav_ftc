@@ -111,7 +111,7 @@ def plot_path(log_dataset):
     return (fig, axh)
 
 
-def plot_angular_rates(log_dataset):
+def plot_angular_rates(log_dataset, x_lims=None):
     fig = plt.figure(dpi=400)
     colorlist = build_colorlist(len(log_dataset.keys()))
 
@@ -120,7 +120,7 @@ def plot_angular_rates(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refRates, log_data.ref_p, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refRates, log_data.ref_p, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.p, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
@@ -132,6 +132,8 @@ def plot_angular_rates(log_dataset):
         # proxy_ref = mpl.patches.Patch(color='tab:blue', label=f'ref_{rate_name}')
         # proxy_cmd = mpl.patches.Patch(color='k', label='ctrl_input')
         # axh.legend(handles = [proxy_state, proxy_ref, proxy_cmd])
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
     axh.set_xticklabels([])
     axh.set_ylabel('Roll (rad/s)')
     axh.grid(True)
@@ -142,10 +144,12 @@ def plot_angular_rates(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refRates, log_data.ref_q, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refRates, log_data.ref_q, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.q, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
     axh.set_xticklabels([])
     axh.set_ylabel('Pitch (rad/s)')
     axh.grid(True)
@@ -156,10 +160,12 @@ def plot_angular_rates(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_name = sanitize_textext(log_data_name)
         log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_refRates, log_data.ref_r, color=colorlist[i], linestyle='dashed')
+        axh.step(log_data.time_refRates, log_data.ref_r, where='post', color=colorlist[i], linestyle='dashed')
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
         axh.plot(log_data.time_databus, log_data.r, color=colorlist[i])
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+    if x_lims is not None:
+        axh.set_xlim(x_lims)
     axh.set_ylabel('Yaw (rad/s)')
     axh.set_xlabel('Time (s)')
     axh.grid(True)

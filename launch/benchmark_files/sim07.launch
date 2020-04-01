@@ -1,0 +1,98 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="false"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="nominal"/>
+	<arg name="visuals" default="false"/>
+	<arg name="log" default="true"/>
+    <arg name="scenario" default="benchmark_1"/>
+    <arg name="shutdownOnScenarioEnd" default="true"/>
+    <arg name="fe_name" default="nominal"/>
+    <arg name="log_name" default="07"/>
+
+    <!-- Launch last-letter simulation nodes -->
+    <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
+        <arg name="manualMode" value="$(arg manualMode)"/>
+        <arg name="autoMode" value="$(arg autoMode)"/>
+        <arg name="uav_name" value="$(arg uav_name)"/>
+        <arg name="visuals" value="$(arg visuals)"/>
+    </include>
+
+    <!-- Launch uav_ftc-related nodes -->
+    <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 2
+            deltaFMin: 0.0
+            pMin: -1.5
+            qMin: -1.5
+            rMin: -0.25
+            deltaFMax: 12.0
+            pMax: 1.5
+            qMax: 1.5
+            rMax: 0.25
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
+            pert_uav_name: pert_5
+        </rosparam>
+
+        <!--  -->
+        <!-- Launch logger -->
+        <!--  -->
+        <group if="$(arg log)">
+            <include file="$(find uav_ftc)/launch/logger.launch">
+                <arg name="custom_name" value="true"/>
+                <arg name="log_name" value="$(arg log_name)"/>
+            </include>
+        </group>
+
+        <!-- Launch the scenario player -->
+        <node pkg="uav_ftc" name="scenario_player" type="scenario_player.py" output="screen" required="$(arg shutdownOnScenarioEnd)">
+            <param name="scenario" value="$(arg scenario)"/>
+        </node>
+
+        <!-- Launch static FE publisher -->
+        <node pkg="uav_ftc" name="fe_publisher" type="fe_publisher.py" output="screen">
+            <param name="fe" value="$(arg fe_name)"/>
+        </node>
+
+        <!-- Launch the databus generator -->
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
+        <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+            <param name="data_source" value="1"/>
+        </node>
+
+        <!--  -->
+        <!-- Launch controllers -->
+        <!--  -->
+
+        <!-- Raise rate controller -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
+            <param name="~rate" value="50"/>
+            <remap from="uav_name" to="pert_uav_name"/>
+        </node>
+
+        <!-- Raise velocity controller -->
+        <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen">
+            <param name="~rate" value="5"/>
+            <remap from="~deltaFMin" to="deltaFMin"/>
+            <remap from="~pMin" to="pMin"/>
+            <remap from="~qMin" to="qMin"/>
+            <remap from="~rMin" to="rMin"/>
+            <remap from="~deltaFMax" to="deltaFMax"/>
+            <remap from="~pMax" to="pMax"/>
+            <remap from="~qMax" to="qMax"/>
+            <remap from="~rMax" to="rMax"/>
+            <remap from="uav_name" to="pert_uav_name"/>
+        </node>
+
+        <!-- Raise input aggreggator node -->
+        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
+            <remap from="~rate" to="/world/simRate"/>
+        </node>
+
+    </group>
+
+</launch>
