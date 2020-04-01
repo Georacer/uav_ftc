@@ -66,7 +66,7 @@ TrajectoryController::TrajectoryController(ros::NodeHandle n, ros::NodeHandle pn
 
     // Initialize default reference states
     reference_ << referenceTrajectory_(0), referenceTrajectory_(1), referenceTrajectory_(2),
-                 trimState(1), trimState(2), refInputs_;
+                 trimState(1), trimState(2), refInputs_, 0.0f;
     mpcController_.setDefaultRunningReference(reference_);
     endReference_ << trimState(0), trimState(1), 0.0f;
     mpcController_.setDefaultEndReference(endReference_);
