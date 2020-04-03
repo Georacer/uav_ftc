@@ -341,6 +341,19 @@ target_link_libraries(path_controller
   nlopt
 )
 
+# The controller for no aileron actuation
+add_executable(controller_no_ail
+  src/controller_no_ail.cpp  
+)
+add_dependencies(controller_no_ail
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
+target_link_libraries(controller_no_ail
+  ${catkin_LIBRARIES}
+  yaml-cpp
+)
+
 # Node reading from joystick and generating reference commands
 add_executable(reference_generator
   src/reference_generator.cpp
