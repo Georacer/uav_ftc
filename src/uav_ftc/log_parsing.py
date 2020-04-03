@@ -93,8 +93,8 @@ def filter_log_data(log_data, t_start, t_end):
     log_data.p_e = log_data.p_e[databus_start_idx:databus_end_idx+1]
     log_data.p_d = log_data.p_d[databus_start_idx:databus_end_idx+1]
     log_data.airspeed = log_data.airspeed[databus_start_idx:databus_end_idx+1]
-    log_data.alpha = log_data.alpha[databus_start_idx:databus_end_idx+1]
-    log_data.beta = log_data.beta[databus_start_idx:databus_end_idx+1]
+    log_data.alpha = -log_data.alpha[databus_start_idx:databus_end_idx+1]
+    log_data.beta = -log_data.beta[databus_start_idx:databus_end_idx+1]
     log_data.phi = log_data.phi[databus_start_idx:databus_end_idx+1]
     log_data.theta = log_data.theta[databus_start_idx:databus_end_idx+1]
     log_data.psi = log_data.psi[databus_start_idx:databus_end_idx+1]
@@ -104,12 +104,13 @@ def filter_log_data(log_data, t_start, t_end):
     log_data.gamma = log_data.gamma[databus_start_idx:databus_end_idx+1]
     log_data.psi_dot = log_data.psi_dot[databus_start_idx:databus_end_idx+1]
 
-    refRates_start_idx = np.where(log_data.time_refRates > t_start)[0][0]
-    refRates_end_idx = np.where(log_data.time_refRates < t_end)[0][-1]
-    log_data.time_refRates = log_data.time_refRates[refRates_start_idx:refRates_end_idx+1]
-    log_data.ref_p = log_data.ref_p[refRates_start_idx:refRates_end_idx+1]
-    log_data.ref_q = log_data.ref_q[refRates_start_idx:refRates_end_idx+1]
-    log_data.ref_r = log_data.ref_r[refRates_start_idx:refRates_end_idx+1]
+    if len(log_data.time_refRates)>0:
+        refRates_start_idx = np.where(log_data.time_refRates > t_start)[0][0]
+        refRates_end_idx = np.where(log_data.time_refRates < t_end)[0][-1]
+        log_data.time_refRates = log_data.time_refRates[refRates_start_idx:refRates_end_idx+1]
+        log_data.ref_p = log_data.ref_p[refRates_start_idx:refRates_end_idx+1]
+        log_data.ref_q = log_data.ref_q[refRates_start_idx:refRates_end_idx+1]
+        log_data.ref_r = log_data.ref_r[refRates_start_idx:refRates_end_idx+1]
 
     if len(log_data.time_refTrajectory)>0:
         refTrajectory_start_idx = np.where(log_data.time_refTrajectory > t_start)[0][0]

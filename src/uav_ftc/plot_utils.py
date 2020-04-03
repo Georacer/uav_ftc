@@ -45,6 +45,55 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
     plt.show()
 
 
+# General functionality for plotting of 2D data
+## INPUTS:
+# plot_data: (iter of iter of tuple) Data for plotting
+# plot_labels: (iter) Y-Labels for the plotted subfigures
+# legend_entries: (iter) Labels for the logs plotted across figures
+# x_lims: The x_lims to apply to the plots
+# y_lims: (iter) the y_lims to apply to each plot
+## OUTPUTS:
+# fig: the generated figure handle
+def plot_2d(plot_data, plot_labels, series_names, series_colors=None, x_lims=None, y_lims=None, dpi=200, fig_size=[6.4, 4.8]):
+
+    fig = plt.figure(dpi=dpi, figsize=fig_size)
+    subfig_num = len(plot_data)
+    if series_colors is None:
+        series_colors = build_colorlist(len(series_names))
+
+    for plot_idx, subfig_data in enumerate(plot_data):
+        axh = fig.add_subplot('{}1{}'.format(subfig_num, plot_idx+1))
+        legend_handles = []
+        for series_idx, series_tuple in enumerate(subfig_data):
+            color = series_colors[series_idx]
+            series_name = series_names[series_idx]
+            series_name = sanitize_textext(series_name)
+            x_data = series_tuple[0]
+            y_data = series_tuple[1]
+            if 'ref' in series_name:
+                axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=1)
+                legend_handles.append(mpl.patches.Patch(color=color, label=series_name+' ref', hatch='/'))
+            else:
+                axh.plot(x_data, y_data, color=color, linewidth=1)
+                legend_handles.append(mpl.patches.Patch(color=color, label=series_name))
+
+        if x_lims is not None:
+            axh.set_xlim(x_lims)
+        # Don't tick x-axis if it's not the last subfigure
+        # if plot_idx < subfig_num - 1:
+        #     axh.set_xticklabels([])
+        if y_lims is not None:
+            if y_lims[plot_idx] is not None:
+                axh.set_ylim(y_lims[plot_idx])
+        axh.set_ylabel(plot_labels[plot_idx])
+        axh.grid(True)
+        axh.legend(handles = legend_handles, fontsize='xx-small')
+
+    plt.tight_layout()
+
+    return (fig, axh)
+
+
 ##########################
 # High-level plot commands
 # Typically operate on a list of log_parsing.LogData objects
@@ -111,69 +160,42 @@ def plot_path(log_dataset):
     return (fig, axh)
 
 
-def plot_angular_rates(log_dataset, x_lims=None):
-    fig = plt.figure(dpi=400)
-    colorlist = build_colorlist(len(log_dataset.keys()))
+def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Roll (rad/s)', 'Pitch (rad/s)', 'Yaw (rad/s)']
+    p_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            p_data.append((log_dataset[log_name].time_refRates, log_dataset[log_name].ref_p))
+        p_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].p))
+    q_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            q_data.append((log_dataset[log_name].time_refRates, log_dataset[log_name].ref_q))
+        q_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].q))
+    r_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            r_data.append((log_dataset[log_name].time_refRates, log_dataset[log_name].ref_r))
+        r_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].r))
+    plot_data = [p_data, q_data, r_data]
 
-    axh = fig.add_subplot('311')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refRates, log_data.ref_p, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.p, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-        # Edit these to enable plotting of corresponding command
-        # axh2 = axh.twinx()
-        # axh2.set_ylabel('control surface command')
-        # cmd_h = axh2.plot(t_cmd, cmd, color='k')
-        # proxy_state = mpl.patches.Patch(color='tab:red', label=rate_name)
-        # proxy_ref = mpl.patches.Patch(color='tab:blue', label=f'ref_{rate_name}')
-        # proxy_cmd = mpl.patches.Patch(color='k', label='ctrl_input')
-        # axh.legend(handles = [proxy_state, proxy_ref, proxy_cmd])
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    axh.set_xticklabels([])
-    axh.set_ylabel('Roll (rad/s)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
+    series_names = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_names.append(log_name + ' ref')
+        series_names.append(log_name)
 
-    axh = fig.add_subplot('312')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refRates, log_data.ref_q, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.q, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    axh.set_xticklabels([])
-    axh.set_ylabel('Pitch (rad/s)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
+    log_colors = build_colorlist(len(log_names))
+    series_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_colors.append(log_colors[log_idx])
+        series_colors.append(log_colors[log_idx])
 
-    axh = fig.add_subplot('313')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refRates, log_data.ref_r, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.r, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    axh.set_ylabel('Yaw (rad/s)')
-    axh.set_xlabel('Time (s)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
-
-    plt.tight_layout()
-
-    return (fig, axh)
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+    return fig
 
 
 def plot_angular_rates_errors(log_dataset):
@@ -235,70 +257,42 @@ def plot_angular_rates_errors(log_dataset):
     return (fig, axh)
 
 
-def plot_trajectories(log_dataset, x_lims=None, y_lims=None):
-    fig = plt.figure(dpi=400)
-    colorlist = build_colorlist(len(log_dataset.keys()))
+def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Airspeed (m/s)', 'Gamma (rad)', '$\dot{\psi}$ (rad/s)']
+    x_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            x_data.append((log_dataset[log_name].time_refTrajectory, log_dataset[log_name].ref_Va))
+        x_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].airspeed))
+    y_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            y_data.append((log_dataset[log_name].time_refTrajectory, log_dataset[log_name].ref_gamma))
+        y_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].gamma))
+    z_data = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            z_data.append((log_dataset[log_name].time_refTrajectory, log_dataset[log_name].ref_psi_dot))
+        z_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].psi_dot))
+    plot_data = [x_data, y_data, z_data]
 
-    axh = fig.add_subplot('311')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refTrajectory, log_data.ref_Va, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.airspeed, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    axh.set_xticklabels([])
-    if y_lims is not None:
-        if y_lims[0] is not None:
-            axh.set_ylim(y_lims[0])
-    axh.set_ylabel('Airspeed (m/s)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
+    series_names = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_names.append(log_name + ' ref')
+        series_names.append(log_name)
 
-    axh = fig.add_subplot('312')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refTrajectory, log_data.ref_gamma, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.gamma, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    axh.set_xticklabels([])
-    if y_lims is not None:
-        if y_lims[1] is not None:
-            axh.set_ylim(y_lims[1])
-    axh.set_ylabel('$\gamma$ (rad)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
+    log_colors = build_colorlist(len(log_names))
+    series_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_colors.append(log_colors[log_idx])
+        series_colors.append(log_colors[log_idx])
 
-    axh = fig.add_subplot('313')
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_name = sanitize_textext(log_data_name)
-        log_data = log_dataset[log_data_name]
-        axh.step(log_data.time_refTrajectory, log_data.ref_psi_dot, where='post', color=colorlist[i], linestyle='dashed')
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name+' ref', hatch='/'))
-        axh.plot(log_data.time_databus, log_data.psi_dot, color=colorlist[i])
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    if x_lims is not None:
-        axh.set_xlim(x_lims)
-    if y_lims is not None:
-        if y_lims[2] is not None:
-            axh.set_ylim(y_lims[2])
-    axh.set_ylabel('$\dot{\psi}$ (rad/s)')
-    axh.set_xlabel('Time (s)')
-    axh.grid(True)
-    axh.legend(handles = legend_handles, fontsize='xx-small')
-
-    plt.tight_layout()
-
-    return (fig, axh)
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+    return fig
 
 
 def plot_trajectories_errors(log_dataset):
@@ -353,41 +347,71 @@ def plot_trajectories_errors(log_dataset):
 
     plt.tight_layout()
 
-    return (fig, axh)
+
+def plot_airdata(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Airspeed (m/s)', 'AoA (rad)', 'AoS (rad)']
+    x_data = []
+    for log_idx, log_name in enumerate(log_names):
+        x_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].airspeed))
+    y_data = []
+    for log_idx, log_name in enumerate(log_names):
+        y_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].alpha))
+    z_data = []
+    for log_idx, log_name in enumerate(log_names):
+        z_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].beta))
+    plot_data = [x_data, y_data, z_data]
+
+    series_names = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_names.append(log_name + ' ref')
+        series_names.append(log_name)
+
+    log_colors = build_colorlist(len(log_names))
+    series_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_colors.append(log_colors[log_idx])
+        series_colors.append(log_colors[log_idx])
+
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
 
 
-def plot_euler(log_dataset):
-    fig = plt.figure(dpi=400)
-    colorlist = build_colorlist(len(log_dataset.keys()))
+def plot_euler(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Roll (deg)', 'Pitch (deg)', 'Yaw (deg)']
+    x_data = []
+    for log_idx, log_name in enumerate(log_names):
+        x_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].phi)))
+    y_data = []
+    for log_idx, log_name in enumerate(log_names):
+        y_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].theta)))
+    z_data = []
+    for log_idx, log_name in enumerate(log_names):
+        z_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].psi)))
+    plot_data = [x_data, y_data, z_data]
 
-    axh = fig.add_subplot('311')
-    axh.set_prop_cycle(color=colorlist)
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_databus, np.rad2deg(log_data.phi))
-        axh.set_ylabel('Roll Angle (deg)')
-        axh.set_xticklabels([])
-        axh.grid(True)
+    series_names = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_names.append(log_name + ' ref')
+        series_names.append(log_name)
 
-    axh = fig.add_subplot('312')
-    axh.set_prop_cycle(color=colorlist)
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_databus, np.rad2deg(log_data.theta))
-        axh.set_ylabel('Pitch Angle (deg)')
-        axh.set_xticklabels([])
-        axh.grid(True)
+    log_colors = build_colorlist(len(log_names))
+    series_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            series_colors.append(log_colors[log_idx])
+        series_colors.append(log_colors[log_idx])
 
-    axh = fig.add_subplot('313')
-    axh.set_prop_cycle(color=colorlist)
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_data = log_dataset[log_data_name]
-        axh.plot(log_data.time_databus, np.rad2deg(log_data.psi))
-        axh.set_xlabel('Time (s)')
-        axh.set_ylabel('Yaw Angle (deg)')
-        axh.grid(True)
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
 
-    return (fig, axh)
+    return fig
 
 
 def plot_fe_subfigure(axh, log_dataset, log_names, fe_params, plot_ref=True):
@@ -496,28 +520,28 @@ def plot_3_errors(time_databus, time_ref, x, y, z, ref_x, ref_y, ref_z, axis_lab
 
 def save_figure_2d(img_name, fig):
     # Save figures
-    fig.savefig('{}.png'.format(img_name), bbox_inches='tight')
+    fig.savefig('{}.png'.format(img_name), bbox_inches='tight', dpi=400)
     # plt.pause(0.01) # Not sure if needed
 
 
 def save_figure_3d(img_name, fig):
     # Save figures
-    fig.savefig('{}.png'.format(img_name), bbox_inches='tight')
+    fig.savefig('{}.png'.format(img_name), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
     for axh in fig.get_axes():
         axh.view_init(0,0)
-    fig.savefig('{}_0_0.png'.format(img_name), bbox_inches='tight')
+    fig.savefig('{}_0_0.png'.format(img_name), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
     for axh in fig.get_axes():
         axh.view_init(-90,0)
-    fig.savefig('{}_90_0.png'.format(img_name), bbox_inches='tight')
+    fig.savefig('{}_90_0.png'.format(img_name), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
     for axh in fig.get_axes():
         axh.view_init(0,-90)
-    fig.savefig('{}_0_90.png'.format(img_name), bbox_inches='tight')
+    fig.savefig('{}_0_90.png'.format(img_name), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
 
