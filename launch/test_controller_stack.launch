@@ -53,7 +53,11 @@
         <!-- <rosparam command="load" file="$(find uav_planner)data/parameters/map_mountains.yaml" /> -->
 
         <!-- Playback waypoints broadcasting from log file-->
-        <node pkg="rosbag" name="replayer" type="play" args="-d 2 $(find uav_ftc)logs/waypoints_sparse_filtered_synched.bag"/>
+        <node pkg="rosbag" name="replayer" type="play" args="-d 2 $(find uav_ftc)logs/waypoints_sparse_filtered_synched.bag">
+            <remap from="/skywalker_2013_mod/waypoints" to="/$(arg uav_name)/waypoints"/>
+            <remap from="/skywalker_2013_mod/obstacles" to="/$(arg uav_name)/obstacles"/>
+            <remap from="/skywalker_2013_mod/rrt_path" to="/$(arg uav_name)/rrt_path"/>
+        </node>
         <!-- <node pkg="rosbag" name="replayer" type="play" args="-d 2 waypoints_mountain_filtered_synched.bag"/> -->
 
         <!--  -->
