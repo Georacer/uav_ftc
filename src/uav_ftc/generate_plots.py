@@ -4,6 +4,7 @@ import os
 import sys
 import pickle
 import numpy as np
+from scipy.signal import medfilt
 import click
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -80,6 +81,45 @@ def build_dataset(log_directory, file_names=None):
             dataset[filename] = log_file
 
     return dataset
+
+
+def sanitize_rps(rps_data_in, ceiling=250):
+    rps_data = np.array(rps_data_in)
+
+    # Cut off obviously large values
+    for pt_idx, point in enumerate(rps_data):
+        if pt_idx == 0:
+            rps_data[pt_idx] = 0
+            continue
+        data_now = point
+        data_prev = rps_data[pt_idx-1]
+        if ( data_now > ceiling ):
+            rps_data[pt_idx] = data_prev
+            continue
+
+    for pt_idx, point in enumerate(rps_data):
+        if pt_idx == 0:
+            continue
+        data_now = point
+        data_prev = rps_data[pt_idx-1]
+        if (abs(data_now-data_prev) > 15):
+            rps_data[pt_idx] = data_prev
+            continue
+
+    # rps_data = medfilt(rps_data, 11)
+
+    # for pt_idx, point in enumerate(rps_data):
+    #     if pt_idx == 0:
+    #         continue
+    #     data_now = point
+    #     data_prev = rps_data[pt_idx-1]
+    #     if (data_prev>10 and abs((data_now-data_prev)/data_prev) > 0.3):
+    #         rps_data[pt_idx] = data_prev
+    #         continue
+
+    rps_data[0] = rps_data[1]
+
+    return rps_data
 
 
 def get_fe_params(log_data, index=0):
