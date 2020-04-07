@@ -54,24 +54,26 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 # y_lims: (iter) the y_lims to apply to each plot
 ## OUTPUTS:
 # fig: the generated figure handle
-def plot_2d(plot_data, plot_labels, series_names, series_colors=None, x_lims=None, y_lims=None, dpi=200, fig_size=[6.4, 4.8]):
+def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None, y_lims=None, dpi=200, fig_size=[6.4, 4.8]):
 
     fig = plt.figure(dpi=dpi, figsize=fig_size)
     subfig_num = len(plot_data)
-    if series_colors is None:
-        series_colors = build_colorlist(len(series_names))
+    if plot_colors is None:
+        plot_colors = [None]*len(plot_data)
+        for subfig_idx in range(len(plot_data)):
+            plot_colors[subfig_idx] = build_colorlist(len(plot_data[subfig_idx]))
 
     for plot_idx, subfig_data in enumerate(plot_data):
         axh = fig.add_subplot('{}1{}'.format(subfig_num, plot_idx+1))
         legend_handles = []
         for series_idx, series_tuple in enumerate(subfig_data):
-            color = series_colors[series_idx]
-            series_name = series_names[series_idx]
+            color = plot_colors[plot_idx][series_idx]
+            series_name = series_names[plot_idx][series_idx]
             series_name = sanitize_textext(series_name)
             x_data = series_tuple[0]
             y_data = series_tuple[1]
             if 'ref' in series_name:
-                axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=1)
+                axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
                 legend_handles.append(mpl.patches.Patch(color=color, label=series_name+' ref', hatch='/'))
             else:
                 axh.plot(x_data, y_data, color=color, linewidth=1)
@@ -145,14 +147,11 @@ def plot_path(log_dataset):
     for i, log_data_name in enumerate(log_dataset.keys()):
         log_data = log_dataset[log_data_name]
         axh.plot(log_data.p_e, log_data.p_n)
-        #axh.grid(True)
-        #axh.set_xlim([-100, 2000])
-        #axh.set_ylim([-100, 2000])
-        axh.axis('equal')
         log_name = sanitize_textext(log_data_name)
         legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
     axh.legend(handles = legend_handles, fontsize='xx-small')
 
+    axh.axis('equal')
     axh.set_xlabel('East (m)')
     axh.set_ylabel('North (m)')
     axh.grid(True)
@@ -351,16 +350,16 @@ def plot_trajectories_errors(log_dataset):
 def plot_airdata(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
     if log_names is None:
         log_names = log_dataset.keys()
-    plot_labels = ['Airspeed (m/s)', 'AoA (rad)', 'AoS (rad)']
+    plot_labels = ['Airspeed (m/s)', 'AoA (deg)', 'AoS (deg)']
     x_data = []
     for log_idx, log_name in enumerate(log_names):
         x_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].airspeed))
     y_data = []
     for log_idx, log_name in enumerate(log_names):
-        y_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].alpha))
+        y_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].alpha)))
     z_data = []
     for log_idx, log_name in enumerate(log_names):
-        z_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].beta))
+        z_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].beta)))
     plot_data = [x_data, y_data, z_data]
 
     series_names = []
@@ -410,6 +409,85 @@ def plot_euler(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=
         series_colors.append(log_colors[log_idx])
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
+
+
+def plot_inputs(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['RC{}'.format(value+1) for value in range(8)]
+    plot_data = [None]*len(plot_labels)
+    for subfig_idx in range(len(plot_labels)):
+        plot_data[subfig_idx] = []
+        for log_idx, log_name in enumerate(log_names):
+            plot_data[subfig_idx].append(
+                (
+                    log_dataset[log_name].time_databus,
+                    getattr(log_dataset[log_name], 'rcin_{}'.format(subfig_idx+1))
+                )
+            )
+
+    series_names = []
+    for log_idx, log_name in enumerate(log_names):
+        series_names.append(log_name)
+
+    log_colors = build_colorlist(len(log_names))
+    series_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        series_colors.append(log_colors[log_idx])
+
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
+
+
+def plot_rps(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['RPS', 'RC3 \& Airspeed*100']
+    log_colors = build_colorlist(len(log_names))
+    plot_data = []
+    series_names = []
+    plot_colors = []
+
+    plot_data.append([])
+    plot_colors.append([])
+    series_names.append([])
+    for log_idx, log_name in enumerate(log_names):
+        plot_data[0].append(
+            (
+                log_dataset[log_name].time_databus,
+                log_dataset[log_name].rps_motor
+            )
+        )
+        plot_colors[0].append(log_colors[log_idx])
+        series_names[0].append(log_name)
+    plot_data.append([])
+    plot_colors.append([])
+    series_names.append([])
+    for log_idx, log_name in enumerate(log_names):
+        plot_data[1].append(
+            (
+                log_dataset[log_name].time_databus,
+                log_dataset[log_name].rcout_3
+            )
+        )
+        plot_colors[1].append(log_colors[log_idx])
+        series_names[1].append(log_name + ' RC3')
+        plot_data[1].append(
+            (
+                log_dataset[log_name].time_databus,
+                log_dataset[log_name].airspeed*100
+            )
+        )
+        plot_colors[1].append(log_colors[log_idx])
+        series_names[1].append(log_name + ' Va*100')
+
+    for log_idx, log_name in enumerate(log_names):
+        series_names.append(log_name)
+
+    fig = plot_2d(plot_data, plot_labels, series_names, plot_colors, x_lims=x_lims, y_lims=y_lims)
 
     return fig
 
