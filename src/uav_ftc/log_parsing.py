@@ -1,55 +1,124 @@
 import numpy as np
 
+log_databus_attrs = [
+    'time_databus',
+    'gps_lat',
+    'gps_lon',
+    'gps_alt',
+    'p_n',
+    'p_e',
+    'p_d',
+    'v_n',
+    'v_e',
+    'v_d',
+    'airspeed',
+    'alpha',
+    'beta',
+    'qx',
+    'qy',
+    'qz',
+    'qw',
+    'phi',
+    'theta',
+    'psi',
+    'p',
+    'q',
+    'r',
+    'ax',
+    'ay',
+    'az',
+    'wind_n',
+    'wind_e',
+    'wind_d',
+    't_air',
+    't_imu',
+    'p_abs',
+    'qbar',
+    'rho',
+    'g',
+    'rps_motor',
+    'rcin_1',
+    'rcin_2',
+    'rcin_3',
+    'rcin_4',
+    'rcin_5',
+    'rcin_6',
+    'rcin_7',
+    'rcin_8',
+    'rcout_1',
+    'rcout_2',
+    'rcout_3',
+    'rcout_4',
+    'gamma',
+    'psi_dot',
+]
+
+log_ref_traj_attrs = [
+        'time_refTrajectory',
+        'ref_Va',
+        'ref_gamma',
+        'ref_psi_dot',
+]
+
+log_ref_rates_attrs = [
+    'time_refRates',
+    'ref_p',
+    'ref_q',
+    'ref_r',
+]
+
+log_fe_attrs = [
+    'time_fe',
+    'el_A',
+    'el_B',
+    'el_C',
+    'el_D',
+    'el_E',
+    'el_F',
+    'el_G',
+    'el_H',
+    'el_I',
+    'el_J',
+]
+
+log_mission_attrs = [
+    'waypoints',
+    'obstacles',
+    'ref_path',
+]
+
+log_attrs_groups = [
+    log_databus_attrs,
+    log_ref_rates_attrs,
+    log_ref_traj_attrs,
+    log_fe_attrs,
+    log_mission_attrs,
+]
+
+
 # Struct to hold log data to be pickled
 class LogData:
 
     def __init__(self):
         # Databus information
-        self.time_databus = None
-        self.p_n = None
-        self.p_e = None
-        self.p_d = None
-        self.airspeed = None
-        self.alpha = None
-        self.beta = None
-        self.phi = None
-        self.theta = None
-        self.psi = None
-        self.p = None
-        self.q = None
-        self.r = None
-        self.gamma = None
-        self.psi_dot = None
+        for attr_name in log_databus_attrs:
+            setattr(self, attr_name, None)
 
         # Reference angular rates
-        self.time_refRates = None
-        self.ref_p = None
-        self.ref_q = None
-        self.ref_r = None
+        for attr_name in log_ref_rates_attrs:
+            setattr(self, attr_name, None)
 
         # Reference Trajectory
-        self.time_refTrajectory = None
-        self.ref_Va = None
-        self.ref_gamma = None
-        self.ref_psi_dot = None
+        for attr_name in log_ref_traj_attrs:
+            setattr(self, attr_name, None)
 
         # Flight Envelope parameters
-        self.time_fe = None
-        self.el_A = None
-        self.el_B = None
-        self.el_C = None
-        self.el_D = None
-        self.el_E = None
-        self.el_F = None
-        self.el_G = None
-        self.el_H = None
-        self.el_I = None
-        self.el_J = None
+        for attr_name in log_fe_attrs:
+            setattr(self, attr_name, None)
 
         # Waypoint information
-        self.waypoints = None
-        self.obstacles = None
-        self.ref_path = None
+        for attr_name in log_mission_attrs:
+            setattr(self, attr_name, None)
 
     def __str__(self):
         s = []
@@ -81,44 +150,26 @@ class LogData:
 
 
 def filter_log_data(log_data, t_start, t_end):
-    # log_attributes = [attr in dir(log_data) if not attr.startswith('__')]
-    # for attr in log_attributes:
-    #     new_dataseries = getattr(log_data, attr)
-    #     new_dataseries = new_dataseries[]
-    #     setattr(log_data, attr, )
+    log_data_filt = LogData()
     databus_start_idx = np.where(log_data.time_databus > t_start)[0][0]
     databus_end_idx = np.where(log_data.time_databus < t_end)[0][-1]
-    log_data.time_databus = log_data.time_databus[databus_start_idx:databus_end_idx+1]
-    log_data.p_n = log_data.p_n[databus_start_idx:databus_end_idx+1]
-    log_data.p_e = log_data.p_e[databus_start_idx:databus_end_idx+1]
-    log_data.p_d = log_data.p_d[databus_start_idx:databus_end_idx+1]
-    log_data.airspeed = log_data.airspeed[databus_start_idx:databus_end_idx+1]
-    log_data.alpha = -log_data.alpha[databus_start_idx:databus_end_idx+1]
-    log_data.beta = -log_data.beta[databus_start_idx:databus_end_idx+1]
-    log_data.phi = log_data.phi[databus_start_idx:databus_end_idx+1]
-    log_data.theta = log_data.theta[databus_start_idx:databus_end_idx+1]
-    log_data.psi = log_data.psi[databus_start_idx:databus_end_idx+1]
-    log_data.p = log_data.p[databus_start_idx:databus_end_idx+1]
-    log_data.q = log_data.q[databus_start_idx:databus_end_idx+1]
-    log_data.r = log_data.r[databus_start_idx:databus_end_idx+1]
-    log_data.gamma = log_data.gamma[databus_start_idx:databus_end_idx+1]
-    log_data.psi_dot = log_data.psi_dot[databus_start_idx:databus_end_idx+1]
+    for attr_name in log_databus_attrs:
+        filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
+        setattr(log_data_filt, attr_name, filtered_data)
 
     if len(log_data.time_refRates)>0:
         refRates_start_idx = np.where(log_data.time_refRates > t_start)[0][0]
         refRates_end_idx = np.where(log_data.time_refRates < t_end)[0][-1]
-        log_data.time_refRates = log_data.time_refRates[refRates_start_idx:refRates_end_idx+1]
-        log_data.ref_p = log_data.ref_p[refRates_start_idx:refRates_end_idx+1]
-        log_data.ref_q = log_data.ref_q[refRates_start_idx:refRates_end_idx+1]
-        log_data.ref_r = log_data.ref_r[refRates_start_idx:refRates_end_idx+1]
+        for attr_name in log_ref_rates_attrs:
+            filtered_data = getattr(log_data, attr_name)[refRates_start_idx:refRates_end_idx+1]
+            setattr(log_data_filt, attr_name, filtered_data)
 
     if len(log_data.time_refTrajectory)>0:
         refTrajectory_start_idx = np.where(log_data.time_refTrajectory > t_start)[0][0]
         refTrajectory_end_idx = np.where(log_data.time_refTrajectory < t_end)[0][-1]
-        log_data.time_refTrajectory = log_data.time_refTrajectory[refTrajectory_start_idx:refTrajectory_end_idx+1]
-        log_data.ref_Va = log_data.ref_Va[refTrajectory_start_idx:refTrajectory_end_idx+1]
-        log_data.ref_gamma = log_data.ref_gamma[refTrajectory_start_idx:refTrajectory_end_idx+1]
-        log_data.ref_psi_dot = log_data.ref_psi_dot[refTrajectory_start_idx:refTrajectory_end_idx+1]
+        for attr_name in log_ref_traj_attrs:
+            filtered_data = getattr(log_data, attr_name)[refTrajectory_start_idx:refTrajectory_end_idx+1]
+            setattr(log_data_filt, attr_name, filtered_data)
 
     # if len(log_data.time_fe)>0:
     #     fe_start_idx = np.where(log_data.time_fe > t_start)[0][0]
@@ -133,5 +184,23 @@ def filter_log_data(log_data, t_start, t_end):
     #     log_data.el_H = log_data.el_H[fe_start_idx:fe_end_idx+1]
     #     log_data.el_I = log_data.el_I[fe_start_idx:fe_end_idx+1]
     #     log_data.el_J = log_data.el_J[fe_start_idx:fe_end_idx+1]
+
+    return log_data_filt
+
+def merge_log_data(log_data_iter):
+    log_data = LogData()
+
+    for log_attrs in log_attrs_groups:
+        for attr_name in log_attrs:
+            value_iter = []
+            for log_data in log_data_iter:
+                series = getattr(log_data, attr_name)
+                if (
+                    series is not None
+                    and len(series)>0
+                ):
+                    value_iter.append(series)
+            if len(value_iter)>0:
+                setattr(log_data, attr_name, np.concatenate(value_iter))
 
     return log_data

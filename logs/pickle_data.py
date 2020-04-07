@@ -15,6 +15,7 @@ import rosbag
 from rospy import Time
 
 from uav_ftc.uav_model import quat2euler2
+import uav_ftc.log_parsing as lp
 from uav_ftc.log_parsing import LogData
 
 
@@ -71,47 +72,23 @@ def test_code(log_file, model_name, export_path):
 
     num_databus_msgs = in_bag.get_message_count(topic_filters = [databus_name])
     print('Expecting {} databus msgs'.format(num_databus_msgs))
-    log_data.time_databus = np.zeros(num_databus_msgs)
-    log_data.p_n = np.zeros(num_databus_msgs)
-    log_data.p_e = np.zeros(num_databus_msgs)
-    log_data.p_d = np.zeros(num_databus_msgs)
-    log_data.airspeed = np.zeros(num_databus_msgs)
-    log_data.alpha = np.zeros(num_databus_msgs)
-    log_data.beta = np.zeros(num_databus_msgs)
-    log_data.phi = np.zeros(num_databus_msgs)
-    log_data.theta = np.zeros(num_databus_msgs)
-    log_data.psi = np.zeros(num_databus_msgs)
-    log_data.p = np.zeros(num_databus_msgs)
-    log_data.q = np.zeros(num_databus_msgs)
-    log_data.r = np.zeros(num_databus_msgs)
+    for attr_name in lp.log_databus_attrs:
+        setattr(log_data, attr_name, np.zeros(num_databus_msgs))
 
     num_refRates_msgs = in_bag.get_message_count(topic_filters = [refRates_name])
     print('Expecting {} refRates msgs'.format(num_refRates_msgs))
-    log_data.time_refRates = np.zeros(num_refRates_msgs)
-    log_data.ref_p = np.zeros(num_refRates_msgs)
-    log_data.ref_q = np.zeros(num_refRates_msgs)
-    log_data.ref_r = np.zeros(num_refRates_msgs)
+    for attr_name in lp.log_ref_rates_attrs:
+        setattr(log_data, attr_name, np.zeros(num_refRates_msgs))
 
     num_refTrajectory_msgs = in_bag.get_message_count(topic_filters = [refTrajectory_name])
     print('Expecting {} refTrajectory msgs'.format(num_refTrajectory_msgs))
-    log_data.time_refTrajectory = np.zeros(num_refTrajectory_msgs)
-    log_data.ref_Va = np.zeros(num_refTrajectory_msgs)
-    log_data.ref_gamma = np.zeros(num_refTrajectory_msgs)
-    log_data.ref_psi_dot = np.zeros(num_refTrajectory_msgs)
+    for attr_name in lp.log_ref_traj_attrs:
+        setattr(log_data, attr_name, np.zeros(num_refTrajectory_msgs))
 
     num_Fe_msgs = in_bag.get_message_count(topic_filters=flightEnvelope_name)
     print('Expecting {} flight_envelope msgs'.format(num_Fe_msgs))
-    log_data.time_fe = np.zeros(num_Fe_msgs)
-    log_data.el_A = np.zeros(num_Fe_msgs)
-    log_data.el_B = np.zeros(num_Fe_msgs)
-    log_data.el_C = np.zeros(num_Fe_msgs)
-    log_data.el_D = np.zeros(num_Fe_msgs)
-    log_data.el_E = np.zeros(num_Fe_msgs)
-    log_data.el_F = np.zeros(num_Fe_msgs)
-    log_data.el_G = np.zeros(num_Fe_msgs)
-    log_data.el_H = np.zeros(num_Fe_msgs)
-    log_data.el_I = np.zeros(num_Fe_msgs)
-    log_data.el_J = np.zeros(num_Fe_msgs)
+    for attr_name in lp.log_fe_attrs:
+        setattr(log_data, attr_name, np.zeros(num_Fe_msgs))
 
     start_time = in_bag.get_start_time()
 
@@ -135,12 +112,22 @@ def test_code(log_file, model_name, export_path):
         if topic.endswith('dataBus'):
             msg_time = msg.header.stamp
             log_data.time_databus[databus_msg_counter] = msg_time.secs + 1.0*msg_time.nsecs/10**9 - start_time
+            log_data.gps_lat[databus_msg_counter]= msg.coordinates.x
+            log_data.gps_lon[databus_msg_counter]= msg.coordinates.y
+            log_data.gps_alt[databus_msg_counter]= msg.coordinates.z
             log_data.p_n[databus_msg_counter]= msg.position.x
             log_data.p_e[databus_msg_counter]= msg.position.y
             log_data.p_d[databus_msg_counter]= msg.position.z
+            log_data.v_n[databus_msg_counter]= msg.inertial_velocity.x
+            log_data.v_e[databus_msg_counter]= msg.inertial_velocity.y
+            log_data.v_d[databus_msg_counter]= msg.inertial_velocity.z
             log_data.airspeed[databus_msg_counter] = msg.airspeed
             log_data.alpha[databus_msg_counter] = msg.angle_of_attack
             log_data.beta[databus_msg_counter] = msg.angle_of_sideslip
+            log_data.qx[databus_msg_counter] = msg.orientation.x
+            log_data.qy[databus_msg_counter] = msg.orientation.y
+            log_data.qz[databus_msg_counter] = msg.orientation.z
+            log_data.qw[databus_msg_counter] = msg.orientation.w
             phi, theta, psi = quat2euler2(
                     msg.orientation.x,
                     msg.orientation.y,
@@ -153,6 +140,31 @@ def test_code(log_file, model_name, export_path):
             log_data.p[databus_msg_counter] = msg.velocity_angular.x
             log_data.q[databus_msg_counter] = msg.velocity_angular.y
             log_data.r[databus_msg_counter] = msg.velocity_angular.z
+            log_data.ax[databus_msg_counter] = msg.acceleration_linear.x
+            log_data.ay[databus_msg_counter] = msg.acceleration_linear.y
+            log_data.az[databus_msg_counter] = msg.acceleration_linear.z
+            log_data.wind_n[databus_msg_counter] = msg.wind.x
+            log_data.wind_e[databus_msg_counter] = msg.wind.y
+            log_data.wind_d[databus_msg_counter] = msg.wind.z
+            log_data.t_air[databus_msg_counter] = msg.temperature_air
+            log_data.t_imu[databus_msg_counter] = msg.temperature_imu
+            log_data.p_abs[databus_msg_counter] = msg.pressure_absolute
+            log_data.qbar[databus_msg_counter] = msg.qbar
+            log_data.rho[databus_msg_counter] = msg.rho
+            log_data.g[databus_msg_counter] = msg.g
+            log_data.rps_motor[databus_msg_counter] = msg.rps_motor
+            log_data.rcin_1[databus_msg_counter] = msg.rc_in[0]
+            log_data.rcin_2[databus_msg_counter] = msg.rc_in[1]
+            log_data.rcin_3[databus_msg_counter] = msg.rc_in[2]
+            log_data.rcin_4[databus_msg_counter] = msg.rc_in[3]
+            log_data.rcin_5[databus_msg_counter] = msg.rc_in[4]
+            log_data.rcin_6[databus_msg_counter] = msg.rc_in[5]
+            log_data.rcin_7[databus_msg_counter] = msg.rc_in[6]
+            log_data.rcin_8[databus_msg_counter] = msg.rc_in[7]
+            log_data.rcout_1[databus_msg_counter] = msg.rc_in[0]
+            log_data.rcout_2[databus_msg_counter] = msg.rc_in[1]
+            log_data.rcout_3[databus_msg_counter] = msg.rc_in[2]
+            log_data.rcout_4[databus_msg_counter] = msg.rc_in[3]
 
             databus_msg_counter += 1
 
