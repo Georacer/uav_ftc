@@ -10,7 +10,7 @@ static constexpr int kStateSize = ACADO_NX;           // number of states
 static constexpr int kRefSize = ACADO_NY;             // number of reference states
 static constexpr int kEndRefSize = ACADO_NYN;         // number of end reference states
 static constexpr int kInputSize = ACADO_NU;           // number of inputs
-static constexpr int kCostSize = ACADO_NY - ACADO_NU; // number of state costs, we do not use them in our case
+static constexpr int kCostSize = ACADO_NY;            // number of state costs
 static constexpr int kOdSize = ACADO_NOD;             // number of online data
 
 ACADOvariables acadoVariables;
@@ -31,6 +31,10 @@ public:
     bool setDefaultBoundsUpper(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> boundsHight);
     bool setDefaultRunningReference(const Eigen::Ref<const Eigen::Matrix<T, kRefSize, 1>> reference);
     bool setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, 1>> endReference);
+    bool setDefaultCosts(
+        const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> W,
+        const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, kEndRefSize>> WN
+    );
     bool setOnlineData(const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> onlineData);
     bool setOnlineDataSingle(const uint index, const T singleData); // Copy over a single online datum
     bool setConstraintBoundsLower(const Eigen::Ref<const Eigen::Matrix<T, Eigen::Dynamic, 1>> constraintBounds);
@@ -42,6 +46,10 @@ public:
     bool setReferenceTrajectory(
         const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kSamples + 1>> states,
         const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kSamples + 1>> inputs);
+    bool setCosts(
+        const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> W,
+        const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, kEndRefSize>> WN
+    );
     bool solve(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state,
                const Eigen::Ref<const Eigen::Matrix<T, kOdSize, 1>> online_data);
     bool update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state); // Version without online_data
@@ -78,6 +86,16 @@ private:
     Eigen::Map<Eigen::Matrix<float, kInputSize, kSamples, Eigen::ColMajor>>
         acado_inputs_{acadoVariables.u};
 
+    #ifdef ACADO_HAS_WEIGHTS
+    Eigen::Map<Eigen::Matrix<float, kRefSize, kRefSize * kSamples>>
+        acado_w_{acadoVariables.W};
+    Eigen::Map<Eigen::Matrix<float, kEndRefSize, kEndRefSize>>
+        acado_w_end_{acadoVariables.WN};
+    #else // Dummy declarations
+        Eigen::Matrix<float, kRefSize, kRefSize * kSamples> acado_w_;
+        Eigen::Matrix<float, kEndRefSize, kEndRefSize> acado_w_end_;
+    #endif
+
     #ifdef ACADO_HAS_ONLINEDATA
     Eigen::Map<Eigen::Matrix<float, kOdSize, kSamples + 1, Eigen::ColMajor>> acado_online_data_;
     #else
@@ -97,6 +115,7 @@ private:
     bool acado_is_prepared_{false};
     bool external_lbounds_set_{false};
     bool external_ubounds_set_{false};
+    bool external_weights_set_{false};
     bool controller_is_reset_{false};
     T dt_; // Currently unused
     int kConstraintSize_{0};
@@ -112,6 +131,10 @@ private:
         Eigen::Matrix<T, kRefSize, 1>::Zero();
     Eigen::Matrix<T, kEndRefSize, 1> defaultEndReference_ =
         Eigen::Matrix<T, kEndRefSize, 1>::Zero();
+    Eigen::Matrix<T, kRefSize, kRefSize> default_W_ = 
+        Eigen::Matrix<T, kRefSize, kRefSize>::Identity(); 
+    Eigen::Matrix<T, kEndRefSize, kEndRefSize> default_WN_ =
+        Eigen::Matrix<T, kEndRefSize, kEndRefSize>::Identity(); 
 
     // Dummy variables to allow the plumbing to work
     // Eigen::Matrix<float, kOdSize, kSamples+1> dummy_od_;

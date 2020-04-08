@@ -109,43 +109,39 @@ int main()
   // End cost vector
   hN << p << q << r;
 
-  // Running cost weight matrix
-  DMatrix Q(h.getDim(), h.getDim());
-  Q.setIdentity();
-  Q(0, 0) = 100; // p
-  Q(1, 1) = 100; // q
-  Q(2, 2) = 100; // r
-  Q(3, 3) = 1;   // da
-  Q(4, 4) = 1;   // de
-  Q(5, 5) = 1;   // dr
-
-  // End cost weight matrix
-  DMatrix QN(hN.getDim(), hN.getDim());
-  QN.setIdentity();
-  QN(0, 0) = Q(0, 0);
-  QN(1, 1) = Q(1, 1);
-  QN(2, 2) = Q(2, 2);
 
   ////////////////////////////////////
   // Define an optimal control problem
   ////////////////////////////////////
   OCP ocp(t_start, t_end, N);
-  // Add system dynamics
-  ocp.subjectTo(f);
-  // Add constraints
-  ocp.subjectTo(-deltaa_max <= da <= deltaa_max);
-  ocp.subjectTo(-deltae_max <= de <= deltae_max);
-  ocp.subjectTo(-deltar_max <= dr <= deltar_max);
 
   // Set Number of Online Data
   ocp.setNOD(19); 
 
+  // Specify cost gains of the problem
   if (!CODE_GEN)
   {
     // Setting the values of online data does not seem to work
     // ocp.subjectTo(Va == 15);
     // ocp.subjectTo(alpha == 0.035);
     // ocp.subjectTo(beta == 0);
+
+    // Running cost weight matrix
+    DMatrix Q(h.getDim(), h.getDim());
+    Q.setIdentity();
+    Q(0, 0) = 100; // p
+    Q(1, 1) = 100; // q
+    Q(2, 2) = 100; // r
+    Q(3, 3) = 1;   // da
+    Q(4, 4) = 1;   // de
+    Q(5, 5) = 1;   // dr
+
+    // End cost weight matrix
+    DMatrix QN(hN.getDim(), hN.getDim());
+    QN.setIdentity();
+    QN(0, 0) = Q(0, 0);
+    QN(1, 1) = Q(1, 1);
+    QN(2, 2) = Q(2, 2);
 
     // Set a reference for the analysis
     DVector ref(h.getDim());
@@ -168,9 +164,20 @@ int main()
   else
   {
     // For code generation, references are set during run time
-    ocp.minimizeLSQ(Q, h);
-    ocp.minimizeLSQEndTerm(QN, hN);
+    BMatrix Q_sparse(h.getDim(), h.getDim());
+    Q_sparse.setIdentity();
+    BMatrix QN_sparse(hN.getDim(), hN.getDim());
+    QN_sparse.setIdentity();
+    ocp.minimizeLSQ(Q_sparse, h);
+    ocp.minimizeLSQEndTerm(QN_sparse, hN);
   }
+
+  // Add system dynamics
+  ocp.subjectTo(f);
+  // Add constraints
+  ocp.subjectTo(-deltaa_max <= da <= deltaa_max);
+  ocp.subjectTo(-deltae_max <= de <= deltae_max);
+  ocp.subjectTo(-deltar_max <= dr <= deltar_max);
 
   ////////////////////
   // System simulation
@@ -233,8 +240,8 @@ int main()
     mpc.set(QP_SOLVER, QP_QPOASES); // free, source code
     mpc.set(HOTSTART_QP, YES);
     mpc.set(CG_USE_OPENMP, YES);                   // paralellization
-    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);   // Leave this to yes for compatibility with uav_ftc/mpc_wrapper
-    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, NO); // only used for time-varying costs
+    mpc.set(CG_HARDCODE_CONSTRAINT_VALUES, NO);    // Leave this to yes for compatibility with uav_ftc/mpc_wrapper
+    mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, YES); // used for time-varying costs
     mpc.set(USE_SINGLE_PRECISION, YES);            // Single precision
 
     // Do not generate tests or matlab-related interfaces.

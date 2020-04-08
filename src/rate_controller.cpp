@@ -26,7 +26,7 @@ using Eigen::Vector3d;
  * 
  * @param n The ROS NodeHandle of the calling ROS node
  */
-RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConstraints_)
+RateController::RateController(ros::NodeHandle n, ros::NodeHandle pnh) : mpcController_(dt_, numConstraints_)
 {
     //Initialize states
     states_.velocity_angular.x = 0;
@@ -68,6 +68,7 @@ RateController::RateController(ros::NodeHandle n) : mpcController_(dt_, numConst
     trimOnlineData_(2) = states_.angle_of_sideslip;
 	string uavName;
 	n.getParam("uav_name", uavName);
+    getDefaultWeights(pnh); // Read and set default MPC weights
     getDefaultParameters(uavName);
     mpcController_.setTrimOnlineData(trimOnlineData_);
 
@@ -212,6 +213,48 @@ void RateController::getReference(geometry_msgs::Vector3Stamped pRefRates)
     refRates_(2) = pRefRates.vector.z;
 }
 
+void RateController::getDefaultWeights(ros::NodeHandle pnh) // Read default MPC weights
+{
+    Eigen::Matrix<float, kRefSize, kRefSize> default_W = Eigen::Matrix<float, kRefSize, kRefSize>::Identity(); 
+
+    // Running cost weights
+    double w_p;
+    double w_q;
+    double w_r;
+    double w_da;
+    double w_de;
+    double w_dr;
+    pnh.param("wp", w_p, 100.0);
+    pnh.param("wq", w_q, 100.0);
+    pnh.param("wr", w_r, 100.0);
+    pnh.param("wda", w_da, 1.0);
+    pnh.param("wde", w_de, 1.0);
+    pnh.param("wdr", w_dr, 1.0);
+
+    default_W(0,0) = w_p;
+    default_W(1,1) = w_q;
+    default_W(2,2) = w_r;
+    default_W(3,3) = w_da;
+    default_W(4,4) = w_de;
+    default_W(5,5) = w_dr;
+
+    Eigen::Matrix<float, kEndRefSize, kEndRefSize> default_WN = Eigen::Matrix<float, kEndRefSize, kEndRefSize>::Identity(); 
+
+    // End cost weights
+    double wn_p;
+    double wn_q;
+    double wn_r;
+    pnh.param("wnp", wn_p, 100.0);
+    pnh.param("wnq", wn_q, 100.0);
+    pnh.param("wnr", wn_r, 100.0);
+
+    default_WN(0,0) = wn_p;
+    default_WN(1,1) = wn_q;
+    default_WN(2,2) = wn_r;
+
+    mpcController_.setDefaultCosts(default_W, default_WN);
+}
+
 /**
  * @brief Callback to store incoming parameter changes
  * 
@@ -284,7 +327,7 @@ int main(int argc, char **argv)
     }
     ros::Rate spinner(ctrlRate);
 
-    RateController rate_ctrl(n);
+    RateController rate_ctrl(n, pnh);
     spinner.sleep();
     ROS_INFO("ControlNode up");
 

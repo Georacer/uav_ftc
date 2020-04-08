@@ -35,6 +35,15 @@
             rMax: 0.25
             referenceMin: [10.0, -0.52, -0.5]
             referenceMax: [20.0,  0.52,  0.5]
+            wp: 100
+            wq: 100
+            wr: 100
+            wda: 10
+            wde: 10
+            wdr: 10
+            wnp: 100
+            wnq: 100
+            wnr: 100
         </rosparam>
 
         <!--  -->
@@ -65,6 +74,12 @@
         <!-- Raise rate controller -->
         <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
             <param name="~rate" value="50"/>
+            <remap from="~wp" to="wp"/>
+            <remap from="~wq" to="wq"/>
+            <remap from="~wr" to="wr"/>
+            <remap from="~wda" to="wda"/>
+            <remap from="~wde" to="wde"/>
+            <remap from="~wdr" to="wdr"/>
         </node>
 
         <!-- Raise input aggreggator node -->

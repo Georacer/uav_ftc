@@ -6,6 +6,15 @@
     <!-- Raise rate controller -->
     <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
         <remap from="~rate" to="ctrlRateRate"/>
+        <remap from="~wp" to="wp"/>
+        <remap from="~wq" to="wq"/>
+        <remap from="~wr" to="wr"/>
+        <remap from="~wda" to="wda"/>
+        <remap from="~wde" to="wde"/>
+        <remap from="~wdr" to="wdr"/>
+        <remap from="~wnp" to="wnp"/>
+        <remap from="~wnq" to="wnq"/>
+        <remap from="~wnr" to="wnr"/>
     </node>
     <!-- Raise velocity controller -->
     <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen">

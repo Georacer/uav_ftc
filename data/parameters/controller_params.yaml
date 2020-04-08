@@ -30,6 +30,17 @@ rMax: 0.25
 # phiMax: 2.09
 # thetaMax: 1.57
 
+# MPC weights
+wp: 100.0
+wq: 100.0
+wr: 100.0
+wda: 1.0
+wde: 1.0
+wdr: 1.0
+wnp: 100.0
+wnq: 100.0
+wnr: 100.0
+
 # # Reference generator parameters for trajectory input
 referenceMin: [10.0, -0.52, -0.5] # Minimum trajectory limits
 referenceMax: [20.0,  0.52,  0.5] # Scaling factor of reference commands

@@ -103,6 +103,20 @@ bool MpcWrapper<T>::setDefaultEndReference(const Eigen::Ref<const Eigen::Matrix<
     return true;
 }
 
+// Set cost matrices for running and end cost
+template <typename T>
+bool MpcWrapper<T>::setDefaultCosts(
+    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> W,
+    const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, kEndRefSize>> WN
+)
+{
+    default_W_ = W;
+    default_WN_ = WN;
+    external_weights_set_ = true;
+    return true;
+}
+
+
 /**
  * @brief Set the online data used by the model
  * 
@@ -280,6 +294,22 @@ bool MpcWrapper<T>::setReferenceTrajectory(
         states.col(kSamples).template cast<float>();
 
     return true;
+}
+
+// Set cost matrices for running and end cost
+template <typename T>
+bool MpcWrapper<T>::setCosts(
+    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> W,
+    const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, kEndRefSize>> WN
+)
+{
+  for(int i=0; i<kSamples; i++)
+  { 
+      acado_w_.block(0, i*kRefSize, kRefSize, kRefSize) = W.template cast<float>();
+  } 
+  acado_w_end_ = WN.template cast<float>();
+
+  return true;
 }
 
 /**
@@ -467,11 +497,16 @@ bool MpcWrapper<T>::resetController()
         setOnlineData(kTrimOnlineData_);
     }
 
-    // TODO: Initialize constraints
-
     // Initialize the states and controls.
     setReference(defaultReference_, defaultEndReference_);
-    // Initialize constarints, if applicable
+
+    // Initialize weights
+    if (external_weights_set_)
+    {
+        setCosts(default_W_, default_WN_);
+    }
+
+    // Initialize constraints, if applicable
     if (
         (kConstraintSize_ > 0)
         && external_lbounds_set_
@@ -495,6 +530,8 @@ bool MpcWrapper<T>::resetController()
     // Sanity check for corrent passing of bound values
     std::cout << "# Upper limits:\n" << acado_upper_bounds_ << std::endl;
     std::cout << "# Lower limits:\n" << acado_lower_bounds_ << std::endl;
+    std::cout << "# Running costs:\n" << acado_w_ << std::endl;
+    std::cout << "# End costs:\n" << acado_w_end_ << std::endl;
 }
 
 /**
