@@ -76,7 +76,7 @@ def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None,
                 axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
                 legend_handles.append(mpl.patches.Patch(color=color, label=series_name+' ref', hatch='/'))
             else:
-                axh.plot(x_data, y_data, color=color, linewidth=1)
+                axh.plot(x_data, y_data, color=color, linewidth=0.5)
                 legend_handles.append(mpl.patches.Patch(color=color, label=series_name))
 
         if x_lims is not None:
@@ -180,18 +180,24 @@ def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, pl
         r_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].r))
     plot_data = [p_data, q_data, r_data]
 
-    series_names = []
+    series_names = [None]*3
+    subfig_names = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_names.append(log_name + ' ref')
-        series_names.append(log_name)
+            subfig_names.append(log_name + ' ref')
+        subfig_names.append(log_name)
+    for subf_idx in range(3):
+        series_names[subf_idx] = subfig_names
 
     log_colors = build_colorlist(len(log_names))
-    series_colors = []
+    series_colors = [None]*3
+    subfig_colors = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_colors.append(log_colors[log_idx])
-        series_colors.append(log_colors[log_idx])
+            subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
     return fig
@@ -277,18 +283,24 @@ def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None, plo
         z_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].psi_dot))
     plot_data = [x_data, y_data, z_data]
 
-    series_names = []
+    series_names = [None]*3
+    subfigure_names = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_names.append(log_name + ' ref')
-        series_names.append(log_name)
+            subfigure_names.append(log_name + ' ref')
+        subfigure_names.append(log_name)
+    for subf_idx in range(3):
+        series_names[subf_idx] = subfigure_names
 
     log_colors = build_colorlist(len(log_names))
-    series_colors = []
+    series_colors = [None]*3
+    subfig_colors = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_colors.append(log_colors[log_idx])
-        series_colors.append(log_colors[log_idx])
+            subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
     return fig
@@ -362,18 +374,24 @@ def plot_airdata(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lim
         z_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].beta)))
     plot_data = [x_data, y_data, z_data]
 
-    series_names = []
+    series_names = [None]*3
+    subfig_names = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_names.append(log_name + ' ref')
-        series_names.append(log_name)
+            subfig_names.append(log_name + ' ref')
+        subfig_names.append(log_name)
+    for subf_idx in range(3):
+        series_names[subf_idx] = subfig_names
 
     log_colors = build_colorlist(len(log_names))
-    series_colors = []
+    series_colors = [None]*3
+    subfig_colors = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_colors.append(log_colors[log_idx])
-        series_colors.append(log_colors[log_idx])
+            subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
 
@@ -395,18 +413,24 @@ def plot_euler(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=
         z_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].psi)))
     plot_data = [x_data, y_data, z_data]
 
-    series_names = []
+    series_names = [None]*3
+    subfig_names = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_names.append(log_name + ' ref')
-        series_names.append(log_name)
+            subfig_names.append(log_name + ' ref')
+        subfig_names.append(log_name)
+    for subf_idx in range(3):
+        series_names[subf_idx] = subfig_names
 
     log_colors = build_colorlist(len(log_names))
-    series_colors = []
+    series_colors = [None]*3
+    subfig_colors = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            series_colors.append(log_colors[log_idx])
-        series_colors.append(log_colors[log_idx])
+            subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
 
@@ -428,14 +452,20 @@ def plot_inputs(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims
                 )
             )
 
-    series_names = []
+    series_names = [None]*len(plot_labels)
+    subfig_names = []
     for log_idx, log_name in enumerate(log_names):
-        series_names.append(log_name)
+        subfig_names.append(log_name)
+    for subf_idx in range(len(series_names)):
+        series_names[subf_idx] = subfig_names
 
     log_colors = build_colorlist(len(log_names))
-    series_colors = []
+    series_colors = [None]*len(plot_labels)
+    subfig_colors = []
     for log_idx, log_name in enumerate(log_names):
-        series_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(len(series_names)):
+        series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
 
