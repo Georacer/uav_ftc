@@ -303,6 +303,8 @@ bool MpcWrapper<T>::setCosts(
     const Eigen::Ref<const Eigen::Matrix<T, kEndRefSize, kEndRefSize>> WN
 )
 {
+#ifdef ACADO_HAS_WEIGHTS
+
   for(int i=0; i<kSamples; i++)
   { 
       acado_w_.block(0, i*kRefSize, kRefSize, kRefSize) = W.template cast<float>();
@@ -310,6 +312,12 @@ bool MpcWrapper<T>::setCosts(
   acado_w_end_ = WN.template cast<float>();
 
   return true;
+
+#else
+  
+  std::cout << "ERROR: Cannot set MPC cost matrix without compiling the MPC to support variable cost matries\n";
+
+#endif
 }
 
 /**

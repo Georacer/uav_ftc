@@ -92,8 +92,8 @@ private:
     Eigen::Map<Eigen::Matrix<float, kEndRefSize, kEndRefSize>>
         acado_w_end_{acadoVariables.WN};
     #else // Dummy declarations
-        Eigen::Matrix<float, kRefSize, kRefSize * kSamples> acado_w_;
-        Eigen::Matrix<float, kEndRefSize, kEndRefSize> acado_w_end_;
+        Eigen::Matrix<float, 1, 1> acado_w_;
+        Eigen::Matrix<float, 1, 1> acado_w_end_;
     #endif
 
     #ifdef ACADO_HAS_ONLINEDATA
