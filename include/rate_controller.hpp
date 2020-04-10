@@ -3,6 +3,7 @@
 
 #include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Eigen>
+#include <iir/Butterworth.h>
 
 #include <uav_ftc/BusData.h>
 #include <last_letter_msgs/Parameter.h>
@@ -14,6 +15,7 @@ enum class Parameter {
     Va = 0,
     alpha,
     beta,
+    t_prop,
     c_l_0,
     c_l_p,
     c_l_b,
@@ -38,6 +40,7 @@ std::vector<std::string> online_data_names {
     "Va",
     "alpha",
     "beta",
+    "t_prop",
     "c_l_0",
     "c_l_pn",
     "c_l_beta",
@@ -64,6 +67,7 @@ private:
     uav_ftc::BusData states_; // Complete aircraft state
     Eigen::Vector3f angularStates_;     // p, q, r measurements
     Eigen::Matrix<real_t, kOdSize, 1> trimOnlineData_; // Vector holding default Online Data values
+    double thrust_moment_{0}; // Downwards moment created by the thrust vector
     Eigen::Vector3f refRates_, refInputs_;
     Eigen::Matrix<float, kInputSize, 1> predicted_controls_; // Stores control outputs, -1,1 range
     float deltaa_max, deltae_max, deltar_max;
@@ -73,6 +77,13 @@ private:
     float dt_ = 0.02;
     int numConstraints_ = 0; // Do not update constraint bounds externally
     bool statesReceivedStatus_ = false;
+
+    static const int filter_order_{2};
+    const float f_sample_ = 100;
+    const float f_cut_ = 10;
+    Iir::Butterworth::LowPass<filter_order_> filt_va_, filt_alpha_, filt_beta_;
+    Iir::Butterworth::LowPass<filter_order_> filt_p_, filt_q_, filt_r_;
+    Iir::Butterworth::LowPass<filter_order_> filt_ty_;
 
     //////////
     // Members

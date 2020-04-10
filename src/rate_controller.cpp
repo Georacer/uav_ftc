@@ -42,6 +42,18 @@ RateController::RateController(ros::NodeHandle n, ros::NodeHandle pnh) : mpcCont
     tprev = ros::Time::now();
     states_.header.stamp = tprev;
 
+    // Setup data filters
+    // Airdata
+    filt_va_.setup(f_sample_, f_cut_);
+    filt_alpha_.setup(f_sample_, f_cut_);
+    filt_beta_.setup(f_sample_, f_cut_);
+    // Angular Rates
+    filt_p_.setup(f_sample_, f_cut_);
+    filt_q_.setup(f_sample_, f_cut_);
+    filt_r_.setup(f_sample_, f_cut_);
+    // Torques
+    filt_ty_.setup(f_sample_, f_cut_);
+
     // Initialize MPC wrapper
 
     // Set default model parameters
@@ -114,11 +126,13 @@ void RateController::step()
     mpcController_.setReference(reference, refRates_);
 
     // Convert airdata triplet
-    Vector3d airdata = Vector3d(states_.airspeed,
-                                states_.angle_of_attack,
-                                states_.angle_of_sideslip);
+    Vector3d airdata = Vector3d(
+        filt_va_.filter(states_.airspeed),
+        filt_alpha_.filter(states_.angle_of_attack),
+        filt_beta_.filter(states_.angle_of_sideslip)
+    );
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
-    if (airdata(0) < 1)
+    if (airdata(0) < 5)
     {
         ROS_WARN_THROTTLE(1, "Read airspeed: %f, setting to 5m/s", airdata(0));
         airdata(0) = 5;
@@ -130,8 +144,17 @@ void RateController::step()
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::alpha, airdata(1));
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::beta, airdata(2));
 
+    thrust_moment_ = filt_ty_.filter(states_.propulsion.torque.y);
+    mpcController_.setOnlineDataSingle((unsigned int) Parameter::t_prop, thrust_moment_);
+
+    // Isolate angular velocity system measurements
+    angularStates_(0) = filt_p_.filter(states_.velocity_angular.x);
+    angularStates_(1) = filt_q_.filter(states_.velocity_angular.y);
+    angularStates_(2) = filt_r_.filter(states_.velocity_angular.z);
+
     // Solve problem with given measurements
     mpcController_.update(angularStates_);
+    // mpcController_.printSolverState();
 
     // Write the resulting controller output
     readControls();
@@ -165,11 +188,6 @@ void RateController::getStates(uav_ftc::BusData bus_data)
 {
     // Copy over all aircraft state
     states_ = bus_data;
-
-    // Isolate angular velocity system measurements
-    angularStates_(0) = bus_data.velocity_angular.x;
-    angularStates_(1) = bus_data.velocity_angular.y;
-    angularStates_(2) = bus_data.velocity_angular.z;
 
     statesReceivedStatus_ = true;
 }
@@ -298,7 +316,7 @@ void RateController::getDefaultParameters(std::string uavName)
     getParameter(configStruct.aero, "airfoil1/deltae_max", deltae_max);
     getParameter(configStruct.aero, "airfoil1/deltar_max", deltar_max);
 
-    for (int i=3; i < kOdSize; i++) // Skip Va, alpha, beta
+    for (int i=4; i < kOdSize; i++) // Skip Va, alpha, beta, t_prop
     {
         std:string param_name = "airfoil1/" + online_data_names[i];
         // ROS_INFO("Getting default value for %s", param_name.c_str());

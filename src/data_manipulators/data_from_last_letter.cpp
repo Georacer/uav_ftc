@@ -83,6 +83,7 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     bus_data.angle_of_attack = airdata.y();
     bus_data.angle_of_sideslip = airdata.z();
 
+
     flag_got_gps = true;
     flag_got_airdata = true;
 }

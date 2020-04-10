@@ -62,6 +62,7 @@ DataBus::DataBus(ros::NodeHandle par_n, uint data_source)
     }
     data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 100);
     ekf_pub_ = n.advertise<uav_ftc::BusData>("ekf", 100);
+
     ekf_init_();
 }
 

@@ -29,6 +29,9 @@ find_package(Eigen3 REQUIRED)
 # Have yaml-cpp already copied and built
 find_package(yaml-cpp PATHS externals/yaml-cpp/build)
 
+# Have IIR1 already cloned and built
+find_package(iir PATHS externals/iir1)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -289,11 +292,12 @@ target_link_libraries(rate_controller
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
   rate_controller_wrapper
+  iir::iir
 )
 
 # The rate (no rudder) controller
 add_executable(rate_controller_no_rud
-  src/rate_controller.cpp
+  src/rate_controller_no_rud.cpp
 )
 add_dependencies(rate_controller_no_rud ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(rate_controller_no_rud
@@ -313,11 +317,12 @@ target_link_libraries(trajectory_controller
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
   trajectory_controller_wrapper
+  iir::iir
 )
 
 # The trajectory (no rudder) controller
 add_executable(trajectory_controller_no_rud
-  src/trajectory_controller.cpp
+  src/trajectory_controller_no_rud.cpp
 )
 add_dependencies(trajectory_controller_no_rud ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(trajectory_controller_no_rud
@@ -358,7 +363,7 @@ target_link_libraries(controller_no_ail
 add_executable(reference_generator
   src/reference_generator.cpp
 )
-add_dependencies(rate_controller ${catkin_EXPORTED_TARGETS} )
+add_dependencies(reference_generator ${catkin_EXPORTED_TARGETS} )
 target_link_libraries(reference_generator
   ${catkin_LIBRARIES}
   ${catkin_INCLUDE_DIRS}

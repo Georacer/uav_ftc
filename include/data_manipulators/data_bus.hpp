@@ -18,7 +18,6 @@ class SubHandler
     bool flag_got_gps, flag_got_airdata;
     uav_ftc::BusData get_data() {};
     SubHandler();
-
 };
 
 class DataBus

@@ -31,6 +31,8 @@ int main()
   OnlineData Va;
   OnlineData alpha;
   OnlineData beta;
+  // Thrust moment parameter
+  OnlineData prop_moment;
   // roll moment parameters
   OnlineData c_l_0;
   OnlineData c_l_p;
@@ -53,7 +55,7 @@ int main()
 
   // Parameters which are to be set/overwritten at runtime
   const double t_start = 0.0;      // Initial time [s]
-  const double t_end = 0.4;        // Time horizon [s]
+  const double t_end = 0.2;        // Time horizon [s]
   const double dt = 0.02;          // Discretization time [s]
   const int N = round(t_end / dt); // Number of computation nodes
 
@@ -90,7 +92,7 @@ int main()
   // Torque calculations
   Expression qbar = 0.5 * rho * Va * Va;
   IntermediateState l = qbar * S * b * (c_l_0 + c_l_b * beta + b / 2 / Va * (c_l_p * p + c_l_r * r) + c_l_deltaa * da + c_l_deltar * dr);
-  IntermediateState m = qbar * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de);
+  IntermediateState m = qbar * S * c * (c_m_0 + c_m_a * alpha + c / 2 / Va * (c_m_q * q) + c_m_deltae * de) + prop_moment;
   IntermediateState n = qbar * S * b * (c_n_0 + c_n_b * beta + b / 2 / Va * (c_n_p * p + c_n_r * r) + c_n_deltaa * da + c_n_deltar * dr);
 
   // System dynamics, Beard notation
@@ -116,7 +118,7 @@ int main()
   OCP ocp(t_start, t_end, N);
 
   // Set Number of Online Data
-  ocp.setNOD(19); 
+  ocp.setNOD(20); 
 
   // Specify cost gains of the problem
   if (!CODE_GEN)

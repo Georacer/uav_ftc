@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2019
  * 
  */
-#include "trajectory_controller.hpp"
+#include "trajectory_controller_no_rud.hpp"
 
 #include <cstdlib>
 #include <math.h>
