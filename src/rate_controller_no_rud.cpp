@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2019
  * 
  */
-#include "rate_controller.hpp"
+#include "rate_controller_no_rud.hpp"
 
 #include <cstdlib>
 #include <math.h>
@@ -255,7 +255,7 @@ void RateController::getDefaultParameters(std::string uavName)
     getParameter(configStruct.aero, "airfoil1/deltae_max", deltae_max);
     getParameter(configStruct.aero, "airfoil1/deltar_max", deltar_max);
 
-    for (int i=3; i < kOdSize; i++) // Skip Va, alpha, beta
+    for (int i=4; i < kOdSize; i++) // Skip Va, alpha, beta, t_prop
     {
         std:string param_name = "airfoil1/" + online_data_names[i];
         // ROS_INFO("Getting default value for %s", param_name.c_str());

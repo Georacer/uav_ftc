@@ -104,11 +104,19 @@ void SubHandlerHW::cb_minidaq(minidaq::minidaq_peripherals msg)
     double press_abs_mbar = press_abs_normalized*(1100-600)+600;
     bus_data.pressure_absolute = press_abs_mbar*100; // Convert to Pascal
     bus_data.rps_motor = msg.rps; // Currently only for first motor
-    // Disregard RC output information, available through ROSFlight topics
+    // Create estimates of the propeller force and torque about the CG
+    // Based on the APC Electric 10x7 propeller
+    const double prop_d = 10*2.54/100;
+    double J = bus_data.airspeed/(bus_data.rps_motor*prop_d);
+    double c_t = 0.2202*J*J*J -0.4277*J*J + 0.0756*J + 0.1054;
+    double c_p = 0.4662*J*J*J*J - 0.8223*J*J*J + 0.3482*J*J -0.0401*J + 0.0530;
+    double thrust = c_t*pow(bus_data.rps_motor,2)*pow(prop_d,4);
+    double power = c_p*pow(bus_data.rps_motor,3)*pow(prop_d,5);
+    double torque = power/(bus_data.rps_motor*2*M_PI);
+    bus_data.propulsion.force.x = thrust;
+    bus_data.propulsion.torque.y = -thrust*0.1; // thrust mult by the torque arm
 
-    // Estimate force-torque data based on rps?
-    // bus_data.propulsion.force = 
-    // bus_data.propulsion.torque = 
+    // Disregard RC output information, available through ROSFlight topics
 
     flag_got_airdata = true;
 }
