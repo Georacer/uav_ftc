@@ -25,25 +25,17 @@
         <!-- Load controller parameters -->
         <rosparam>
             ctrlMode: 1
-            deltaFMin: 0.0
-            pMin: -1.5
-            qMin: -1.5
-            rMin: -0.25
-            deltaFMax: 12.0
-            pMax: 1.5
-            qMax: 1.5
-            rMax: 0.25
             referenceMin: [10.0, -0.52, -0.5]
             referenceMax: [20.0,  0.52,  0.5]
-            wp: 100
-            wq: 100
-            wr: 100
-            wda: 10
-            wde: 10
-            wdr: 10
-            wnp: 100
-            wnq: 100
-            wnr: 100
+            wp: 1
+            wq: 1
+            wr: 1
+            wda: 1
+            wde: 1
+            wdr: 1
+            wnp: 1
+            wnq: 1
+            wnr: 1
         </rosparam>
 
         <!--  -->
@@ -80,6 +72,9 @@
             <remap from="~wda" to="wda"/>
             <remap from="~wde" to="wde"/>
             <remap from="~wdr" to="wdr"/>
+            <remap from="~wnp" to="wnp"/>
+            <remap from="~wnq" to="wnq"/>
+            <remap from="~wnr" to="wnr"/>
         </node>
 
         <!-- Raise input aggreggator node -->
