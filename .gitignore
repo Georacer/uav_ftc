@@ -17,6 +17,8 @@ mpc_models/rate_controller_no_rud/rate_controller_mpc_solver/*
 !mpc_models/rate_controller_no_rud/rate_controller_mpc_solver/acado_problem_definitions.h
 mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/*
 !mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_problem_definitions.h
+mpc_models/trajectory_controller_no_va/trajectory_controller_mpc_solver/*
+!mpc_models/trajectory_controller_no_va/trajectory_controller_mpc_solver/acado_problem_definitions.h
 
 utilities/*
 scrap_scripts/*
