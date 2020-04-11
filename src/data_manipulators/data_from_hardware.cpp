@@ -97,7 +97,7 @@ void SubHandlerHW::cb_minidaq(minidaq::minidaq_peripherals msg)
     bus_data.rho = 1.225; // Air density
     bus_data.airspeed = qbar_sign*sqrt(2*fabs(bus_data.qbar)/bus_data.rho);
 
-    bus_data.angle_of_attack = double(msg.aoa-2048.0)/4096.0*(2*M_PI);
+    bus_data.angle_of_attack = -double(msg.aoa-2048.0)/4096.0*(2*M_PI); // Needs reversing because of sensor direction
     bus_data.angle_of_sideslip = double(msg.aos-2048.0)/4096.0*(2*M_PI);
     bus_data.temperature_air = msg.temperature*0.01;
     double press_abs_normalized = double(msg.press_abs-0x666)/0x6ccc;
