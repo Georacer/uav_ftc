@@ -599,11 +599,21 @@ void MpcWrapper<T>::getInputs(
 template <typename T>
 void MpcWrapper<T>::printSolverState()
 {
+    #ifdef ACADO_HAS_ONLINEDATA
     std::cout << "Online Data: \n" << acado_online_data_ << std::endl;
-    std::cout << "Reference:   \n" << acado_reference_states_ << std::endl;
-    std::cout << "Measurements:\n" << acado_initial_state_ << std::endl;
-    std::cout << "States:      \n" << acado_states_ << std::endl;
-    std::cout << "Input:       \n" << acado_inputs_ << std::endl;
+    #endif
+    std::cout << "Reference:      \n" << acado_reference_states_ << std::endl;
+    std::cout << "Measurements:   \n" << acado_initial_state_ << std::endl;
+    std::cout << "States:         \n" << acado_states_ << std::endl;
+    std::cout << "Input:          \n" << acado_inputs_ << std::endl;
+    #ifdef ACADO_HAS_CONSTRAINTS
+    std::cout << "Lower bounds:   \n" << acado_lower_bounds_ << std::endl;
+    std::cout << "Upper bounds:   \n" << acado_upper_bounds_ << std::endl;
+    #endif
+    #ifdef ACADO_HAS_WEIGHTS
+    std::cout << "Running Weights:\n" << acado_w_ << std::endl;
+    std::cout << "End Weights:    \n" << acado_w_end_ << std::endl;
+    #endif
 }
 
 template class MpcWrapper<float>;
