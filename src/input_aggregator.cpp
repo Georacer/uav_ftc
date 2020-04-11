@@ -18,6 +18,16 @@
  */
 InputAggregator::InputAggregator(ros::NodeHandle n)
 {
+    // Initialize controls
+    surfaceCtrls_.vector.x = 0.0;
+    surfaceCtrls_.vector.y = 0.0;
+    surfaceCtrls_.vector.z = 0.0;
+    throttleCtrls_.vector.x = 0.5;
+    rawCtrls_.value[0] = 1500;
+    rawCtrls_.value[1] = 1500;
+    rawCtrls_.value[2] = 1500;
+    rawCtrls_.value[3] = 1500;
+
     rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
     surfaceSub_ = n.subscribe("ctrlSurfaceCmds", 1, &InputAggregator::surfaceCtrlsCallback, this);
     throttleSub_ = n.subscribe("throttleCmd", 1, &InputAggregator::throttleCtrlsCallback, this);
