@@ -111,7 +111,7 @@ public:
     void getDefaultParameters(std::string uavName);             // Read necessary UAV parameters
     bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
     float calcOmega(const float thrust);                        // Calculate required RPM from desired thrust
-    double estimateThrust(const double airspeed, const double rps);
+    double estimateThrust(const double airspeed, const double deltat);
 
     // Constructor
     TrajectoryController(ros::NodeHandle nh, ros::NodeHandle pnh);

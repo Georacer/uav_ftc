@@ -139,10 +139,10 @@ void TrajectoryController::step()
     }
     
     // Restrict airspeed to non-zero to avoid divide-by-zero errors
-    if (airdata_(0) < 1)
+    if (airdata_(0) < 10)
     {
-        ROS_WARN_THROTTLE(1, "Read airspeed: %f, setting to 5m/s", airdata_(0));
-        airdata_(0) = 5;
+        ROS_WARN_THROTTLE(1, "Read airspeed: %f, setting to 10m/s", airdata_(0));
+        airdata_(0) = 10;
     }
 
     // reference vectors are already saved in the controller
