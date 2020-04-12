@@ -28,7 +28,7 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
     rawCtrls_.value[2] = 1500;
     rawCtrls_.value[3] = 1500;
 
-    rawSub_ = n.subscribe("rawPWM", 1, &InputAggregator::rawCtrlsCallback, this);
+    rawSub_ = n.subscribe("dataBus", 1, &InputAggregator::rawCtrlsCallback, this);
     surfaceSub_ = n.subscribe("ctrlSurfaceCmds", 1, &InputAggregator::surfaceCtrlsCallback, this);
     throttleSub_ = n.subscribe("throttleCmd", 1, &InputAggregator::throttleCtrlsCallback, this);
 
@@ -42,13 +42,12 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
  * 
  * @param msg The user control input message
  */
-void InputAggregator::rawCtrlsCallback(last_letter_msgs::SimPWM msg)
+void InputAggregator::rawCtrlsCallback(uav_ftc::BusData msg)
 {
-    rawCtrls_ = msg;
-    // if (ctrlMode_ == 0) // Direct passthrough, trigger with raw controls
-    // {
-    //     publishCtrls();
-    // }
+    rawCtrls_.value[0] = msg.rc_in[0];
+    rawCtrls_.value[1] = msg.rc_in[1];
+    rawCtrls_.value[2] = msg.rc_in[2];
+    rawCtrls_.value[3] = msg.rc_in[3];
 }
 
 /**

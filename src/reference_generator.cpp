@@ -22,98 +22,21 @@
 ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
 {
     n_ = n;
-    sub_ = n.subscribe("joy", 1, &ReferenceGenerator::joyCallback, this);
+    sub_ = n.subscribe("dataBus", 1, &ReferenceGenerator::rcCallback, this);
     pub_ = n.advertise<geometry_msgs::Vector3Stamped>("refCmds", 1);
-
-    // Read the controller configuration parameters from the HID.yaml file
-    XmlRpc::XmlRpcValue listInt, listDouble;
-    int i;
-    ROS_INFO("Reading throws directions");
-    if (!ros::param::getCached("/HID/throws", listDouble))
-    {
-        ROS_FATAL("Invalid parameters for -/HID/throws- in param server!");
-        ros::shutdown();
-    }
-    for (i = 0; i < listDouble.size(); ++i)
-    {
-        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-        throwIndex_[i] = listDouble[i];
-    }
-    ROS_INFO("Reading input axes");
-    if (!ros::param::getCached("/HID/axes", listInt))
-    {
-        ROS_FATAL("Invalid parameters for -/HID/axes- in param server!");
-        ros::shutdown();
-    }
-    for (i = 0; i < listInt.size(); ++i)
-    {
-        ROS_ASSERT(listInt[i].getType() == XmlRpc::XmlRpcValue::TypeInt);
-        axisIndex_[i] = listInt[i];
-    }
-    ROS_INFO("Reading input buttons configuration");
-    if (!ros::param::getCached("/HID/buttons", listInt))
-    {
-        ROS_FATAL("Invalid parameters for -/HID/buttons- in param server!");
-        ros::shutdown();
-    }
-    for (i = 0; i < listInt.size(); ++i)
-    {
-        ROS_ASSERT(listInt[i].getType() == XmlRpc::XmlRpcValue::TypeInt);
-        buttonIndex_[i] = listInt[i];
-    }
-    // Read the control mode
-    ROS_INFO("Reading the control mode setting");
-    if (!ros::param::getCached("ctrlMode", ctrlMode_))
-    {
-        ROS_FATAL("Invalid parameter for -/ctrlMode- in param server!");
-        ros::shutdown();
-    }
-    // Read the reference commands parameters from the server:w
-    ROS_INFO("Reading reference scale configuration");
-    if (!ros::param::getCached("referenceMin", listDouble))
-    {
-        ROS_FATAL("Invalid parameters for -/referenceMin- in param server!");
-        ros::shutdown();
-    }
-    for (i = 0; i < listDouble.size(); ++i)
-    {
-        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-        referenceMin_(i) = listDouble[i];
-    }
-    if (!ros::param::getCached("referenceMax", listDouble))
-    {
-        ROS_FATAL("Invalid parameters for -/referenceMax- in param server!");
-        ros::shutdown();
-    }
-    for (i = 0; i < listDouble.size(); ++i)
-    {
-        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-        referenceMax_(i) = listDouble[i];
-    }
 }
 
 /**
- * @brief Callback to the joystick message, representing user input
+ * @brief Callback to the BusData message, including user input
  * 
- * @param joyMsg The joystick message
+ * @param data_bus The BusData message
  */
-void ReferenceGenerator::joyCallback(sensor_msgs::Joy joyMsg)
+void ReferenceGenerator::rcCallback(uav_ftc::BusData data_bus)
 {
-    for (int i = 0; i < 11; i++)
-    {
-        if (axisIndex_[i] != -1)
-        { // if an axis is assigned in this channel
-            inpChannels_[i] = 1.0 / throwIndex_[i] * joyMsg.axes[axisIndex_[i]];
-        }
-        else if (buttonIndex_[i] != -1)
-        {
-            inpChannels_[i] = 1.0 / throwIndex_[i] * joyMsg.buttons[buttonIndex_[i]];
-        }
-        else
-        {
-            inpChannels_[i] = 0.0;
-        }
-    }
+    inpChannels_[0] = data_bus.rc_in[0];
+    inpChannels_[1] = data_bus.rc_in[1];
+    inpChannels_[2] = data_bus.rc_in[2];
+    inpChannels_[3] = data_bus.rc_in[3];
 
     reference_ = convertInputs(inpChannels_);
     publishCmds(reference_);

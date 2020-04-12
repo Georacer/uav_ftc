@@ -3,8 +3,9 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <rosgraph_msgs/Clock.h>
 
-#include <last_letter_msgs/SimPWM.h>
 #include <last_letter_msgs/SimStates.h>
+#include <last_letter_msgs/SimPWM.h>
+#include <uav_ftc/BusData.h>
 
 class InputAggregator
 {
@@ -27,7 +28,7 @@ bool ctrl_stale{false}; // TODO: for future feature
 // Methods
 
 InputAggregator(ros::NodeHandle n);
-void rawCtrlsCallback(last_letter_msgs::SimPWM msg);
+void rawCtrlsCallback(uav_ftc::BusData msg);
 void surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg);
 void throttleCtrlsCallback(geometry_msgs::Vector3Stamped msg);
 void statesCallback(last_letter_msgs::SimStates msg);
