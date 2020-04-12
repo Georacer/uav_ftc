@@ -94,6 +94,30 @@ enum class Constraint {
 
 class TrajectoryController
 {
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    ////////////
+    // Functions
+    void step();                                                // Caller of rate_controller_wrapper
+    void stepAirspeedController();                              // Airspeed controller calculations
+    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
+    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
+    void getParameters(last_letter_msgs::Parameter parameter);  // Callback to capture parameter changes
+    void getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr&); // Callback to capture Flight Envelope ellipsoid parameters
+    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
+    void writeOutput();                                         // Send control signals to the control inputs aggregator
+    void getDefaultWeights(ros::NodeHandle pnh);
+    void getDefaultParameters(std::string uavName);             // Read necessary UAV parameters
+    bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
+    float calcOmega(const float thrust);                        // Calculate required RPM from desired thrust
+    double estimateThrust(const double airspeed, const double rps);
+
+    // Constructor
+    TrajectoryController(ros::NodeHandle nh, ros::NodeHandle pnh);
+    // Destructor
+    ~TrajectoryController();
+
 private:
     ////////////
     // Variables
@@ -133,29 +157,6 @@ private:
     //////////
     // Members
     MpcWrapper<float> mpcController_;
-
-public:
-
-    ////////////
-    // Functions
-    void step();                                                // Caller of rate_controller_wrapper
-    void stepAirspeedController();                              // Airspeed controller calculations
-    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
-    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
-    void getParameters(last_letter_msgs::Parameter parameter);  // Callback to capture parameter changes
-    void getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr&); // Callback to capture Flight Envelope ellipsoid parameters
-    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
-    void writeOutput();                                         // Send control signals to the control inputs aggregator
-    void getDefaultWeights(ros::NodeHandle pnh);
-    void getDefaultParameters(std::string uavName);             // Read necessary UAV parameters
-    bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
-    float calcOmega(const float thrust);                        // Calculate required RPM from desired thrust
-    double estimateThrust(const double airspeed, const double rps);
-
-    // Constructor
-    TrajectoryController(ros::NodeHandle nh, ros::NodeHandle pnh);
-    // Destructor
-    ~TrajectoryController();
 };
 
 float calcPsiDotDes(Eigen::Vector3f refTrajectory);

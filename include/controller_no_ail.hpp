@@ -11,6 +11,25 @@
 
 class Controller
 {
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    ////////////
+    // Functions
+    void step();                                                // Caller of rate_controller_wrapper
+    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
+    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
+    void getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr&); // Callback to capture Flight Envelope ellipsoid parameters
+    void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
+    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
+    double calcOmega(const double thrust);                       // Calculate the rpms required to produce thrust
+    void writeOutput();                                         // Send control signals to the control inputs aggregator
+
+    // Constructor
+    Controller(ros::NodeHandle n, ros::NodeHandle pnh);
+    // Destructor
+    ~Controller();
+
 private:
     ////////////
     // Variables
@@ -34,22 +53,4 @@ private:
 
     //////////
     // Members
-
-public:
-
-    ////////////
-    // Functions
-    void step();                                                // Caller of rate_controller_wrapper
-    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
-    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
-    void getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr&); // Callback to capture Flight Envelope ellipsoid parameters
-    void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
-    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
-    double calcOmega(const double thrust);                       // Calculate the rpms required to produce thrust
-    void writeOutput();                                         // Send control signals to the control inputs aggregator
-
-    // Constructor
-    Controller(ros::NodeHandle n, ros::NodeHandle pnh);
-    // Destructor
-    ~Controller();
 };

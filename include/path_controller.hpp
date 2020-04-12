@@ -45,6 +45,8 @@ struct PathControllerSettings{
 
 class PathController {
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     PathController(const PathControllerSettings& s);
     ~PathController();
     VectorXd uav_model(Vector4d state, Vector3d inputs);
@@ -77,6 +79,8 @@ class PathController {
 
 class WaypointMngr {
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     WaypointMngr()
     {};
     ~WaypointMngr()

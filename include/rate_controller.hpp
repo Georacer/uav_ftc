@@ -61,6 +61,25 @@ std::vector<std::string> online_data_names {
 
 class RateController
 {
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    ////////////
+    // Functions
+    void step();                                                // Caller of rate_controller_wrapper
+    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
+    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
+    void getDefaultWeights(ros::NodeHandle pnh);
+    void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
+    void getParameters(last_letter_msgs::Parameter parameter);  // Callback to store estimated parameters
+    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
+    void writeOutput();                                         // Send control signals to the control inputs aggregator
+
+    // Constructor
+    RateController(ros::NodeHandle n, ros::NodeHandle pnh);
+    // Destructor
+    ~RateController();
+
 private:
     ////////////
     // Variables
@@ -88,22 +107,4 @@ private:
     //////////
     // Members
     MpcWrapper<float> mpcController_;
-
-public:
-
-    ////////////
-    // Functions
-    void step();                                                // Caller of rate_controller_wrapper
-    void getStates(uav_ftc::BusData bus_data);                  // Callback to store measured states
-    void getReference(geometry_msgs::Vector3Stamped reference); // Callback to store reference command
-    void getDefaultWeights(ros::NodeHandle pnh);
-    void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
-    void getParameters(last_letter_msgs::Parameter parameter);  // Callback to store estimated parameters
-    void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
-    void writeOutput();                                         // Send control signals to the control inputs aggregator
-
-    // Constructor
-    RateController(ros::NodeHandle n, ros::NodeHandle pnh);
-    // Destructor
-    ~RateController();
 };

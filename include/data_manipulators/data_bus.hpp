@@ -22,23 +22,9 @@ class SubHandler
 
 class DataBus
 {
-    // Variables
-    private:
-    ros::NodeHandle n;
-    double pub_rate_;
-    ros::Publisher data_pub_;
-    ros::Publisher ekf_pub_;
-    bool ekf_enable = true;
-    uav_ftc::BusData bus_data_; // Contains aggregated output data
-    SubHandler * sub_handler_;
-
-    Ekf * ekf_;
-    Eigen::Matrix<double, 10, 1> ekf_u_;
-    Eigen::Matrix<double, 6, 1> ekf_y_;
-    Eigen::Matrix<double, 6, 6> ekf_D_;
-    uav_ftc::BusData ekf_data_;
 
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     // Methods
 
@@ -55,4 +41,20 @@ class DataBus
     void publish_data(); // Data publisher
     void set_pub_rate(double rate);
     void run(); // Spin constantly
+
+    // Variables
+    private:
+    ros::NodeHandle n;
+    double pub_rate_;
+    ros::Publisher data_pub_;
+    ros::Publisher ekf_pub_;
+    bool ekf_enable = true;
+    uav_ftc::BusData bus_data_; // Contains aggregated output data
+    SubHandler * sub_handler_;
+
+    Ekf * ekf_;
+    Eigen::Matrix<double, 10, 1> ekf_u_;
+    Eigen::Matrix<double, 6, 1> ekf_y_;
+    Eigen::Matrix<double, 6, 6> ekf_D_;
+    uav_ftc::BusData ekf_data_;
 };

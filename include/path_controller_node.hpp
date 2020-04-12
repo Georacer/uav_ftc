@@ -8,6 +8,8 @@
 
 class PathControllerROS {
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     PathControllerROS(ros::NodeHandle nh, ros::NodeHandle pnh);
     void cb_update_uav_states(const uav_ftc::BusData::ConstPtr& nav_msg);
     void cb_update_path(const visualization_msgs::MarkerArray::ConstPtr& path_msg);

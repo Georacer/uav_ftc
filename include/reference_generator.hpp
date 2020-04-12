@@ -1,10 +1,21 @@
 #include <ros/ros.h>
-#include <sensor_msgs/Joy.h>
 #include <Eigen/Eigen>
+
+#include <uav_ftc/BusData.h>
 
 
 class ReferenceGenerator
 {
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    //////////
+    // Methods
+    ReferenceGenerator(ros::NodeHandle n);
+    void rcCallback(uav_ftc::BusData joyMsg); // Joystick input callback
+    void publishCmds(Eigen::Vector3d ref);
+    Eigen::Vector3d convertInputs(double *input);
+
 private:
     ////////////
     // Variables
@@ -13,18 +24,6 @@ private:
     Eigen::Vector3d reference_;
     ros::Publisher pub_;
     ros::Subscriber sub_;
-    // Parameters for conversion from joy message to channels
-    int axisIndex_[11];
-    int buttonIndex_[11];
-    double throwIndex_[11];
-    double inpChannels_[11]; // The recorded input channels
+    double inpChannels_[8];
     int ctrlMode_;
-
-public:
-    //////////
-    // Methods
-    ReferenceGenerator(ros::NodeHandle n);
-    void joyCallback(sensor_msgs::Joy joyMsg); // Joystick input callback
-    void publishCmds(Eigen::Vector3d ref);
-    Eigen::Vector3d convertInputs(double *input);
 };
