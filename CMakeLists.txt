@@ -434,6 +434,16 @@ target_link_libraries(data_bus
   ${catkin_INCLUDE_DIRS}
 )
 
+# Node converting from ctrlPWM to rosflight control messages
+add_executable(rosflight_publisher
+  src/rosflight_publisher.cpp
+)
+add_dependencies(rosflight_publisher ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(rosflight_publisher
+  ${catkin_LIBRARIES}
+  ${catkin_INCLUDE_DIRS}
+)
+
 #############
 ## Install ##
 #############
