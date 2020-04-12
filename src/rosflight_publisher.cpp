@@ -14,6 +14,7 @@
 #include <rosflight_msgs/Command.h>
 
 #include <math_utils.hpp>
+#include <uav_utils.hpp>
 #include <last_letter_msgs/SimPWM.h>
 
 ros::Publisher pub;
@@ -28,10 +29,10 @@ void rcCallback(last_letter_msgs::SimPWM pwm_msg)
     rosflight_msgs::Command new_msg;
     new_msg.mode = new_msg.MODE_PASS_THROUGH;
     new_msg.ignore = new_msg.IGNORE_NONE;
-    new_msg.x = pwm_msg.value[0];
-    new_msg.y = pwm_msg.value[1];
-    new_msg.F = pwm_msg.value[2];
-    new_msg.z = pwm_msg.value[3];
+    new_msg.x = PwmToFullRange(pwm_msg.value[0]);
+    new_msg.y = PwmToFullRange(pwm_msg.value[1]);
+    new_msg.F = PwmToHalfRange(pwm_msg.value[2]);
+    new_msg.z = PwmToFullRange(pwm_msg.value[3]);
 
     pub.publish(new_msg);
 }
@@ -47,7 +48,7 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     ros::Subscriber sub = n.subscribe("ctrlPWM", 1, rcCallback);
-    pub = n.advertise<rosflight_msgs::Command>("/command", 1);
+    pub = n.advertise<rosflight_msgs::Command>("command", 1);
 
     ROS_INFO("rosflight_publisher node up");
 

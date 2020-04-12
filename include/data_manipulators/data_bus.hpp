@@ -13,6 +13,8 @@ enum data_source{
 class SubHandler
 {
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     uav_ftc::BusData bus_data;
     // Measurement availability flags
     bool flag_got_gps, flag_got_airdata;

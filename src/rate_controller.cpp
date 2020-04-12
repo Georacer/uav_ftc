@@ -74,6 +74,9 @@ RateController::RateController(ros::NodeHandle n, ros::NodeHandle pnh) : mpcCont
     mpcController_.setDefaultRunningReference(reference);
     mpcController_.setDefaultEndReference(refRates_);
 
+    // Initialize default variable bounds
+    getDefaultBounds(pnh);
+
     // Capture trim/default online data values
     trimOnlineData_(0) = states_.airspeed;
     trimOnlineData_(1) = states_.angle_of_attack;
@@ -144,7 +147,9 @@ void RateController::step()
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::alpha, airdata(1));
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::beta, airdata(2));
 
-    thrust_moment_ = filt_ty_.filter(states_.propulsion.torque.y);
+    double thrust_estimate = estimateThrust(airdata(0), PwmToHalfRange(states_.rc_in[2])); // Estimate thrust using previous readings and outputs
+    thrust_moment_ = -thrust_estimate*0.1;
+    thrust_moment_ = filt_ty_.filter(thrust_moment_);
     mpcController_.setOnlineDataSingle((unsigned int) Parameter::t_prop, thrust_moment_);
 
     // Isolate angular velocity system measurements
@@ -213,7 +218,7 @@ void RateController::writeOutput()
     // std::cout << "Division result cmd:\n" << predicted_controls_(0)/deltaa_max << "\n"<< predicted_controls_(1)/deltaa_max << "\n"<< predicted_controls_(2)/deltaa_max << std::endl;
     channels.vector.x = constrain(predicted_controls_(0) / deltaa_max, (float)-1.0, (float)1.0); // Pass aileron input
     channels.vector.y = constrain(predicted_controls_(1) / deltae_max, (float)-1.0, (float)1.0); // Pass elevator input
-    channels.vector.z = constrain(predicted_controls_(2) / deltar_max, (float)-1.0, (float)1.0);   // Pass rudder input
+    channels.vector.z = -constrain(predicted_controls_(2) / deltar_max, (float)-1.0, (float)1.0);   // Pass rudder input, invesion needed
     // std::cout << "Equivalent model cmd:\n" << channels.vector.x << "\n"<< channels.vector.y << "\n"<< channels.vector.z << std::endl;
     channels.header.stamp = ros::Time::now();
     pubCtrl.publish(channels);
@@ -323,6 +328,47 @@ void RateController::getDefaultParameters(std::string uavName)
         trimOnlineData_(i) = configStruct.aero[param_name].as<float>();
     }
 }
+
+bool RateController::getDefaultBounds(ros::NodeHandle pnh) // Read default state and input bounds
+{
+
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1> defaultBoundsMin;
+    defaultBoundsMin.resize(numConstraints_, Eigen::NoChange);
+    defaultBoundsMin <<
+        -0.349,
+        -0.349,
+        -0.349
+    ;
+    mpcController_.setDefaultBoundsLower(defaultBoundsMin);
+
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1> defaultBoundsMax;
+    defaultBoundsMax.resize(numConstraints_, Eigen::NoChange);
+    defaultBoundsMax <<
+        0.349,
+        0.349,
+        0.349
+    ;
+    mpcController_.setDefaultBoundsUpper(defaultBoundsMax);
+}
+
+double RateController::estimateThrust(const double Va, const double deltat)
+{
+    // Estimate the RPS the motor is running at
+    double p1 = -133.5;
+    double p2 =  306.6;
+    double p3 =   10.2;
+    double rps_estimate = p1*deltat*deltat + p2*deltat + p3;
+
+    // Create estimates of the propeller force and torque about the CG
+    // Based on the APC Electric 10x7 propeller
+    const double prop_d = 10*2.54/100;
+    double J = Va/(rps_estimate*prop_d);
+    double c_t = 0.2202*J*J*J -0.4277*J*J + 0.0756*J + 0.1054;
+    double thrust_estimate = c_t*pow(rps_estimate,2)*pow(prop_d,4);
+
+    return thrust_estimate;
+}
+
 
 ///////////////
 //Main function

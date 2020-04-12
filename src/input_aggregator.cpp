@@ -22,10 +22,10 @@ InputAggregator::InputAggregator(ros::NodeHandle n)
     surfaceCtrls_.vector.x = 0.0;
     surfaceCtrls_.vector.y = 0.0;
     surfaceCtrls_.vector.z = 0.0;
-    throttleCtrls_.vector.x = 0.5;
+    throttleCtrls_.vector.x = 0.0;
     rawCtrls_.value[0] = 1500;
     rawCtrls_.value[1] = 1500;
-    rawCtrls_.value[2] = 1500;
+    rawCtrls_.value[2] = 1000;
     rawCtrls_.value[3] = 1500;
 
     rawSub_ = n.subscribe("dataBus", 1, &InputAggregator::rawCtrlsCallback, this);
@@ -60,15 +60,6 @@ void InputAggregator::surfaceCtrlsCallback(geometry_msgs::Vector3Stamped msg)
     surfaceCtrls_.vector.x = msg.vector.x;
     surfaceCtrls_.vector.y = msg.vector.y;
     surfaceCtrls_.vector.z = msg.vector.z;
-
-    // // If controllers are enabled, publish as fast as you have control surface inputs and not faster
-    // if (ctrlMode_ == 1 || 
-    //     ctrlMode_ == 2 ||
-    //     ctrlMode_ == 3
-    //    )
-    // {
-    //     publishCtrls();
-    // }
 }
 
 /**

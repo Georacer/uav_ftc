@@ -72,8 +72,10 @@ public:
     void getDefaultWeights(ros::NodeHandle pnh);
     void getDefaultParameters(std::string uavName);             // Read default uav parameters and pass them to the MPC
     void getParameters(last_letter_msgs::Parameter parameter);  // Callback to store estimated parameters
+    bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
     void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
     void writeOutput();                                         // Send control signals to the control inputs aggregator
+    double estimateThrust(const double airspeed, const double deltat);
 
     // Constructor
     RateController(ros::NodeHandle n, ros::NodeHandle pnh);
@@ -94,7 +96,7 @@ private:
     ros::Subscriber subState, subRef, subParam;
     ros::Publisher pubCtrl;
     float dt_ = 0.02;
-    int numConstraints_ = 0; // Do not update constraint bounds externally
+    int numConstraints_ = 3; // Do not update constraint bounds externally
     bool statesReceivedStatus_ = false;
 
     static const int filter_order_{2};

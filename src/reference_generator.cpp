@@ -10,6 +10,7 @@
 #include <reference_generator.hpp>
 
 #include <math_utils.hpp>
+#include <uav_utils.hpp>
 
 #include <geometry_msgs/Vector3Stamped.h>
 
@@ -19,11 +20,43 @@
  * 
  * @param n The ROS NodeHandle of the ROS node instantiating this class
  */
-ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
+ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n, ros::NodeHandle pnh)
 {
     n_ = n;
     sub_ = n.subscribe("dataBus", 1, &ReferenceGenerator::rcCallback, this);
     pub_ = n.advertise<geometry_msgs::Vector3Stamped>("refCmds", 1);
+
+    XmlRpc::XmlRpcValue listDouble;
+
+    // Read the control mode
+    ROS_INFO("Reading the control mode setting");
+    if (!pnh.getParam("ctrlMode", ctrlMode_))
+    {
+        ROS_FATAL("Invalid parameter for -~ctrlMode- in param server!");
+        ros::shutdown();
+    }
+    // Read the reference commands parameters from the server:w
+    ROS_INFO("Reading reference scale configuration");
+    if (!pnh.getParam("referenceMin", listDouble))
+    {
+        ROS_FATAL("Invalid parameters for -~referenceMin- in param server!");
+        ros::shutdown();
+    }
+    for (int i = 0; i < listDouble.size(); ++i)
+    {
+        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+        referenceMin_(i) = listDouble[i];
+    }
+    if (!pnh.getParam("referenceMax", listDouble))
+    {
+        ROS_FATAL("Invalid parameters for -~referenceMax- in param server!");
+        ros::shutdown();
+    }
+    for (int i = 0; i < listDouble.size(); ++i)
+    {
+        ROS_ASSERT(listDouble[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+        referenceMax_(i) = listDouble[i];
+    }
 }
 
 /**
@@ -31,14 +64,15 @@ ReferenceGenerator::ReferenceGenerator(ros::NodeHandle n)
  * 
  * @param data_bus The BusData message
  */
-void ReferenceGenerator::rcCallback(uav_ftc::BusData data_bus)
+void ReferenceGenerator::rcCallback(const uav_ftc::BusData data_bus)
 {
-    inpChannels_[0] = data_bus.rc_in[0];
-    inpChannels_[1] = data_bus.rc_in[1];
-    inpChannels_[2] = data_bus.rc_in[2];
-    inpChannels_[3] = data_bus.rc_in[3];
+    // Convert PWM inputs to -1,1 ranges
+    inputSignals_[0] = PwmToFullRange(data_bus.rc_in[0]);
+    inputSignals_[1] = PwmToFullRange(data_bus.rc_in[1]);
+    inputSignals_[2] = PwmToHalfRange(data_bus.rc_in[2]);
+    inputSignals_[3] = -PwmToFullRange(data_bus.rc_in[3]); // Invert rudder channel
 
-    reference_ = convertInputs(inpChannels_);
+    reference_ = convertInputs(inputSignals_);
     publishCmds(reference_);
 }
 
@@ -104,10 +138,11 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "reference_generator");
     ros::NodeHandle n;
+    ros::NodeHandle pnh("~");
 
     ros::WallDuration(3).sleep(); //wait for other nodes to get raised
 
-    ReferenceGenerator refGen(n);
+    ReferenceGenerator refGen(n, pnh);
     ROS_INFO("Reference Generator up");
 
     while (ros::ok())

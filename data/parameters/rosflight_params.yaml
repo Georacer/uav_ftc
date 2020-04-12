@@ -78,7 +78,7 @@
 - {name: RC_MAX_ROLLRATE, type: 9, value: 3.141590118408203}
 - {name: RC_MAX_YAWRATE, type: 9, value: 1.506999969482422}
 - {name: RC_NUM_CHN, type: 6, value: 8}
-- {name: RC_OVRD_DEV, type: 9, value: 0.1000000014901161}
+- {name: RC_OVRD_DEV, type: 9, value: 0.9}
 - {name: RC_THR_OVRD_CHN, type: 6, value: 4}
 - {name: RC_TYPE, type: 6, value: 0}
 - {name: RC_X_CHN, type: 6, value: 0}

@@ -11,8 +11,8 @@ public:
 
     //////////
     // Methods
-    ReferenceGenerator(ros::NodeHandle n);
-    void rcCallback(uav_ftc::BusData joyMsg); // Joystick input callback
+    ReferenceGenerator(ros::NodeHandle n, ros::NodeHandle pnh);
+    void rcCallback(const uav_ftc::BusData data_bus); // Joystick input callback
     void publishCmds(Eigen::Vector3d ref);
     Eigen::Vector3d convertInputs(double *input);
 
@@ -24,6 +24,6 @@ private:
     Eigen::Vector3d reference_;
     ros::Publisher pub_;
     ros::Subscriber sub_;
-    double inpChannels_[8];
+    double inputSignals_[8];
     int ctrlMode_;
 };

@@ -142,6 +142,8 @@ include_directories(
 	${last_letter_lib_INCLUDE_DIRS}
 )
 
+link_directories(externals/iir1)
+
 ## Declare a C++ library
 
 # Utilities library relevant to this package
@@ -337,6 +339,7 @@ target_link_libraries(rate_controller_no_rud
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
   rate_controller_no_rud_wrapper
+  iir::iir
 )
 
 # The trajectory controller
@@ -362,6 +365,7 @@ target_link_libraries(trajectory_controller_no_rud
   ${last_letter_lib_LIBRARIES}
   yaml-cpp
   trajectory_controller_no_rud_wrapper
+  iir::iir
 )
 
 # The trajectory (no airspeed) controller

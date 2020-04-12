@@ -1,6 +1,6 @@
 <launch>
 <!-- Top-Level launch file for bundled launching /-->
-<!-- Launcher for the uav_ftc package -->
+<!-- Launcher for the data logging nodes of the uav_ftc pakage -->
 
 	<!-- Available arguments -->
 	<arg name="manualMode" default="false"/>
