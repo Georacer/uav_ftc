@@ -75,7 +75,6 @@ public:
     bool getDefaultBounds(ros::NodeHandle pnh);                 // Read default state and input bounds
     void readControls();                                        // Read the resulting predicted output from the RateMpcWrapper
     void writeOutput();                                         // Send control signals to the control inputs aggregator
-    double estimateThrust(const double airspeed, const double deltat);
 
     // Constructor
     RateController(ros::NodeHandle n, ros::NodeHandle pnh);
@@ -96,7 +95,7 @@ private:
     ros::Subscriber subState, subRef, subParam;
     ros::Publisher pubCtrl;
     float dt_ = 0.02;
-    int numConstraints_ = 3; // Do not update constraint bounds externally
+    int numConstraints_ = 3;
     bool statesReceivedStatus_ = false;
 
     static const int filter_order_{2};

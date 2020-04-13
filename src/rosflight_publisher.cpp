@@ -32,7 +32,7 @@ void rcCallback(last_letter_msgs::SimPWM pwm_msg)
     new_msg.x = PwmToFullRange(pwm_msg.value[0]);
     new_msg.y = PwmToFullRange(pwm_msg.value[1]);
     new_msg.F = PwmToHalfRange(pwm_msg.value[2]);
-    new_msg.z = PwmToFullRange(pwm_msg.value[3]);
+    new_msg.z = -PwmToFullRange(pwm_msg.value[3]); // Invert sign because of topology of DeFault UAV
 
     pub.publish(new_msg);
 }

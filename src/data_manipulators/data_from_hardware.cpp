@@ -50,6 +50,8 @@ class SubHandlerHW : public SubHandler
     void cb_input(rosflight_msgs::RCRaw msg);
     void cb_output(rosflight_msgs::OutputRaw msg);
     Vector3d coords_to_ned(Vector3d coords, Vector3d coords_init);
+    double estimateThrustFromDeltat(const double Va, const double deltat);
+    double testimateThrustFromRPS(const double Va, const double rps);
 
 };
 
@@ -105,16 +107,9 @@ void SubHandlerHW::cb_minidaq(minidaq::minidaq_peripherals msg)
     bus_data.pressure_absolute = press_abs_mbar*100; // Convert to Pascal
     bus_data.rps_motor = msg.rps; // Currently only for first motor
     // Create estimates of the propeller force and torque about the CG
-    // Based on the APC Electric 10x7 propeller
-    const double prop_d = 10*2.54/100;
-    double J = bus_data.airspeed/(bus_data.rps_motor*prop_d);
-    double c_t = 0.2202*J*J*J -0.4277*J*J + 0.0756*J + 0.1054;
-    double c_p = 0.4662*J*J*J*J - 0.8223*J*J*J + 0.3482*J*J -0.0401*J + 0.0530;
-    double thrust = c_t*pow(bus_data.rps_motor,2)*pow(prop_d,4);
-    double power = c_p*pow(bus_data.rps_motor,3)*pow(prop_d,5);
-    double torque = power/(bus_data.rps_motor*2*M_PI);
-    bus_data.propulsion.force.x = thrust;
-    bus_data.propulsion.torque.y = -thrust*0.1; // thrust mult by the torque arm
+    double thrust_estimate = estimateThrustFromDeltat(bus_data.airspeed, PwmToHalfRange(bus_data.rc_in[2])); // Estimate thrust using previous readings and outputs
+    bus_data.propulsion.force.x = thrust_estimate;
+    bus_data.propulsion.torque.y = -thrust_estimate*0.1; // thrust mult by the torque arm
 
     // Disregard RC output information, available through ROSFlight topics
 
@@ -194,8 +189,40 @@ void SubHandlerHW::cb_output(rosflight_msgs::OutputRaw msg)
 }
 
 // Convert gps coordinates to local frame NED position
-Vector3d coords_to_ned(Vector3d coords, Vector3d coords_init)
+Vector3d SubHandlerHW::coords_to_ned(Vector3d coords, Vector3d coords_init)
 {
     Vector3d position_ned;
 
+}
+
+double SubHandlerHW::estimateThrustFromDeltat(const double Va, const double deltat)
+{
+    // Estimate the RPS the motor is running at
+    double p1 = -133.5;
+    double p2 =  306.6;
+    double p3 =   10.2;
+    double rps_estimate = p1*deltat*deltat + p2*deltat + p3;
+
+    // Create estimates of the propeller force and torque about the CG
+    // Based on the APC Electric 10x7 propeller
+    const double prop_d = 10*2.54/100;
+    double J = Va/(rps_estimate*prop_d);
+    double c_t = 0.2202*J*J*J -0.4277*J*J + 0.0756*J + 0.1054;
+    double thrust_estimate = c_t*pow(rps_estimate,2)*pow(prop_d,4);
+
+    return thrust_estimate;
+}
+
+double SubHandlerHW::testimateThrustFromRPS(const double Va, const double rps)
+{
+    // Based on the APC Electric 10x7 propeller
+    const double prop_d = 10*2.54/100;
+    double J = Va/(rps*prop_d);
+    double c_t = 0.2202*J*J*J -0.4277*J*J + 0.0756*J + 0.1054;
+    double c_p = 0.4662*J*J*J*J - 0.8223*J*J*J + 0.3482*J*J -0.0401*J + 0.0530;
+    double thrust = c_t*pow(rps,2)*pow(prop_d,4);
+    double power = c_p*pow(rps,3)*pow(prop_d,5);
+    double torque = power/(rps*2*M_PI);
+
+    return thrust;
 }

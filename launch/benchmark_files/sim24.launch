@@ -1,0 +1,90 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="false"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="default"/>
+	<arg name="visuals" default="false"/>
+	<arg name="log" default="true"/>
+    <arg name="scenario" default="benchmark_3"/>
+    <arg name="shutdownOnScenarioEnd" default="true"/>
+    <arg name="log_name" default="24"/>
+
+    <!-- Launch last-letter simulation nodes -->
+    <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
+        <arg name="manualMode" value="$(arg manualMode)"/>
+        <arg name="autoMode" value="$(arg autoMode)"/>
+        <arg name="uav_name" value="$(arg uav_name)"/>
+        <arg name="visuals" value="$(arg visuals)"/>
+    </include>
+
+    <!-- Launch uav_ftc-related nodes -->
+    <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 1
+            wp: 10
+            wq: 1
+            wr: 10
+            wda: 100
+            wde: 100
+            wdr: 10
+            wnp: 1000
+            wnq: 1000
+            wnr: 1000
+        </rosparam>
+
+        <!--  -->
+        <!-- Launch logger -->
+        <!--  -->
+        <group if="$(arg log)">
+            <include file="$(find uav_ftc)/launch/logger.launch">
+                <arg name="custom_name" value="true"/>
+                <arg name="log_name" value="$(arg log_name)"/>
+            </include>
+        </group>
+
+        <!-- Launch the scenario player -->
+        <node pkg="uav_ftc" name="scenario_player" type="scenario_player.py" output="screen" required="$(arg shutdownOnScenarioEnd)">
+            <param name="scenario" value="$(arg scenario)"/>
+        </node>
+
+        <!-- Launch simulated static throttle command -->
+        <node name="throttle_pub" pkg="rostopic" type="rostopic" args="pub -r 1 rawPWM last_letter_msgs/SimPWM --file '$(find uav_ftc)/data/rostopic_pub_arguments/raw_ctrls_throttle.txt'"/>
+
+        <!-- Launch the databus generator -->
+        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
+        <node pkg="uav_ftc" name="data_bus" type="data_bus" output="screen">
+            <param name="data_source" value="1"/>
+        </node>
+
+        <!--  -->
+        <!-- Launch controllers -->
+        <!--  -->
+
+        <!-- Raise rate controller -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
+            <param name="~rate" value="50"/>
+            <remap from="~wp" to="wp"/>
+            <remap from="~wq" to="wq"/>
+            <remap from="~wr" to="wr"/>
+            <remap from="~wda" to="wda"/>
+            <remap from="~wde" to="wde"/>
+            <remap from="~wdr" to="wdr"/>
+            <remap from="~wnp" to="wnp"/>
+            <remap from="~wnq" to="wnq"/>
+            <remap from="~wnr" to="wnr"/>
+        </node>
+
+        <!-- Raise input aggreggator node -->
+        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
+            <remap from="~rate" to="/world/simRate"/>
+        </node>
+
+        <!-- Raise rosflight topic converted node -->
+        <node pkg="uav_ftc" name="rosflight_publisher" type="rosflight_publisher" output="screen"/>
+
+    </group>
+
+</launch>
