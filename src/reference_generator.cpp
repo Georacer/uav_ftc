@@ -100,7 +100,7 @@ Eigen::Vector3d ReferenceGenerator::convertInputs(double *inputs)
     
     case 2: // Generate reference trajectory
         // use map_centered because reference trajectories usually don't have symmetric limits
-        reference(0) = map(inputs[2], -1.0, 1.0, referenceMin_(0), referenceMax_(0) ); // Airspeed channel
+        reference(0) = map(inputs[2], 0.0, 1.0, referenceMin_(0), referenceMax_(0) ); // Airspeed channel
         reference(1) = map_centered(inputs[1], -1.0, 1.0, referenceMin_(1), referenceMax_(1) ); // Flight path angle channel
         reference(2) = map_centered(inputs[0], -1.0, 1.0, referenceMin_(2), referenceMax_(2) ); // Turn rate channel
         // reference(2) = referenceMax_(2)/inputs[0]; // Turn rate channel
