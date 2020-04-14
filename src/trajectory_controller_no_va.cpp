@@ -336,8 +336,9 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
     if (point_value>0)
     {
         // Project setpoint onto ellipsoid
+        std::cout << "*** Projecting point " << setpoint.transpose() << std::endl;
         projected_setpoint = fe_ellipsoid_.project_point(setpoint);
-        // std::cout << "*** Projected point " << setpoint.transpose() << " onto " << projected_setpoint.transpose() << std::endl;
+        std::cout << "*** Projected point " << setpoint.transpose() << " onto " << projected_setpoint.transpose() << std::endl;
     }
     else
     {
@@ -581,16 +582,16 @@ bool TrajectoryController::getDefaultBounds(ros::NodeHandle pnh) // Read default
 void TrajectoryController::getFlightEnvelope(const uav_ftc::FlightEnvelopeEllipsoid::ConstPtr& fe_msg)
 {
     // ROS_INFO("Received new Flight Envelope");
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_A, fe_msg->el_A);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_B, fe_msg->el_B);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_C, fe_msg->el_C);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_D, fe_msg->el_D);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_E, fe_msg->el_E);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_F, fe_msg->el_F);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_G, fe_msg->el_G);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_H, fe_msg->el_H);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_I, fe_msg->el_I);
-    mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_J, fe_msg->el_J);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_A, fe_msg->el_A);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_B, fe_msg->el_B);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_C, fe_msg->el_C);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_D, fe_msg->el_D);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_E, fe_msg->el_E);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_F, fe_msg->el_F);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_G, fe_msg->el_G);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_H, fe_msg->el_H);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_I, fe_msg->el_I);
+    // mpcController_.setOnlineDataSingle((unsigned int) Parameter::el_J, fe_msg->el_J);
     // TODO: could also pass box constraints provided in fe_msg
     // Update the ellipsoid coefficients for debugging purposes
     Ellipsoid3DCoefficients_t coeffs = {

@@ -385,7 +385,7 @@ bool MpcWrapper<T>::update(const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1
     {
         // TODO: Maybe reset the MPC somehow?
         ROS_ERROR("MPC has crashed!");
-        // printSolverState();
+        printSolverState();
         // resetController();
         ros::shutdown();
     }
