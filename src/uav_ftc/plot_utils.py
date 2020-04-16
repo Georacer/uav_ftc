@@ -261,6 +261,43 @@ def plot_angular_rates_errors(log_dataset):
 
     return (fig, axh)
 
+def plot_accelerations(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['acc x (m/s/s)', 'acc y (m/s/s)', 'acc z (m/s/s)']
+    p_data = []
+    for log_idx, log_name in enumerate(log_names):
+        p_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].ax))
+    q_data = []
+    for log_idx, log_name in enumerate(log_names):
+        q_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].ay))
+    r_data = []
+    for log_idx, log_name in enumerate(log_names):
+        r_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].az))
+    plot_data = [p_data, q_data, r_data]
+
+    series_names = [None]*3
+    subfig_names = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            subfig_names.append(log_name + ' ref')
+        subfig_names.append(log_name)
+    for subf_idx in range(3):
+        series_names[subf_idx] = subfig_names
+
+    log_colors = build_colorlist(len(log_names))
+    series_colors = [None]*3
+    subfig_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        if plot_ref:
+            subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
+
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+    return fig
+
 
 def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
     if log_names is None:
