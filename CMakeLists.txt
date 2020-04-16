@@ -342,6 +342,19 @@ target_link_libraries(rate_controller_no_rud
   iir::iir
 )
 
+# The controller for no aileron actuation
+add_executable(rate_controller_pid
+  src/rate_controller_pid.cpp  
+)
+add_dependencies(rate_controller_pid
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
+target_link_libraries(rate_controller_pid
+  ${catkin_LIBRARIES}
+  iir::iir
+)
+
 # The trajectory controller
 add_executable(trajectory_controller
   src/trajectory_controller.cpp
