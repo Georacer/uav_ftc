@@ -4,12 +4,12 @@
 	<!-- Available arguments -->
 	<arg name="manualMode" default="false"/>
 	<arg name="autoMode" default="false"/>
-	<arg name="uav_name" default="ail_0"/>
+	<arg name="uav_name" default="elev_0"/>
 	<arg name="visuals" default="false"/>
 	<arg name="log" default="true"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
-    <arg name="fe_name" default="rud_0"/>
-    <arg name="log_name" default="14"/>
+    <arg name="fe_name" default="elev_0"/>
+    <arg name="log_name" default="16"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -69,17 +69,23 @@
         <!--  -->
         
         <!-- Raise controller -->
-        <node pkg="uav_ftc" name="controller" type="controller_no_ail" respawn="true" output="screen">
+        <node pkg="uav_ftc" name="controller" type="controller_no_elev" respawn="true" output="screen">
             <param name="~rate" value="50"/>
-            <param name="~kp_va" value="0.1"/>
-            <param name="~ki_va" value="0.01"/>
-            <param name="~kd_va" value="0"/>
-            <param name="~kp_gamma" value="2"/>
-            <param name="~ki_gamma" value="0.2"/>
+            <param name="~kp_beta" value="2.0"/>
+            <param name="~ki_beta" value="0.0"/>
+            <param name="~kd_beta" value="0"/>
+            <param name="~kp_gamma" value="1"/>
+            <param name="~ki_gamma" value="1.0"/>
             <param name="~kd_gamma" value="0"/>
-            <param name="~kp_psi_dot" value="5"/>
-            <param name="~ki_psi_dot" value="0"/>
+            <param name="~kp_psi_dot" value="10"/>
+            <param name="~ki_psi_dot" value="20"/>
             <param name="~kd_psi_dot" value="0"/>
+            <param name="~kp_phi" value="0.2"/>
+            <param name="~ki_phi" value="0.1"/>
+            <param name="~kd_phi" value="0"/>
+            <param name="~kp_p" value="5"/>
+            <param name="~ki_p" value="0.1"/>
+            <param name="~kd_p" value="0"/>
         </node>
 
         <!-- Load obstacles -->

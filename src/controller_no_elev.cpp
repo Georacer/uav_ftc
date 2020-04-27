@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2020
  * 
  */
-#include "controller_no_ail.hpp"
+#include "controller_no_elev.hpp"
 
 #include <cstdlib>
 #include <math.h>
@@ -54,10 +54,10 @@ Controller::Controller(ros::NodeHandle n, ros::NodeHandle pnh)
     // Mandatory controller setup 
     double rate;
     pnh.getParam("rate", rate);
-    double kp_va, ki_va, kd_va;
-    pnh.getParam("kp_va", kp_va);
-    pnh.getParam("ki_va", ki_va);
-    pnh.getParam("kd_va", kd_va);
+    double kp_beta, ki_beta, kd_beta;
+    pnh.getParam("kp_beta", kp_beta);
+    pnh.getParam("ki_beta", ki_beta);
+    pnh.getParam("kd_beta", kd_beta);
     double kp_gamma, ki_gamma, kd_gamma;
     pnh.getParam("kp_gamma", kp_gamma);
     pnh.getParam("ki_gamma", ki_gamma);
@@ -66,10 +66,20 @@ Controller::Controller(ros::NodeHandle n, ros::NodeHandle pnh)
     pnh.getParam("kp_psi_dot", kp_psi_dot);
     pnh.getParam("ki_psi_dot", ki_psi_dot);
     pnh.getParam("kd_psi_dot", kd_psi_dot);
-    double trim_deltaF = 6;
-    pid_va_ = new PID(kp_va, ki_va, kd_va, 1.2*9.81, 0.0, trim_deltaF, 1.0/rate, 0.1);
-    pid_gamma_ = new PID(kp_gamma, ki_gamma, kd_gamma, 1.0, -1.0, 0.0, 1.0/rate, 0.1);
-    pid_psi_dot_ = new PID(kp_psi_dot, ki_psi_dot, kd_psi_dot, 1.0, -1.0, 0.0, 1.0/rate, 0.1);
+    double kp_phi, ki_phi, kd_phi;
+    pnh.getParam("kp_phi", kp_phi);
+    pnh.getParam("ki_phi", ki_phi);
+    pnh.getParam("kd_phi", kd_phi);
+    double kp_p, ki_p, kd_p;
+    pnh.getParam("kp_p", kp_p);
+    pnh.getParam("ki_p", ki_p);
+    pnh.getParam("kd_p", kd_p);
+    double trim_deltaF = 0.6*9.81;
+    pid_beta_ = new PID(kp_beta, ki_beta, kd_beta, 1.0, -1.0, 0.0, 1.0/rate, 0.1);
+    pid_gamma_ = new PID(kp_gamma, ki_gamma, kd_gamma, 1.2*9.81, 0.0, trim_deltaF, 1.0/rate, 0.1);
+    pid_psi_dot_ = new PID(kp_psi_dot, ki_psi_dot, kd_psi_dot, 60, -60.0, 0.0, 1.0/rate, 0.1);
+    pid_phi_ = new PID(kp_phi, ki_phi, kd_phi, 1.0, -1.0, 0.0, 1.0/rate, 0.1);
+    pid_p_ = new PID(kp_p, ki_p, kd_p, 1.0, -1.0, 0.0, 1.0/rate, 0.1);
 
     //Subscribe and advertize
     subState = n.subscribe("dataBus", 1, &Controller::getStates, this);
@@ -85,9 +95,11 @@ Controller::Controller(ros::NodeHandle n, ros::NodeHandle pnh)
  */
 Controller::~Controller()
 {
-    delete pid_va_;
+    delete pid_beta_;
     delete pid_gamma_;
     delete pid_psi_dot_;
+    delete pid_phi_;
+    delete pid_p_;
 }
 
 /**
@@ -109,6 +121,7 @@ void Controller::step()
                                 states_.orientation.y,
                                 states_.orientation.z);
     Vector3d euler = quat2euler(tempQuat);
+    double p = states_.velocity_angular.x;
     double q = states_.velocity_angular.y;
     double r = states_.velocity_angular.z;
     double va = states_.airspeed;
@@ -127,14 +140,18 @@ void Controller::step()
     double gamma = asin((ca*cb)*sth - (sph*sb + cph*sa*cb)*cth); // Stevens-Lewis 2003 3.4-2
 
     // Calculate errors
-    double va_err = reference_(0) - va;
+    double beta_err = beta;
     double gamma_err = reference_(1) - gamma;
     double psi_dot_err = reference_(2) - psi_dot;
+    double phi_err = phi_des_ - euler.x()*180/M_PI;
+    double p_err = p_des_ - p;
 
     // Generate control inputs
-    deltaF_ = pid_va_->step(va_err);
-    deltae_ = pid_gamma_->step(gamma_err);
-    deltar_ = pid_psi_dot_->step(psi_dot_err);
+    deltar_ = pid_beta_->step(beta_err);
+    deltaF_ = pid_gamma_->step(gamma_err);
+    phi_des_ = pid_psi_dot_->step(psi_dot_err);
+    p_des_ = pid_phi_->step(phi_err);
+    deltaa_ = pid_p_->step(p_err);
     
     // Write the resulting controller output
     readControls();
@@ -169,7 +186,7 @@ void Controller::getStates(uav_ftc::BusData bus_data)
  */
 void Controller::readControls()
 {
-    controls_ << 0, deltae_, deltaF_, deltar_;
+    controls_ << deltaa_, 0, deltaF_, deltar_;
 }
 
 /**

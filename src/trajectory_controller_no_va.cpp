@@ -336,9 +336,9 @@ void TrajectoryController::getReference(geometry_msgs::Vector3Stamped pRefTrajec
     if (point_value>0)
     {
         // Project setpoint onto ellipsoid
-        std::cout << "*** Projecting point " << setpoint.transpose() << std::endl;
+        // std::cout << "*** Projecting point " << setpoint.transpose() << std::endl;
         projected_setpoint = fe_ellipsoid_.project_point(setpoint);
-        std::cout << "*** Projected point " << setpoint.transpose() << " onto " << projected_setpoint.transpose() << std::endl;
+        // std::cout << "*** Projected point " << setpoint.transpose() << " onto " << projected_setpoint.transpose() << std::endl;
     }
     else
     {

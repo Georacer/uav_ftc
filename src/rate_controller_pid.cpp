@@ -60,8 +60,11 @@ RateController::RateController(ros::NodeHandle n, ros::NodeHandle pnh)
     pnh.getParam("ki_r", pid_r_ki_);
     pnh.getParam("kd_r", pid_r_kd_);
     pid_p_ = new PID(pid_p_kp_, pid_p_ki_, pid_p_kd_, 1.0, -1.0, 0, 1.0/rate, 0.1);
+    ROS_INFO("Raised p_pid with gains: %f, %f, %f", pid_p_kp_, pid_p_ki_, pid_p_kd_);
     pid_q_ = new PID(pid_q_kp_, pid_q_ki_, pid_q_kd_, 1.0, -1.0, 0, 1.0/rate, 0.1);
+    ROS_INFO("Raised q_pid with gains: %f, %f, %f", pid_q_kp_, pid_q_ki_, pid_q_kd_);
     pid_r_ = new PID(pid_r_kp_, pid_r_ki_, pid_r_kd_, 1.0, -1.0, 0, 1.0/rate, 0.1);
+    ROS_INFO("Raised r_pid with gains: %f, %f, %f", pid_r_kp_, pid_r_ki_, pid_r_kd_);
 
     //Subscribe and advertize
     subState = n.subscribe("dataBus", 1, &RateController::getStates, this);
