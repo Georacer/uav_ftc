@@ -306,6 +306,7 @@ class SafeConvexPolytope:
     _el_radii = None
     _el_v = None  # Ellipsoid coefficients
 
+    _figure_handle = None
     _axis_handle = None
     _plot_index = 0
     save_figures = False

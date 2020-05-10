@@ -5,11 +5,18 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
+from matplotlib.ticker import FormatStrFormatter
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import Axes3D
 import re
+import pickle
+import io
 
 from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
+
+# mpl.rcParams['pdf.fonttype'] = 42
+# mpl.rc('text', usetex=True)
+mpl.rcParams.update({'font.size': 12})
 
 
 def build_colorlist(num_lines):
@@ -669,24 +676,60 @@ def save_figure_2d(img_name, fig):
     # plt.pause(0.01) # Not sure if needed
 
 
-def save_figure_3d(img_name, fig):
+def save_figure_3d(img_name, fig, dpi=400, filetype='png'):
+    # Duplicate figure to be able to selectively hide axes
+    # Create temporary storage buffers
+    buf_a = io.BytesIO()
+    buf_b = io.BytesIO()
+    buf_c = io.BytesIO()
+    # Dump the figure in them using pickle
+    pickle.dump(fig, buf_a)
+    pickle.dump(fig, buf_b)
+    pickle.dump(fig, buf_c)
+    # Rewind the buffers
+    buf_a.seek(0)
+    buf_b.seek(0)
+    buf_c.seek(0)
+    # Pull the fresh figures from them
+    fig_a = pickle.load(buf_a) 
+    fig_b = pickle.load(buf_b) 
+    fig_c = pickle.load(buf_c) 
+
     # Save figures
-    fig.savefig('{}.png'.format(img_name), bbox_inches='tight', dpi=400)
+    fig.savefig('{}.{}'.format(img_name, filetype), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
-    for axh in fig.get_axes():
+    for axh in fig_a.get_axes():
+        axh.set_xlabel("")
+        axh.set_xticklabels([])
+        axh.set_xticks([])
         axh.view_init(0,0)
-    fig.savefig('{}_0_0.png'.format(img_name), bbox_inches='tight', dpi=400)
+        label = '.\n'+axh.get_ylabel()
+        axh.set_ylabel(label)
+        axh.tick_params(labelsize=10)
+    fig_a.savefig('{}_0_0.{}'.format(img_name, filetype), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
-    for axh in fig.get_axes():
+    for axh in fig_b.get_axes():
+        axh.set_zlabel("")
+        axh.set_zticklabels([])
+        axh.set_zticks([])
         axh.view_init(-90,0)
-    fig.savefig('{}_90_0.png'.format(img_name), bbox_inches='tight', dpi=400)
+        label = '.\n'+axh.get_xlabel()
+        axh.set_xlabel(label)
+        axh.tick_params(labelsize=10)
+    fig_b.savefig('{}_90_0.{}'.format(img_name, filetype), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
-    for axh in fig.get_axes():
+    for axh in fig_c.get_axes():
+        axh.set_ylabel("")
+        axh.set_yticklabels([])
+        axh.set_yticks([])
         axh.view_init(0,-90)
-    fig.savefig('{}_0_90.png'.format(img_name), bbox_inches='tight', dpi=400)
+        label = '.\n'+axh.get_xlabel()
+        axh.set_xlabel(label)
+        axh.tick_params(labelsize=10)
+    fig_c.savefig('{}_0_90.{}'.format(img_name, filetype), bbox_inches='tight', dpi=400)
     plt.pause(0.01)
 
 
