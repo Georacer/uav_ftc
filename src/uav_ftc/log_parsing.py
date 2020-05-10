@@ -54,10 +54,10 @@ log_databus_attrs = [
 ]
 
 log_ref_traj_attrs = [
-        'time_refTrajectory',
-        'ref_Va',
-        'ref_gamma',
-        'ref_psi_dot',
+    'time_refTrajectory',
+    'ref_Va',
+    'ref_gamma',
+    'ref_psi_dot',
 ]
 
 log_ref_rates_attrs = [
@@ -171,19 +171,17 @@ def filter_log_data(log_data, t_start, t_end):
             filtered_data = getattr(log_data, attr_name)[refTrajectory_start_idx:refTrajectory_end_idx+1]
             setattr(log_data_filt, attr_name, filtered_data)
 
-    # if len(log_data.time_fe)>0:
-    #     fe_start_idx = np.where(log_data.time_fe > t_start)[0][0]
-    #     fe_end_idx = np.where(log_data.time_fe < t_end)[0][-1]
-    #     log_data.el_A = log_data.el_A[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_B = log_data.el_B[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_C = log_data.el_C[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_D = log_data.el_D[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_E = log_data.el_E[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_F = log_data.el_F[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_G = log_data.el_G[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_H = log_data.el_H[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_I = log_data.el_I[fe_start_idx:fe_end_idx+1]
-    #     log_data.el_J = log_data.el_J[fe_start_idx:fe_end_idx+1]
+    if len(log_data.time_fe)>0:
+        fe_start_idx = np.where(log_data.time_fe > t_start)[0][0]
+        fe_end_idx = np.where(log_data.time_fe < t_end)[0][-1]
+        for attr_name in log_fe_attrs:
+            filtered_data = getattr(log_data, attr_name)[fe_start_idx:fe_end_idx+1]
+            setattr(log_data_filt, attr_name, filtered_data)
+
+    # Pass mission data directly
+    log_data_filt.waypoints = log_data.waypoints
+    log_data_filt.obstacles = log_data.obstacles
+    log_data_filt.ref_path = log_data.ref_path
 
     return log_data_filt
 

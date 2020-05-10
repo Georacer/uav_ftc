@@ -23,7 +23,7 @@ from uav_ftc.log_parsing import LogData, filter_log_data
 
 uav_name = 'skywalker_2013_mod'  # UAV name to use for FE extraction
 
-# Add do python paths because Pickle does not loot at ROS ws includes
+# Add do python paths because Pickle does not look at ROS ws includes
 sys.path.append('/home/george/ros_workspaces/uav_ftc/src/uav_ftc/src/uav_ftc')
 
 mpl.rcParams['pdf.fonttype'] = 42
