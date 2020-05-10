@@ -161,6 +161,7 @@ class FlightEnvelope:
     flag_plot = False
     flag_interactive = False
     flag_verbose = False
+    flag_plot_points = True
     uav_name = None
 
     _trimmer = None
@@ -306,6 +307,7 @@ class FlightEnvelope:
         # User interface options
         if self.flag_plot:
             safe_poly.enable_plotting = True
+            safe_poly._plot_points = self.flag_plot_points
         if self.flag_interactive:
             safe_poly.wait_for_user = True
 
@@ -377,6 +379,7 @@ def test_code(model_name, plot, interactive, export_path, verbose):
     flight_envelope.set_domain_gamma((-30, 30))
     flight_envelope.set_R_min(100)
     flight_envelope.initialize(model_name)
+    flight_envelope.flag_plot_points = False
 
     safe_poly = flight_envelope.find_flight_envelope()
     safe_poly._flag_verbose = verbose
@@ -388,55 +391,12 @@ def test_code(model_name, plot, interactive, export_path, verbose):
     if plot:
         safe_poly.plot_ellipsoid()
         # plt.ion()
-        plt.show()
 
-    print("Changing model parameter and re-extracting")
-    result = flight_envelope.set_model_parameter(
-        5, "motor1/omega_max", 10
-    )  # Zero-out propeller efficiency
-    if result:
-        print("Succeeded")
-    else:
-        print("Failed")
-    flight_envelope.update_model()  # Register model changes
-    # Set the model parameters. They will not take effect (be written)
-    # param_type defined as:
-    # typedef enum {
-    #     PARAM_TYPE_WORLD = 0,
-    #     PARAM_TYPE_ENV,
-    #     PARAM_TYPE_INIT,
-    #     PARAM_TYPE_INERTIAL,
-    #     PARAM_TYPE_AERO,
-    #     PARAM_TYPE_PROP,
-    #     PARAM_TYPE_GROUND
-    # } ParamType_t;
-    safe_poly = flight_envelope.find_flight_envelope()
-    # Approximate by ellipsoid
-    safe_poly.ellipsoid_fit()
-    print("Fitted Ellipsoid coefficients:\n")
-    print(safe_poly._el_v)
+    if plot and export_path:
+        plu.save_figure_3d(os.path.join(export_path, model_name+'_fe'), safe_poly._figure_handle, filetype='pdf')
+
     if plot:
-        safe_poly.plot_ellipsoid()
         plt.show()
-
-    # Approximate the safe convex polytope with k vertices
-    print("Performing clustering")
-    # cluster_num = 2 ** n_dim
-    # cluster_num = 2 * (n_dim-3)
-    if safe_poly._n_dim == 2:
-        cluster_num = 4
-    elif safe_poly._n_dim == 3:
-        cluster_num = 12
-
-    safe_poly.cluster(cluster_num)
-    # if plot:
-    #     safe_poly.plot()
-    #     plt.show()
-
-    safe_poly.display_constraints()
-
-    print("C-type definition:")
-    print(safe_poly.print_c_arrays())
 
     # Export polytope search results
     if export_path is not None:
