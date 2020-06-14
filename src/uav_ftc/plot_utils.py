@@ -61,7 +61,10 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 # y_lims: (iter) the y_lims to apply to each plot
 ## OUTPUTS:
 # fig: the generated figure handle
-def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None, y_lims=None, dpi=200, fig_size=[6.4, 4.8]):
+def plot_2d(plot_data, plot_labels, series_names, 
+    plot_colors=None, x_lims=None, y_lims=None,
+    single_legend=False, single_ref=False,
+    dpi=200, fig_size=[6.4, 4.8]):
 
     fig = plt.figure(dpi=dpi, figsize=fig_size)
     subfig_num = len(plot_data)
@@ -73,6 +76,7 @@ def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None,
     for plot_idx, subfig_data in enumerate(plot_data):
         axh = fig.add_subplot('{}1{}'.format(subfig_num, plot_idx+1))
         legend_handles = []
+        plotted_ref = False
         for series_idx, series_tuple in enumerate(subfig_data):
             color = plot_colors[plot_idx][series_idx]
             series_name = series_names[plot_idx][series_idx]
@@ -80,8 +84,10 @@ def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None,
             x_data = series_tuple[0]
             y_data = series_tuple[1]
             if 'ref' in series_name:
-                axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
-                legend_handles.append(mpl.patches.Patch(color=color, label=series_name+' ref', hatch='/'))
+                if not plotted_ref or not single_ref:
+                    axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
+                    legend_handles.append(mpl.patches.Patch(color=color, label=series_name, hatch='/'))
+                    plotted_ref = True
             else:
                 axh.plot(x_data, y_data, color=color, linewidth=0.5)
                 legend_handles.append(mpl.patches.Patch(color=color, label=series_name))
@@ -96,7 +102,8 @@ def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None,
                 axh.set_ylim(y_lims[plot_idx])
         axh.set_ylabel(plot_labels[plot_idx])
         axh.grid(True)
-        axh.legend(handles = legend_handles, fontsize='xx-small')
+        if plot_idx==0 or not single_legend:
+            axh.legend(handles = legend_handles, fontsize='xx-small')
 
     plt.tight_layout()
 
@@ -107,7 +114,7 @@ def plot_2d(plot_data, plot_labels, series_names, plot_colors=None, x_lims=None,
 # High-level plot commands
 # Typically operate on a list of log_parsing.LogData objects
 
-def plot_path(log_dataset):
+def plot_path(log_dataset, plot_path=True):
 
     fig = plt.figure(dpi=200)
     colorlist = build_colorlist(len(log_dataset.keys()))
@@ -150,13 +157,14 @@ def plot_path(log_dataset):
         axh.add_collection(collection)
 
     # Plot paths
-    legend_handles = []
-    for i, log_data_name in enumerate(log_dataset.keys()):
-        log_data = log_dataset[log_data_name]
-        axh.plot(log_data.p_e, log_data.p_n)
-        log_name = sanitize_textext(log_data_name)
-        legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
-    axh.legend(handles = legend_handles, fontsize='xx-small')
+    if plot_path:
+        legend_handles = []
+        for i, log_data_name in enumerate(log_dataset.keys()):
+            log_data = log_dataset[log_data_name]
+            axh.plot(log_data.p_e, log_data.p_n)
+            log_name = sanitize_textext(log_data_name)
+            legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+        axh.legend(handles = legend_handles, fontsize='xx-small')
 
     axh.axis('equal')
     axh.set_xlabel('East (m)')
@@ -166,7 +174,9 @@ def plot_path(log_dataset):
     return (fig, axh)
 
 
-def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
+def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False,
+    single_ref=False, single_legend=False):
+
     if log_names is None:
         log_names = log_dataset.keys()
     plot_labels = ['Roll (rad/s)', 'Pitch (rad/s)', 'Yaw (rad/s)']
@@ -206,7 +216,8 @@ def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, pl
     for subf_idx in range(3):
         series_colors[subf_idx] = subfig_colors
 
-    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors,
+        x_lims=x_lims, y_lims=y_lims, single_ref=single_ref, single_legend=single_legend)
     return fig
 
 
@@ -481,18 +492,23 @@ def plot_euler(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=
     return fig
 
 
-def plot_inputs(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=None):
+def plot_inputs(log_dataset, channels=None, log_names=None, plot_ref=False, x_lims=None, y_lims=None,
+    single_ref=False, single_legend=False):
     if log_names is None:
         log_names = log_dataset.keys()
-    plot_labels = ['RC{}'.format(value+1) for value in range(8)]
+    if channels is None:
+        channels = [value+1 for value in range(8)]
+
+    plot_labels = ['RC{}'.format(channel) for channel in channels]
     plot_data = [None]*len(plot_labels)
-    for subfig_idx in range(len(plot_labels)):
+    for subfig_idx, channel in enumerate(channels):
+    # for subfig_idx in range(len(plot_labels)):
         plot_data[subfig_idx] = []
         for log_idx, log_name in enumerate(log_names):
             plot_data[subfig_idx].append(
                 (
                     log_dataset[log_name].time_databus,
-                    getattr(log_dataset[log_name], 'rcin_{}'.format(subfig_idx+1))
+                    getattr(log_dataset[log_name], 'rcout_{}'.format(channel))
                 )
             )
 
