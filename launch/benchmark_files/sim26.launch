@@ -7,9 +7,10 @@
 	<arg name="uav_name" default="default"/>
 	<arg name="visuals" default="false"/>
 	<arg name="log" default="true"/>
-    <arg name="scenario" default="benchmark_5"/>
+    <arg name="scenario" default="benchmark_2"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
-    <arg name="log_name" default="24"/>
+    <arg name="fe_name" default="nominal"/>
+    <arg name="log_name" default="26"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -18,21 +19,43 @@
         <arg name="uav_name" value="$(arg uav_name)"/>
         <arg name="visuals" value="$(arg visuals)"/>
     </include>
-
+    
     <!-- Launch uav_ftc-related nodes -->
     <group ns="$(arg uav_name)">
         <!-- Load controller parameters -->
         <rosparam>
-            ctrlMode: 1
+            ctrlMode: 3
+            deltaFMin: 0.0
+            pMin: -1.5
+            qMin: -1.5
+            rMin: -0.25
+            deltaFMax: 12.0
+            pMax: 1.5
+            qMax: 1.5
+            rMax: 0.25
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
             wp: 10
-            wq: 1
-            wr: 10
+            wq: 10
+            wr: 100
             wda: 100
             wde: 100
             wdr: 10
             wnp: 1000
             wnq: 1000
             wnr: 1000
+            wgamma: 1000.0
+            wpsidot: 10000.0
+            walpha: 0.01
+            wbeta: 100
+            wdp: 10.0
+            wdq: 50.0
+            wdr: 100.0
+            wphi: 0.01
+            wngamma: 10000.0
+            wnphi: 100.0
+            waypointRadius: 20
+            numWpLookahead: 0
         </rosparam>
 
         <!--  -->
@@ -50,8 +73,10 @@
             <param name="scenario" value="$(arg scenario)"/>
         </node>
 
-        <!-- Launch simulated static throttle command -->
-        <node name="throttle_pub" pkg="rostopic" type="rostopic" args="pub -r 1 rawPWM last_letter_msgs/SimPWM --file '$(find uav_ftc)/data/rostopic_pub_arguments/raw_ctrls_throttle.txt'"/>
+        <!-- Launch static FE publisher -->
+        <node pkg="uav_ftc" name="fe_publisher" type="fe_publisher.py" output="screen">
+            <param name="fe" value="$(arg fe_name)"/>
+        </node>
 
         <!-- Launch the databus generator -->
         <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
@@ -62,9 +87,9 @@
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
-
+        
         <!-- Raise rate controller -->
-        <!-- <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
             <param name="~rate" value="50"/>
             <remap from="~wp" to="wp"/>
             <remap from="~wq" to="wq"/>
@@ -75,18 +100,36 @@
             <remap from="~wnp" to="wnp"/>
             <remap from="~wnq" to="wnq"/>
             <remap from="~wnr" to="wnr"/>
-        </node> -->
-        <node pkg="uav_ftc" name="rate_controller" type="rate_controller_pid" respawn="true" output="screen">
-            <param name="~rate" value="50"/>
-            <param name="~kp_p" value="1.0"/>
-            <param name="~ki_p" value="1.0"/>
-            <param name="~kd_p" value="0.0"/>
-            <param name="~kp_q" value="0.50"/>
-            <param name="~ki_q" value="0.5"/>
-            <param name="~kd_q" value="0.0"/>
-            <param name="~kp_r" value="1.0"/>
-            <param name="~ki_r" value="4.0"/>
-            <param name="~kd_r" value="0.0"/>
+        </node>
+        <!-- Raise velocity controller -->
+        <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller_no_va" respawn="true" output="screen">
+            <param name="~rate" value="5"/>
+            <param name="~kp_va" value="0.1"/>
+            <param name="~ki_va" value="0.05"/>
+            <param name="~kd_va" value="0"/>
+            <remap from="~pMin" to="pMin"/>
+            <remap from="~qMin" to="qMin"/>
+            <remap from="~rMin" to="rMin"/>
+            <remap from="~pMax" to="pMax"/>
+            <remap from="~qMax" to="qMax"/>
+            <remap from="~rMax" to="rMax"/>
+            <remap from="~wgamma" to="wgamma"/>
+            <remap from="~wpsidot" to="wpsidot"/>
+            <remap from="~walpha" to="walpha"/>
+            <remap from="~wbeta" to="wbeta"/>
+            <remap from="~wdp" to="wdp"/>
+            <remap from="~wdq" to="wdq"/>
+            <remap from="~wdr" to="wdr"/>
+            <remap from="~wphi" to="wphi"/>
+            <remap from="~wngamma" to="wngamma"/>
+            <remap from="~wnphi" to="wnphi"/>
+        </node>
+
+        <!-- Raise path controller -->
+        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen">
+            <param name="~rate" value="2"/>
+            <remap from="~waypointRadius" to="waypointRadius"/>
+            <remap from="~numWpLookahead" to="numWpLookahead"/>
         </node>
 
         <!-- Raise input aggreggator node -->
