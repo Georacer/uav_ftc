@@ -161,10 +161,14 @@ def test_code(log_file, model_name, export_path):
             log_data.rcin_6[databus_msg_counter] = msg.rc_in[5]
             log_data.rcin_7[databus_msg_counter] = msg.rc_in[6]
             log_data.rcin_8[databus_msg_counter] = msg.rc_in[7]
-            log_data.rcout_1[databus_msg_counter] = msg.rc_in[0]
-            log_data.rcout_2[databus_msg_counter] = msg.rc_in[1]
-            log_data.rcout_3[databus_msg_counter] = msg.rc_in[2]
-            log_data.rcout_4[databus_msg_counter] = msg.rc_in[3]
+            log_data.rcout_1[databus_msg_counter] = msg.rc_out[0]
+            log_data.rcout_2[databus_msg_counter] = msg.rc_out[1]
+            log_data.rcout_3[databus_msg_counter] = msg.rc_out[2]
+            log_data.rcout_4[databus_msg_counter] = msg.rc_out[3]
+            log_data.rcout_5[databus_msg_counter] = msg.rc_out[4]
+            log_data.rcout_6[databus_msg_counter] = msg.rc_out[5]
+            log_data.rcout_7[databus_msg_counter] = msg.rc_out[6]
+            log_data.rcout_8[databus_msg_counter] = msg.rc_out[7]
 
             databus_msg_counter += 1
 

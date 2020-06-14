@@ -1,3 +1,6 @@
+import exceptions
+import warnings
+
 import numpy as np
 
 log_databus_attrs = [
@@ -49,6 +52,10 @@ log_databus_attrs = [
     'rcout_2',
     'rcout_3',
     'rcout_4',
+    'rcout_5',
+    'rcout_6',
+    'rcout_7',
+    'rcout_8',
     'gamma',
     'psi_dot',
 ]
@@ -154,8 +161,11 @@ def filter_log_data(log_data, t_start, t_end):
     databus_start_idx = np.where(log_data.time_databus > t_start)[0][0]
     databus_end_idx = np.where(log_data.time_databus < t_end)[0][-1]
     for attr_name in log_databus_attrs:
-        filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
-        setattr(log_data_filt, attr_name, filtered_data)
+        try:
+            filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
+            setattr(log_data_filt, attr_name, filtered_data)
+        except AttributeError as e:
+            warnings.warn('Tried to access non-existing log variable {}. Make sure it is not needed.'.format(attr_name))
 
     if len(log_data.time_refRates)>0:
         refRates_start_idx = np.where(log_data.time_refRates > t_start)[0][0]
