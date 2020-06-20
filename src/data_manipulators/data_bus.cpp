@@ -47,18 +47,18 @@ SubHandler::SubHandler()
 ////////////////////////////
 // DataBus Class definitions
 ////////////////////////////
-DataBus::DataBus(ros::NodeHandle par_n, uint data_source)
+DataBus::DataBus(ros::NodeHandle par_n, const Settings &opts)
 {
     n = par_n; // Store nodehandle
-    if (data_source == DATA_SOURCE_LL)
+    if (opts.data_source == DATA_SOURCE_LL)
     {
         ROS_INFO("Creating new SITL databus");
-        sub_handler_ = new SubHandlerLL(n);
+        sub_handler_ = new SubHandlerLL(n, opts);
     }
-    if (data_source == DATA_SOURCE_HW)
+    if (opts.data_source == DATA_SOURCE_HW)
     {
         ROS_INFO("Creating new HW databus");
-        sub_handler_ = new SubHandlerHW(n);
+        sub_handler_ = new SubHandlerHW(n, opts);
     }
     data_pub_ = n.advertise<uav_ftc::BusData>("dataBus", 100);
     ekf_pub_ = n.advertise<uav_ftc::BusData>("ekf", 100);
@@ -235,17 +235,19 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "data_bus");
 	ros::NodeHandle n;
-	ros::NodeHandle np("~");
+	ros::NodeHandle pnh("~");
     int pub_rate;
-	np.param("pub_rate", pub_rate, 100); //publication rate in Hz
+	pnh.param("~pub_rate", pub_rate, 100); //publication rate in Hz
     int data_source;
-	if (!np.getParam("data_source", data_source))
+	if (!pnh.getParam("~data_source", data_source))
     {
         ROS_ERROR("Could not read 'data_source' parameter");
         ros::shutdown();
     } //publication rate in Hz
 
-    DataBus data_bus(n, data_source);
+    DataBus::Settings opts;
+    opts.data_source = data_source;
+    DataBus data_bus(n, opts);
     data_bus.set_pub_rate(pub_rate);
 	ROS_INFO("DataBus node up");
 

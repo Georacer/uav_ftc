@@ -28,9 +28,17 @@ class DataBus
     public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    struct Settings {
+        uint data_source;
+        bool estimate_rps = false;
+        bool estimate_airspeed = false;
+        bool estimate_aoa = false;
+        bool estimate_aos = false;
+    };
+
     // Methods
 
-    DataBus(ros::NodeHandle h, uint data_source); // Constructor
+    DataBus(ros::NodeHandle h, const Settings &opts); // Constructor
     ~DataBus();
 
     void ekf_init_();
@@ -47,6 +55,7 @@ class DataBus
     // Variables
     private:
     ros::NodeHandle n;
+    ros::NodeHandle pnh;
     double pub_rate_;
     ros::Publisher data_pub_;
     ros::Publisher ekf_pub_;

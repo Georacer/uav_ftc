@@ -16,11 +16,17 @@ class SubHandlerLL : public SubHandler
     public:
     ros::Subscriber sub_state, sub_state_dot, sub_environment, sub_wrench, sub_input, sub_output;
 
-    SubHandlerLL(ros::NodeHandle n);
+    SubHandlerLL(ros::NodeHandle n, const DataBus::Settings &opts);
 
     private:
     Vector3d wind_body, vel_body_inertial, vel_body_relative;
     Quaterniond rotation_be;
+    bool _estimate_rps{false};
+    bool _estimate_airspeed{false};
+    bool _estimate_aoa{false};
+    bool _estimate_aos{false};
+    double _aoa_estimated{0};
+    double _aos_estimated{0};
 
     void cb_state(last_letter_msgs::SimStates msg);
     void cb_state_dot(last_letter_msgs::SimStates msg);
@@ -28,15 +34,23 @@ class SubHandlerLL : public SubHandler
     void cb_wrench(last_letter_msgs::SimWrenches msg);
     void cb_input(last_letter_msgs::SimPWM msg);
     void cb_output(last_letter_msgs::SimPWM msg);
+    double estimate_aoa_mahony(double Va, double q);
+    double estimate_aoa_mine(double Va, double q);
+    double estimate_aos(double Va);
 };
 
-SubHandlerLL::SubHandlerLL(ros::NodeHandle n) : SubHandler()
+SubHandlerLL::SubHandlerLL(ros::NodeHandle n, const DataBus::Settings &opts) : SubHandler()
 {
     // Variable initialization
     wind_body = Vector3d::Zero();
     vel_body_inertial = Vector3d::Zero();
     vel_body_relative = Vector3d::Zero(); // Body velocity relative to air-mass
     rotation_be = Quaterniond::Identity();
+
+    _estimate_rps = opts.estimate_rps;
+    _estimate_airspeed = opts.estimate_airspeed;
+    _estimate_aoa = opts.estimate_aoa;
+    _estimate_aos = opts.estimate_aos;
 
 	sub_state = n.subscribe("states",1,&SubHandlerLL::cb_state, this); // State subscriber
     ROS_INFO("Subscribed to state %s", sub_state.getTopic().c_str());
@@ -66,7 +80,15 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     rotation_be.z() = msg.pose.orientation.z;
     rotation_be.w() = msg.pose.orientation.w;
     bus_data.velocity_angular = msg.velocity.angular; // Body frame
-    bus_data.rps_motor = msg.rotorspeed[0]; // Currently only for first motor
+
+    if (!_estimate_rps) {
+        bus_data.rps_motor = msg.rotorspeed[0]; // Currently only for first motor
+    }
+    else {
+        // Estimate rps based on last available motor command
+        // Calculate based on omega vs deltat coefficient
+        bus_data.rps_motor = 1050.0/2000.0*bus_data.rc_out[2] / (2*M_PI); 
+    }
 
     temp_vect_eig = rotation_be * wind_body;
     convertRosVector3(temp_vect_eig, bus_data.wind); // NED frame
@@ -78,11 +100,30 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     vel_body_inertial = Vector3d(msg.velocity.linear.x, msg.velocity.linear.y, msg.velocity.linear.z); // Body frame
     vel_body_relative = vel_body_inertial - wind_body;
     Vector3d airdata = getAirData(vel_body_relative);
-    bus_data.airspeed = airdata.x();
-    bus_data.qbar = 0.5*bus_data.rho*airdata.x()*airdata.x();
-    bus_data.angle_of_attack = airdata.y();
-    bus_data.angle_of_sideslip = airdata.z();
+    if (!_estimate_airspeed) {
+        bus_data.airspeed = airdata.x();
+    }
+    else {
+        bus_data.airspeed = vel_body_inertial.norm();//TODO: Take constant wind component into account
+    }
+    bus_data.qbar = 0.5*bus_data.rho*bus_data.airspeed*bus_data.airspeed;
 
+    if (!_eistmate_aoa) { // No AoA estimation
+        bus_data.angle_of_attack = airdata.y();
+    }
+    else if (_estimate_aoa == 1) { // Mahony's estimator
+        estimate_aoa_mahony();
+    }
+    else if (_estimate_aoa == 2) { // My estimator
+        estimate_aoa_mine();
+    }
+
+    if (!_eistmate_aos) {
+        bus_data.angle_of_sideslip = airdata.z();
+    }
+    else {
+        estimate_aos();
+    }
 
     flag_got_gps = true;
     flag_got_airdata = true;
@@ -141,4 +182,31 @@ void SubHandlerLL::cb_output(last_letter_msgs::SimPWM msg)
     {
         bus_data.rc_out[i] = msg.value[i];
     }
+}
+
+double SubHandlerLL::estimate_aoa_mahony(double Va, double q)
+{
+    // Constant values suitable only for nominal model
+    const double dt{0.0025}; // 400Hz simulation
+    const double c1 = 3.82; 
+    const double a0 = -0.0056;
+    _aoa_estimated += (-c1/Va*_aoa_estimated + q + a0)*dt;
+    return _aoa_estimated;
+}
+
+double SubHandlerLL::estimate_aoa_mine(double Va, double q)
+{
+    // Constant values suitable only for nominal model
+    const double dt{0.0025}; // 400Hz simulation
+    const double c1 = 3.82; 
+    const double c2 = 0.897;
+    const double c3 = 0.0551;
+    const double g3 = 9.81; // approximate gravity z-component of wind-frame
+    _aoa_estimated += ((-c1/Va-c2*Va)*_aoa_estimated + q + g3/Va - c3*Va)*dt;
+    return _aoa_estimated;
+}
+
+double SubHandlerLL::estimate_aos(double Va)
+{
+    return 0;
 }

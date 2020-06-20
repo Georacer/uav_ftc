@@ -51,14 +51,17 @@ def test_code(log_file, model_name, export_path):
 
     # Construct topic names
     databus_name = '/{}/dataBus'.format(model_name)
+    estimates_name = '/{}/dataBus_est'.format(model_name)
     refRates_name = '/{}/refRates'.format(model_name)
     refTrajectory_name = '/{}/refTrajectory'.format(model_name)
     flightEnvelope_name = '/{}/flight_envelope'.format(model_name)
     waypoints_name = '/{}/waypoints'.format(model_name)
     obstacles_name = '/{}/obstacles'.format(model_name)
     ref_path_name = '/{}/rrt_path'.format(model_name)
+
     topics_of_interest = [
        databus_name,
+       estimates_name,
        refTrajectory_name,
        refRates_name,
        flightEnvelope_name,
@@ -74,6 +77,11 @@ def test_code(log_file, model_name, export_path):
     print('Expecting {} databus msgs'.format(num_databus_msgs))
     for attr_name in lp.log_databus_attrs:
         setattr(log_data, attr_name, np.zeros(num_databus_msgs))
+
+    num_estimates_msgs = in_bag.get_message_count(topic_filters = [estimates_name])
+    print('Expecting {} estimates msgs'.format(num_estimates_msgs))
+    for attr_name in lp.log_estimates_attrs:
+        setattr(log_data, attr_name, np.zeros(num_estimates_msgs))
 
     num_refRates_msgs = in_bag.get_message_count(topic_filters = [refRates_name])
     print('Expecting {} refRates msgs'.format(num_refRates_msgs))
@@ -95,6 +103,7 @@ def test_code(log_file, model_name, export_path):
     ###########
     # Read msgs
     databus_msg_counter = 0
+    estimates_msg_counter = 0
     refRates_msg_counter = 0
     refTrajectory_msg_counter = 0
     fe_msg_counter = 0
@@ -109,6 +118,7 @@ def test_code(log_file, model_name, export_path):
     print('Reading bag file...')
     for topic, msg, t in in_bag.read_messages(topics=topics_of_interest):
 
+        #TODO: Pull in topic names from constants declared at start of file
         if topic.endswith('dataBus'):
             msg_time = msg.header.stamp
             log_data.time_databus[databus_msg_counter] = msg_time.secs + 1.0*msg_time.nsecs/10**9 - start_time
@@ -171,6 +181,13 @@ def test_code(log_file, model_name, export_path):
             log_data.rcout_8[databus_msg_counter] = msg.rc_out[7]
 
             databus_msg_counter += 1
+
+        if topic.endswith('dataBus_est'):
+            msg_time = msg.header.stamp
+            log_data.time_estimates[estimates_msg_counter] = msg_time.secs + 1.0*msg_time.nsecs/10**9 - start_time
+            log_data.airspeed_est[estimates_msg_counter] = msg.airspeed
+            log_data.alpha_est[estimates_msg_counter] = msg.angle_of_attack
+            log_data.beta_est[estimates_msg_counter] = msg.angle_of_sideslip
 
         if topic.endswith('refRates'):
             msg_time = msg.header.stamp

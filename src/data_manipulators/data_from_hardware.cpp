@@ -33,7 +33,7 @@ class SubHandlerHW : public SubHandler
     ros::Subscriber sub_input;
     ros::Subscriber sub_output;
 
-    SubHandlerHW(ros::NodeHandle n);
+    SubHandlerHW(ros::NodeHandle n, const DataBus::Settings &opts);
     GeodeticConverter geodetic_converter;
 
     private:
@@ -55,7 +55,7 @@ class SubHandlerHW : public SubHandler
 
 };
 
-SubHandlerHW::SubHandlerHW(ros::NodeHandle n) : SubHandler()
+SubHandlerHW::SubHandlerHW(ros::NodeHandle n, const DataBus::Settings &opts) : SubHandler()
 {
     sub_imu = n.subscribe("imu/data", 1, &SubHandlerHW::cb_imu, this);
     sub_imu_temp = n.subscribe("imu/temperature", 1, &SubHandlerHW::cb_imu_temp, this);

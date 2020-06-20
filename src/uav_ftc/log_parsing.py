@@ -60,6 +60,13 @@ log_databus_attrs = [
     'psi_dot',
 ]
 
+log_estimates_attrs = [
+    'time_estimates',
+    'airseed_est',
+    'alpha_est',
+    'beta_est',
+]
+
 log_ref_traj_attrs = [
     'time_refTrajectory',
     'ref_Va',
@@ -96,6 +103,7 @@ log_mission_attrs = [
 
 log_attrs_groups = [
     log_databus_attrs,
+    log_estimates_attrs,
     log_ref_rates_attrs,
     log_ref_traj_attrs,
     log_fe_attrs,
@@ -109,6 +117,10 @@ class LogData:
     def __init__(self):
         # Databus information
         for attr_name in log_databus_attrs:
+            setattr(self, attr_name, None)
+
+        # Estimated databus information
+        for attr_name in log_estimates_attrs:
             setattr(self, attr_name, None)
 
         # Reference angular rates
@@ -158,11 +170,21 @@ class LogData:
 
 def filter_log_data(log_data, t_start, t_end):
     log_data_filt = LogData()
+
     databus_start_idx = np.where(log_data.time_databus > t_start)[0][0]
     databus_end_idx = np.where(log_data.time_databus < t_end)[0][-1]
     for attr_name in log_databus_attrs:
         try:
             filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
+            setattr(log_data_filt, attr_name, filtered_data)
+        except AttributeError as e:
+            warnings.warn('Tried to access non-existing log variable {}. Make sure it is not needed.'.format(attr_name))
+
+    estimates_start_idx = np.where(log_data.time_estimates > t_start)[0][0]
+    estimates_end_idx = np.where(log_data.time_estimates < t_end)[0][-1]
+    for attr_name in log_estimates_attrs:
+        try:
+            filtered_data = getattr(log_data, attr_name)[estimates_start_idx:estimates_end_idx+1]
             setattr(log_data_filt, attr_name, filtered_data)
         except AttributeError as e:
             warnings.warn('Tried to access non-existing log variable {}. Make sure it is not needed.'.format(attr_name))
