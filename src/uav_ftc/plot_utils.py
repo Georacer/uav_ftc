@@ -61,9 +61,9 @@ def plot3_points(point_array, axes_names=['x', 'y', 'z']):
 # y_lims: (iter) the y_lims to apply to each plot
 ## OUTPUTS:
 # fig: the generated figure handle
-def plot_2d(plot_data, plot_labels, series_names, 
-    plot_colors=None, x_lims=None, y_lims=None,
-    single_legend=False, single_ref=False,
+def plot_2d(plot_data, plot_labels, series_names,
+    plot_colors=None, x_label=None, x_lims=None, y_lims=None,
+    plot_type='plot', single_legend=False, single_ref=False,
     dpi=200, fig_size=[6.4, 4.8]):
 
     fig = plt.figure(dpi=dpi, figsize=fig_size)
@@ -89,7 +89,12 @@ def plot_2d(plot_data, plot_labels, series_names,
                     legend_handles.append(mpl.patches.Patch(color=color, label=series_name, hatch='/'))
                     plotted_ref = True
             else:
-                axh.plot(x_data, y_data, color=color, linewidth=0.5)
+                if plot_type == 'plot':
+                    axh.plot(x_data, y_data, color=color, linewidth=0.5)
+                elif plot_type == 'scatter':
+                    axh.scatter(x_data, y_data, c=color, s=1.0, marker='x')
+                else:
+                    raise ValueError('Unsupported plot type {}'.format(plot_type))
                 legend_handles.append(mpl.patches.Patch(color=color, label=series_name))
 
         if x_lims is not None:
@@ -104,7 +109,9 @@ def plot_2d(plot_data, plot_labels, series_names,
         axh.grid(True)
         if plot_idx==0 or not single_legend:
             axh.legend(handles = legend_handles, fontsize='xx-small')
-
+    
+    if x_label is not None:
+        axh.set_xlabel(x_label)
     plt.tight_layout()
 
     return (fig, axh)
@@ -578,6 +585,37 @@ def plot_rps(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lims=No
         series_names.append(log_name)
 
     fig = plot_2d(plot_data, plot_labels, series_names, plot_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
+
+
+def plot_rps_vs_throttle(log_dataset, log_names=None, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Motor RPS',]
+    log_colors = build_colorlist(len(log_names))
+    plot_data = []
+    series_names = []
+    plot_colors = []
+
+    plot_data.append([])
+    plot_colors.append([])
+    series_names.append([])
+    for log_idx, log_name in enumerate(log_names):
+        plot_data[0].append(
+            (
+                log_dataset[log_name].rcout_3,
+                log_dataset[log_name].rps_motor
+            )
+        )
+        plot_colors[0].append(log_colors[log_idx])
+        series_names[0].append(log_name)
+
+    for log_idx, log_name in enumerate(log_names):
+        series_names.append(log_name)
+
+    fig = plot_2d(plot_data, plot_labels, series_names, plot_colors, dpi=400,
+        x_label='Throttle (us of PWM)', x_lims=x_lims, y_lims=y_lims, plot_type='scatter')
 
     return fig
 
