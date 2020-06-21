@@ -21,10 +21,12 @@ class SubHandlerLL : public SubHandler
     private:
     Vector3d wind_body, vel_body_inertial, vel_body_relative;
     Quaterniond rotation_be;
-    bool _estimate_rps{false};
-    bool _estimate_airspeed{false};
-    bool _estimate_aoa{false};
-    bool _estimate_aos{false};
+    // Variable estimation flags
+    uint _estimate_rps{0};
+    uint _estimate_airspeed{0};
+    uint _estimate_aoa{0};
+    uint _estimate_aos{0};
+    // Variable estimates initialization
     double _aoa_estimated{0};
     double _aos_estimated{0};
 
@@ -48,9 +50,13 @@ SubHandlerLL::SubHandlerLL(ros::NodeHandle n, const DataBus::Settings &opts) : S
     rotation_be = Quaterniond::Identity();
 
     _estimate_rps = opts.estimate_rps;
+    if (!_estimate_rps) { ROS_INFO("Estimating RPS");}
     _estimate_airspeed = opts.estimate_airspeed;
+    if (!_estimate_airspeed) { ROS_INFO("Estimating airspeed");}
     _estimate_aoa = opts.estimate_aoa;
+    if (!_estimate_aoa) { ROS_INFO("Estimating AoA");}
     _estimate_aos = opts.estimate_aos;
+    if (!_estimate_aos) { ROS_INFO("Estimating AoS");}
 
 	sub_state = n.subscribe("states",1,&SubHandlerLL::cb_state, this); // State subscriber
     ROS_INFO("Subscribed to state %s", sub_state.getTopic().c_str());
@@ -108,21 +114,21 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
     }
     bus_data.qbar = 0.5*bus_data.rho*bus_data.airspeed*bus_data.airspeed;
 
-    if (!_eistmate_aoa) { // No AoA estimation
+    if (!_estimate_aoa) { // No AoA estimation
         bus_data.angle_of_attack = airdata.y();
     }
     else if (_estimate_aoa == 1) { // Mahony's estimator
-        estimate_aoa_mahony();
+        estimate_aoa_mahony(bus_data.airspeed, bus_data.velocity_angular.y);
     }
     else if (_estimate_aoa == 2) { // My estimator
-        estimate_aoa_mine();
+        estimate_aoa_mine(bus_data.airspeed, bus_data.velocity_angular.y);
     }
 
-    if (!_eistmate_aos) {
+    if (!_estimate_aos) {
         bus_data.angle_of_sideslip = airdata.z();
     }
     else {
-        estimate_aos();
+        estimate_aos(bus_data.airspeed);
     }
 
     flag_got_gps = true;

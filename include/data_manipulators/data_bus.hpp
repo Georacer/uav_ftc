@@ -30,10 +30,10 @@ class DataBus
 
     struct Settings {
         uint data_source;
-        bool estimate_rps = false;
-        bool estimate_airspeed = false;
-        bool estimate_aoa = false;
-        bool estimate_aos = false;
+        uint estimate_rps{0};
+        uint estimate_airspeed{0};
+        uint estimate_aoa{0};
+        uint estimate_aos{0};
     };
 
     // Methods

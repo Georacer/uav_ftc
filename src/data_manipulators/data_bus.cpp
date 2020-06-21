@@ -238,15 +238,29 @@ int main(int argc, char **argv)
 	ros::NodeHandle pnh("~");
     int pub_rate;
 	pnh.param("~pub_rate", pub_rate, 100); //publication rate in Hz
+
+    // Read node parameters
+    DataBus::Settings opts;
+
     int data_source;
-	if (!pnh.getParam("~data_source", data_source))
-    {
+	if (!pnh.getParam("data_source", data_source)) {
         ROS_ERROR("Could not read 'data_source' parameter");
         ros::shutdown();
-    } //publication rate in Hz
-
-    DataBus::Settings opts;
+    } 
     opts.data_source = data_source;
+
+    int estimate_airspeed;
+	pnh.param("estimate_airspeed", estimate_airspeed, 0);
+    opts.estimate_airspeed = estimate_airspeed;
+
+    int estimate_aoa;
+	pnh.param("estimate_aoa", estimate_aoa, 0);
+    opts.estimate_aoa = estimate_aoa;
+
+    int estimate_aos;
+	pnh.param("estimate_aos", estimate_aos, 0);
+    opts.estimate_aos = estimate_aos;
+
     DataBus data_bus(n, opts);
     data_bus.set_pub_rate(pub_rate);
 	ROS_INFO("DataBus node up");
