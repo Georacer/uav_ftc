@@ -10,7 +10,7 @@
     <arg name="scenario" default="benchmark_1"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
     <arg name="fe_name" default="nominal"/>
-    <arg name="log_name" default="34"/>
+    <arg name="log_name" default="35"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -76,7 +76,7 @@
         <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
         <node pkg="uav_ftc" name="data_bus_est" type="data_bus" output="screen">
             <param name="data_source" value="1"/>
-            <param name="estimate_airspeed" value="1"/>
+            <param name="estimate_aoa" value="1"/>
             <remap from="dataBus" to="dataBus_est"/>
         </node>
 

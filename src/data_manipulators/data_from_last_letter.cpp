@@ -50,13 +50,14 @@ SubHandlerLL::SubHandlerLL(ros::NodeHandle n, const DataBus::Settings &opts) : S
     rotation_be = Quaterniond::Identity();
 
     _estimate_rps = opts.estimate_rps;
-    if (!_estimate_rps) { ROS_INFO("Estimating RPS");}
+    if (_estimate_rps) { ROS_INFO("Estimating RPS");}
     _estimate_airspeed = opts.estimate_airspeed;
-    if (!_estimate_airspeed) { ROS_INFO("Estimating airspeed");}
+    if (_estimate_airspeed==1) { ROS_INFO("Estimating airspeed using Mahony's filter");}
+    if (_estimate_airspeed==2) { ROS_INFO("Estimating airspeed using Zogopoulos' filter");}
     _estimate_aoa = opts.estimate_aoa;
-    if (!_estimate_aoa) { ROS_INFO("Estimating AoA");}
+    if (_estimate_aoa) { ROS_INFO("Estimating AoA");}
     _estimate_aos = opts.estimate_aos;
-    if (!_estimate_aos) { ROS_INFO("Estimating AoS");}
+    if (_estimate_aos) { ROS_INFO("Estimating AoS");}
 
 	sub_state = n.subscribe("states",1,&SubHandlerLL::cb_state, this); // State subscriber
     ROS_INFO("Subscribed to state %s", sub_state.getTopic().c_str());
@@ -118,17 +119,20 @@ void SubHandlerLL::cb_state(last_letter_msgs::SimStates msg)
         bus_data.angle_of_attack = airdata.y();
     }
     else if (_estimate_aoa == 1) { // Mahony's estimator
-        estimate_aoa_mahony(bus_data.airspeed, bus_data.velocity_angular.y);
+        bus_data.angle_of_attack = estimate_aoa_mahony(bus_data.airspeed, bus_data.velocity_angular.y);
     }
     else if (_estimate_aoa == 2) { // My estimator
-        estimate_aoa_mine(bus_data.airspeed, bus_data.velocity_angular.y);
+        bus_data.angle_of_attack = estimate_aoa_mine(bus_data.airspeed, bus_data.velocity_angular.y);
+    }
+    else {
+        ROS_ERROR("Invalid AoA estimator flag: %d", _estimate_aoa);
     }
 
     if (!_estimate_aos) {
         bus_data.angle_of_sideslip = airdata.z();
     }
     else {
-        estimate_aos(bus_data.airspeed);
+        bus_data.angle_of_sideslip = estimate_aos(bus_data.airspeed);
     }
 
     flag_got_gps = true;

@@ -189,6 +189,8 @@ def test_code(log_file, model_name, export_path):
             log_data.alpha_est[estimates_msg_counter] = msg.angle_of_attack
             log_data.beta_est[estimates_msg_counter] = msg.angle_of_sideslip
 
+            estimates_msg_counter += 1
+
         if topic.endswith('refRates'):
             msg_time = msg.header.stamp
             log_data.time_refRates[refRates_msg_counter] = msg_time.secs + 1.0*msg_time.nsecs/10**9 - start_time

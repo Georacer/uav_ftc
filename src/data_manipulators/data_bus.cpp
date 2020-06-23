@@ -237,7 +237,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ros::NodeHandle pnh("~");
     int pub_rate;
-	pnh.param("~pub_rate", pub_rate, 100); //publication rate in Hz
+	pnh.param("pub_rate", pub_rate, 100); //publication rate in Hz
 
     // Read node parameters
     DataBus::Settings opts;

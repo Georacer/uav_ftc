@@ -83,7 +83,7 @@ def plot_2d(plot_data, plot_labels, series_names,
             series_name = sanitize_textext(series_name)
             x_data = series_tuple[0]
             y_data = series_tuple[1]
-            if 'ref' in series_name:
+            if ('ref' in series_name) or ('est' in series_name):
                 if not plotted_ref or not single_ref:
                     axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
                     legend_handles.append(mpl.patches.Patch(color=color, label=series_name, hatch='/'))
@@ -324,7 +324,9 @@ def plot_accelerations(log_dataset, log_names=None, x_lims=None, y_lims=None, pl
     return fig
 
 
-def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False):
+def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None,
+    plot_ref=False, single_ref=False):
+
     if log_names is None:
         log_names = log_dataset.keys()
     plot_labels = ['Airspeed (m/s)', 'Gamma (rad)', '$\dot{\psi}$ (rad/s)']
@@ -364,7 +366,8 @@ def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None, plo
     for subf_idx in range(3):
         series_colors[subf_idx] = subfig_colors
 
-    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors,
+        x_lims=x_lims, y_lims=y_lims, single_ref=single_ref)
     return fig
 
 
@@ -453,6 +456,70 @@ def plot_airdata(log_dataset, log_names=None, plot_ref=False, x_lims=None, y_lim
             subfig_colors.append(log_colors[log_idx])
         subfig_colors.append(log_colors[log_idx])
     for subf_idx in range(3):
+        series_colors[subf_idx] = subfig_colors
+
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
+
+
+def plot_airspeed_estimate(log_dataset, log_names=None, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Airspeed (m/s)',]
+    x_data = []
+    for log_idx, log_name in enumerate(log_names):
+        x_data.append((log_dataset[log_name].time_databus, log_dataset[log_name].airspeed))
+        x_data.append((log_dataset[log_name].time_estimates, log_dataset[log_name].airspeed_est))
+    plot_data = [x_data,]
+
+    series_names = [None,]
+    subfig_names = []
+    for log_idx, log_name in enumerate(log_names):
+        subfig_names.append(log_name)
+        subfig_names.append(log_name + ' estimate')
+    for subf_idx in range(len(plot_data)):
+        series_names[subf_idx] = subfig_names
+
+    log_colors = build_colorlist(len(log_names))
+    series_colors = [None,]
+    subfig_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(len(plot_data)):
+        series_colors[subf_idx] = subfig_colors
+
+    fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)
+
+    return fig
+
+
+def plot_aoa_estimate(log_dataset, log_names=None, x_lims=None, y_lims=None):
+    if log_names is None:
+        log_names = log_dataset.keys()
+    plot_labels = ['Angle of Attack (deg)',]
+    x_data = []
+    for log_idx, log_name in enumerate(log_names):
+        x_data.append((log_dataset[log_name].time_databus, np.rad2deg(log_dataset[log_name].alpha)))
+        x_data.append((log_dataset[log_name].time_estimates, np.rad2deg(log_dataset[log_name].alpha_est)))
+    plot_data = [x_data,]
+
+    series_names = [None,]
+    subfig_names = []
+    for log_idx, log_name in enumerate(log_names):
+        subfig_names.append(log_name)
+        subfig_names.append(log_name + ' estimate')
+    for subf_idx in range(len(plot_data)):
+        series_names[subf_idx] = subfig_names
+
+    log_colors = build_colorlist(len(log_names))
+    series_colors = [None,]
+    subfig_colors = []
+    for log_idx, log_name in enumerate(log_names):
+        subfig_colors.append(log_colors[log_idx])
+        subfig_colors.append(log_colors[log_idx])
+    for subf_idx in range(len(plot_data)):
         series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors, x_lims=x_lims, y_lims=y_lims)

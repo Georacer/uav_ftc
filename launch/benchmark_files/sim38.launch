@@ -10,7 +10,7 @@
     <arg name="scenario" default="benchmark_1"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
     <arg name="fe_name" default="nominal"/>
-    <arg name="log_name" default="34"/>
+    <arg name="log_name" default="38"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -72,14 +72,6 @@
             <param name="data_source" value="1"/>
         </node>
 
-        <!-- Launch the estimated databus generator -->
-        <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
-        <node pkg="uav_ftc" name="data_bus_est" type="data_bus" output="screen">
-            <param name="data_source" value="1"/>
-            <param name="estimate_airspeed" value="1"/>
-            <remap from="dataBus" to="dataBus_est"/>
-        </node>
-
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
@@ -96,7 +88,6 @@
             <remap from="~wnp" to="wnp"/>
             <remap from="~wnq" to="wnq"/>
             <remap from="~wnr" to="wnr"/>
-            <remap from="dataBus" to="dataBus_est"/>
         </node>
 
         <!-- Raise velocity controller -->
@@ -110,7 +101,6 @@
             <remap from="~pMax" to="pMax"/>
             <remap from="~qMax" to="qMax"/>
             <remap from="~rMax" to="rMax"/>
-            <remap from="dataBus" to="dataBus_est"/>
         </node>
 
         <!-- Raise input aggreggator node -->
