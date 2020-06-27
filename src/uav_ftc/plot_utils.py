@@ -325,7 +325,7 @@ def plot_accelerations(log_dataset, log_names=None, x_lims=None, y_lims=None, pl
 
 
 def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None,
-    plot_ref=False, single_ref=False):
+    plot_ref=False, single_ref=False, single_legend=False):
 
     if log_names is None:
         log_names = log_dataset.keys()
@@ -367,7 +367,7 @@ def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None,
         series_colors[subf_idx] = subfig_colors
 
     fig = plot_2d(plot_data, plot_labels, series_names, series_colors,
-        x_lims=x_lims, y_lims=y_lims, single_ref=single_ref)
+        x_lims=x_lims, y_lims=y_lims, single_ref=single_ref, single_legend=single_legend)
     return fig
 
 
