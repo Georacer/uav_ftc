@@ -181,6 +181,62 @@ def plot_path(log_dataset, plot_path=True):
     return (fig, axh)
 
 
+def plot_plan(log_dataset):
+
+    fig = plt.figure(dpi=200)
+    colorlist = build_colorlist(len(log_dataset.keys()))
+    plot_order = log_dataset.keys()
+
+    axh = fig.add_subplot('111')
+    axh.set_prop_cycle(color=build_colorlist(len(log_dataset.keys())))
+
+    legend_handles = []
+    for i, log_data_name in enumerate(log_dataset.keys()):
+        log_data = log_dataset[log_data_name]
+
+        # Plot waypoints
+        if log_data.waypoints is not None:
+            waypoint_list = []
+            for waypoint in log_data.waypoints.T:
+                waypoint_list.append(mpatches.Circle(
+                    (waypoint[1], waypoint[0]),
+                    radius=waypoint[3],
+                    alpha = 0.3,
+                    ))
+            collection = PatchCollection(waypoint_list)
+            collection.set_edgecolor(colorlist[i])
+            collection.set_facecolor('none')
+            axh.add_collection(collection)
+
+            log_name = sanitize_textext(log_data_name)
+            legend_handles.append(mpl.patches.Patch(color=colorlist[i], label=log_name))
+
+    reference_log = log_dataset[plot_order[0]]
+    # Plot obstacles
+    if reference_log.obstacles is not None:
+        obstacle_list = []
+        for obstacle in reference_log.obstacles.T:
+            obstacle_list.append(mpatches.Circle(
+                (obstacle[1], obstacle[0]),
+                radius=obstacle[3],
+                alpha = 0.3,
+                # color = 'r',
+                # fill = True
+                ))
+        collection = PatchCollection(obstacle_list)
+        collection.set_edgecolor('r')
+        collection.set_facecolor('r')
+        axh.add_collection(collection)
+
+    axh.axis('equal')
+    axh.set_xlabel('East (m)')
+    axh.set_ylabel('North (m)')
+    axh.grid(True)
+    axh.legend(handles = legend_handles, fontsize='xx-small')
+
+    return (fig, axh)
+
+
 def plot_angular_rates(log_dataset, log_names=None, x_lims=None, y_lims=None, plot_ref=False,
     single_ref=False, single_legend=False):
 

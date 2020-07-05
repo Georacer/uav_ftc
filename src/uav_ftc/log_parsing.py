@@ -171,14 +171,17 @@ class LogData:
 def filter_log_data(log_data, t_start, t_end):
     log_data_filt = LogData()
 
-    databus_start_idx = np.where(log_data.time_databus > t_start)[0][0]
-    databus_end_idx = np.where(log_data.time_databus < t_end)[0][-1]
-    for attr_name in log_databus_attrs:
-        try:
-            filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
-            setattr(log_data_filt, attr_name, filtered_data)
-        except AttributeError as e:
-            warnings.warn('Tried to access non-existing log variable {}. Make sure it is not needed.'.format(attr_name))
+    try:
+        databus_start_idx = np.where(log_data.time_databus > t_start)[0][0]
+        databus_end_idx = np.where(log_data.time_databus < t_end)[0][-1]
+        for attr_name in log_databus_attrs:
+            try:
+                filtered_data = getattr(log_data, attr_name)[databus_start_idx:databus_end_idx+1]
+                setattr(log_data_filt, attr_name, filtered_data)
+            except AttributeError as e:
+                warnings.warn('Tried to access non-existing log variable {}. Make sure it is not needed.'.format(attr_name))
+    except (AttributeError, IndexError):
+        warnings.warn('Tried to access non-existing log time_databus. Make sure it is not needed.')
 
     try:
         estimates_start_idx = np.where(log_data.time_estimates > t_start)[0][0]
