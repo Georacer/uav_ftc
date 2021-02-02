@@ -221,29 +221,29 @@ target_include_directories(trajectory_controller_solver PUBLIC
   externals/qpoases/SRC
 )
 
-# The trajectory controller (no rudder) solver library
-add_library(trajectory_controller_solver_no_rud
-  externals/qpoases/SRC/Bounds.cpp
-  externals/qpoases/SRC/Constraints.cpp
-  externals/qpoases/SRC/CyclingManager.cpp
-  externals/qpoases/SRC/Indexlist.cpp
-  externals/qpoases/SRC/MessageHandling.cpp
-  externals/qpoases/SRC/QProblem.cpp
-  externals/qpoases/SRC/QProblemB.cpp
-  externals/qpoases/SRC/SubjectTo.cpp
-  externals/qpoases/SRC/Utils.cpp
-  externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
-  mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_qpoases_interface.cpp
-  mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_integrator.c
-  mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_solver.c
-  mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_auxiliary_functions.c
-)
-target_include_directories(trajectory_controller_solver_no_rud PUBLIC
-  mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/
-  externals/qpoases
-  externals/qpoases/INCLUDE
-  externals/qpoases/SRC
-)
+# # The trajectory controller (no rudder) solver library
+# add_library(trajectory_controller_solver_no_rud
+#   externals/qpoases/SRC/Bounds.cpp
+#   externals/qpoases/SRC/Constraints.cpp
+#   externals/qpoases/SRC/CyclingManager.cpp
+#   externals/qpoases/SRC/Indexlist.cpp
+#   externals/qpoases/SRC/MessageHandling.cpp
+#   externals/qpoases/SRC/QProblem.cpp
+#   externals/qpoases/SRC/QProblemB.cpp
+#   externals/qpoases/SRC/SubjectTo.cpp
+#   externals/qpoases/SRC/Utils.cpp
+#   externals/qpoases/SRC/EXTRAS/SolutionAnalysis.cpp
+#   mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_qpoases_interface.cpp
+#   mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_integrator.c
+#   mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_solver.c
+#   mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/acado_auxiliary_functions.c
+# )
+# target_include_directories(trajectory_controller_solver_no_rud PUBLIC
+#   mpc_models/trajectory_controller_no_rud/trajectory_controller_mpc_solver/
+#   externals/qpoases
+#   externals/qpoases/INCLUDE
+#   externals/qpoases/SRC
+# )
 
 # The trajectory controller (no airspeed) solver library
 add_library(trajectory_controller_solver_no_va
@@ -293,13 +293,13 @@ target_link_libraries(trajectory_controller_wrapper
   trajectory_controller_solver
 )
 
-# The trajectory controller (no rudder) wrapper
-add_library(trajectory_controller_no_rud_wrapper
-  src/mpc_wrapper.cpp
-)
-target_link_libraries(trajectory_controller_no_rud_wrapper
-  trajectory_controller_solver_no_rud
-)
+# # The trajectory controller (no rudder) wrapper
+# add_library(trajectory_controller_no_rud_wrapper
+#   src/mpc_wrapper.cpp
+# )
+# target_link_libraries(trajectory_controller_no_rud_wrapper
+#   trajectory_controller_solver_no_rud
+# )
 
 # The trajectory controller (no airspeed) wrapper
 add_library(trajectory_controller_no_va_wrapper
@@ -368,18 +368,18 @@ target_link_libraries(trajectory_controller
   iir::iir
 )
 
-# The trajectory (no rudder) controller
-add_executable(trajectory_controller_no_rud
-  src/trajectory_controller_no_rud.cpp
-)
-add_dependencies(trajectory_controller_no_rud ${catkin_EXPORTED_TARGETS} )
-target_link_libraries(trajectory_controller_no_rud
-  ${catkin_LIBRARIES}
-  ${last_letter_lib_LIBRARIES}
-  yaml-cpp
-  trajectory_controller_no_rud_wrapper
-  iir::iir
-)
+# # The trajectory (no rudder) controller
+# add_executable(trajectory_controller_no_rud
+#   src/trajectory_controller_no_rud.cpp
+# )
+# add_dependencies(trajectory_controller_no_rud ${catkin_EXPORTED_TARGETS} )
+# target_link_libraries(trajectory_controller_no_rud
+#   ${catkin_LIBRARIES}
+#   ${last_letter_lib_LIBRARIES}
+#   yaml-cpp
+#   trajectory_controller_no_rud_wrapper
+#   iir::iir
+# )
 
 # The trajectory (no airspeed) controller
 add_executable(trajectory_controller_no_va

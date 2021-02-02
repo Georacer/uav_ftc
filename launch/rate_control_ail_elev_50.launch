@@ -5,7 +5,7 @@
 	<!-- Available arguments -->
 	<arg name="manualMode" default="false"/>
 	<arg name="autoMode" default="false"/>
-	<arg name="uav_name" default="default"/>
+	<arg name="uav_name" default="default_ail_elev_50"/>
 	<arg name="log" default="true"/>
 
     <!-- Launch uav_ftc-related nodes -->
@@ -33,17 +33,17 @@
         <include file="$(find uav_ftc)/launch/data_sources.launch" />
 
         <!-- Raise rate controller -->
-        <node pkg="uav_ftc" name="rate_controller" type="rate_controller_pid" respawn="true" output="screen">
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
             <param name="~rate" value="50"/>
-            <param name="~kp_p" value="0.5"/>
-            <param name="~ki_p" value="0.0"/>
-            <param name="~kd_p" value="0.0"/>
-            <param name="~kp_q" value="0.25"/>
-            <param name="~ki_q" value="0.0"/>
-            <param name="~kd_q" value="0.0"/>
-            <param name="~kp_r" value="0.5"/>
-            <param name="~ki_r" value="0.0"/>
-            <param name="~kd_r" value="0.0"/>
+            <remap from="~wp" to="wp"/>
+            <remap from="~wq" to="wq"/>
+            <remap from="~wr" to="wr"/>
+            <remap from="~wda" to="wda"/>
+            <remap from="~wde" to="wde"/>
+            <remap from="~wdr" to="wdr"/>
+            <remap from="~wnp" to="wnp"/>
+            <remap from="~wnq" to="wnq"/>
+            <remap from="~wnr" to="wnr"/>
         </node>
 
         <!-- Raise input aggreggator node -->
@@ -60,7 +60,12 @@
         </node>
 
         <!-- Raise rosflight topic converted node -->
-        <node pkg="uav_ftc" name="rosflight_publisher" type="rosflight_publisher" respawn="true" output="screen"/>
+        <node pkg="uav_ftc" name="rosflight_publisher" type="rosflight_publisher" respawn="true" output="screen">
+            <param name="xscale" value="2.0"/>
+            <param name="yscale" value="2.0"/>
+            <param name="zscale" value="1.0"/>
+            <param name="fscale" value="1.0"/>
+        </node>
 
         <!--  -->
         <!-- Launch logger -->

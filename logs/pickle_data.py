@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Read ROS .bag files, extract all required data series and save as Python
 # pickle file. This is done to avoid re-parsing the whole log file while
@@ -6,6 +6,7 @@
 # NOTE: Will capture only the first waypoints, obstacles and rrt_path message
 
 import os
+import sys
 import pickle
 
 import numpy as np

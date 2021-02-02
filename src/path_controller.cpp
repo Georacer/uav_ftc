@@ -40,7 +40,7 @@ PathController::PathController(const PathControllerSettings& s)
     nlopt_set_ftol_abs(opt, 0.001);
     nlopt_set_xtol_abs1(opt, 0.001);
 
-    input_target_ << 0, 0, 15;
+    input_target_ << 0, 0, 18;
     
     // Setup optimization constraints
     // Convention:

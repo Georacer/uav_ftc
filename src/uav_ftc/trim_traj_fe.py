@@ -10,20 +10,26 @@ import itertools as it
 
 # import xyzpy as xyz
 import os
+import sys
 import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import click
-import imp
+import importlib
 
-import uav_model as mdl  # Import UAV model library
-import plot_utils as plu  # Import plotting utilities
-import polytope_utils as poly  # Used for SafeConvexPoly class
+from uav_ftc import uav_model as mdl  # Import UAV model library
+from uav_ftc import plot_utils as plu  # Import plotting utilities
+from uav_ftc import polytope_utils as poly  # Used for SafeConvexPoly class
 
-tcpp = imp.load_source(
+spec = importlib.util.spec_from_file_location(
     "trimmer",
-    "/home/george/ros_workspaces/uav_ftc/src/last_letter/last_letter_lib/src/trimmer.py",
-)
+    "/home/george/Dropbox/George/Projects/CSL/uav_ftc/ros_ws/src/last_letter/last_letter_lib/src/trimmer.py"
+    )
+tcpp = importlib.util.module_from_spec(spec)
+sys.modules['tcpp'] = tcpp
+spec.loader.exec_module(tcpp)
+# tcpp = imp.load_source(
+#)
 
 
 # Raise an error when invalid floating-point operations occur
@@ -379,6 +385,7 @@ def test_code(model_name, plot, interactive, export_path, verbose):
     flight_envelope.set_domain_gamma((-30, 30))
     flight_envelope.set_R_min(100)
     flight_envelope.initialize(model_name)
+    # flight_envelope.update_model()
     flight_envelope.flag_plot_points = False
 
     safe_poly = flight_envelope.find_flight_envelope()

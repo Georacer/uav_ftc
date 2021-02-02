@@ -1,0 +1,91 @@
+{
+    "relative_time": true,
+    "point_1": {
+        "time": 0,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_2": {
+        "time": 3,
+        "angular_rates": {
+            "p": 0.5,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_3": {
+        "time": 4,
+        "angular_rates": {
+            "p": -0.5,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_4": {
+        "time": 5,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_5": {
+        "time": 6,
+        "angular_rates": {
+            "p": 0,
+            "q": -0.5,
+            "r": 0
+        }
+    },
+    "point_6": {
+        "time": 7,
+        "angular_rates": {
+            "p": 0,
+            "q": 0.5,
+            "r": 0
+        }
+    },
+    "point_7": {
+        "time": 8,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_8": {
+        "time": 9,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0.25
+        }
+    },
+    "point_9": {
+        "time": 10,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": -0.25
+        }
+    },
+    "point_10": {
+        "time": 11,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    },
+    "point_11": {
+        "time": 12,
+        "angular_rates": {
+            "p": 0,
+            "q": 0,
+            "r": 0
+        }
+    }
+}

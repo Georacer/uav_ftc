@@ -86,7 +86,7 @@ def plot_2d(plot_data, plot_labels, series_names,
             if ('ref' in series_name) or ('est' in series_name):
                 if not plotted_ref or not single_ref:
                     axh.step(x_data, y_data, where='post', color=color, linestyle='dashed', linewidth=0.5)
-                    legend_handles.append(mpl.patches.Patch(color=color, label=series_name, hatch='/'))
+                    legend_handles.append(mpl.patches.Patch(color=color, label=series_name, hatch='////', Fill=False))
                     plotted_ref = True
             else:
                 if plot_type == 'plot':
@@ -407,7 +407,7 @@ def plot_trajectories(log_dataset, log_names=None, x_lims=None, y_lims=None,
     subfigure_names = []
     for log_idx, log_name in enumerate(log_names):
         if plot_ref:
-            subfigure_names.append(log_name + ' ref')
+            subfigure_names.append(log_name + ' reference')
         subfigure_names.append(log_name)
     for subf_idx in range(3):
         series_names[subf_idx] = subfigure_names

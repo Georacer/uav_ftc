@@ -4,13 +4,12 @@
 	<!-- Available arguments -->
 	<arg name="manualMode" default="false"/>
 	<arg name="autoMode" default="false"/>
-	<arg name="uav_name" default="nominal"/>
+	<arg name="uav_name" default="nominal_nofe"/>
 	<arg name="visuals" default="false"/>
 	<arg name="log" default="true"/>
-    <arg name="scenario" default="benchmark_1"/>
     <arg name="shutdownOnScenarioEnd" default="true"/>
-    <arg name="fe_name" default="nominal"/>
-    <arg name="log_name" default="02"/>
+    <arg name="fe_name" default="nominal_nofe"/>
+    <arg name="log_name" default="41"/>
 
     <!-- Launch last-letter simulation nodes -->
     <include file="$(find uav_ftc)/launch/last_letter_nodes.launch" >
@@ -22,6 +21,31 @@
     
     <!-- Launch uav_ftc-related nodes -->
     <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 3
+            wp: 1
+            wq: 1
+            wr: 1
+            wda: 1
+            wde: 1
+            wdr: 1
+            wnp: 1
+            wnq: 1
+            wnr: 1
+            deltaFMin: 0.0
+            pMin: -1.0
+            qMin: -1.0
+            rMin: -10
+            deltaFMax: 12.0
+            pMax: 1.0
+            qMax: 1.0
+            rMax: 10
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
+            waypointRadius: 20
+            numWpLookahead: 5
+        </rosparam>
 
         <!--  -->
         <!-- Launch logger -->
@@ -34,11 +58,9 @@
         </group>
 
         <!-- Launch the scenario player -->
-        <node pkg="uav_ftc" name="scenario_player" type="scenario_player.py" output="screen" required="$(arg shutdownOnScenarioEnd)">
+        <!-- <node pkg="uav_ftc" name="scenario_player" type="scenario_player.py" output="screen" required="$(arg shutdownOnScenarioEnd)">
             <param name="scenario" value="$(arg scenario)"/>
-        </node>
-
-        <!-- No Flight Envelope -->
+        </node> -->
 
         <!-- Launch the databus generator -->
         <rosparam command="load" file="$(find uav_ftc)data/parameters/data_bus.yaml" />
@@ -49,28 +71,19 @@
         <!--  -->
         <!-- Launch controllers -->
         <!--  -->
-        <!-- Load controller parameters -->
-        <rosparam>
-            ctrlMode: 2
-            deltaFMin: 0.0
-            pMin: -1.5
-            qMin: -1.5
-            rMin: -0.25
-            deltaFMax: 12.0
-            pMax: 1.5
-            qMax: 1.5
-            rMax: 0.25
-            referenceMin: [10.0, -0.52, -0.5]
-            referenceMax: [20.0,  0.52,  0.5]
-            wda: 1
-            wde: 1
-        </rosparam>
         
         <!-- Raise rate controller -->
         <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
             <param name="~rate" value="50"/>
+            <remap from="~wp" to="wp"/>
+            <remap from="~wq" to="wq"/>
+            <remap from="~wr" to="wr"/>
             <remap from="~wda" to="wda"/>
             <remap from="~wde" to="wde"/>
+            <remap from="~wdr" to="wdr"/>
+            <remap from="~wnp" to="wnp"/>
+            <remap from="~wnq" to="wnq"/>
+            <remap from="~wnr" to="wnr"/>
         </node>
         <!-- Raise velocity controller -->
         <node pkg="uav_ftc" name="trajectory_controller" type="trajectory_controller" respawn="true" output="screen">
@@ -85,10 +98,25 @@
             <remap from="~rMax" to="rMax"/>
         </node>
 
+        <!-- Raise path controller -->
+        <node pkg="uav_ftc" name="path_controller" type="path_controller" respawn="true" output="screen">
+            <param name="~rate" value="2"/>
+            <remap from="~waypointRadius" to="waypointRadius"/>
+            <remap from="~numWpLookahead" to="numWpLookahead"/>
+        </node>
+
+        <!-- Playback waypoints broadcasting from log file-->
+        <node pkg="rosbag" name="replayer" type="play" args="-d 2 $(find uav_ftc)logs/waypoints_sparse_filtered_synched.bag">
+            <remap from="/skywalker_2013_mod/obstacles" to="/$(arg uav_name)/obstacles"/>
+            <remap from="/skywalker_2013_mod/rrt_path" to="/$(arg uav_name)/rrt_path"/>
+            <remap from="/skywalker_2013_mod/waypoints" to="/$(arg uav_name)/waypoints"/>
+        </node>
+
         <!-- Raise input aggreggator node -->
         <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
             <remap from="~rate" to="/world/simRate"/>
         </node>
+
     </group>
 
 </launch>

@@ -27,8 +27,8 @@ import cdd
 import ppl
 import click
 
-import plot_utils as pu
-from ellipsoid_fit_python import ellipsoid_fit as el_fit
+from uav_ftc import plot_utils as pu
+from uav_ftc.ellipsoid_fit_python import ellipsoid_fit as el_fit
 
 mpl.rcParams['pdf.fonttype'] = 42 # Avoid Type 3 fonts, some journals don't accept them
 mpl.rcParams.update({'font.size': 14})

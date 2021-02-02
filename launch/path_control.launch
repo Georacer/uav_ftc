@@ -1,0 +1,89 @@
+<launch>
+<!-- Top-Level launch file for bundled launching /-->
+<!-- Launcher for the uav_ftc package -->
+
+	<!-- Available arguments -->
+	<arg name="manualMode" default="false"/>
+	<arg name="autoMode" default="false"/>
+	<arg name="uav_name" default="skywalker_2013_mod"/>
+	<arg name="log" default="false"/>
+    <arg name="scenario" default="none"/>
+    <arg name="shutdownOnScenarioEnd" default="false"/>
+
+    <!-- Launch uav_ftc-related nodes -->
+    <group ns="$(arg uav_name)">
+        <!-- Load controller parameters -->
+        <rosparam>
+            ctrlMode: 3
+            pMin: -1.5
+            qMin: -1.5
+            rMin: -0.25
+            pMax: 1.5
+            qMax: 1.5
+            rMax: 0.25
+            referenceMin: [10.0, -0.52, -0.5]
+            referenceMax: [20.0,  0.52,  0.5]
+            wp: 10
+            wq: 10
+            wr: 10
+            wda: 100
+            wde: 100
+            wdr: 100
+            wnp: 1000
+            wnq: 1000
+            wnr: 1000
+            wgamma: 1000.0
+            wpsidot: 10000.0
+            walpha: 0.01
+            wbeta: 100
+            wdp: 10.0
+            wdq: 50.0
+            wdr: 100.0
+            wphi: 0.01
+            wngamma: 10000.0
+            wnphi: 100.0
+        </rosparam>
+
+        <!--  -->
+        <!-- Launch data sources -->
+        <!--  -->
+        <include file="$(find uav_ftc)/launch/data_sources.launch" />
+
+        <!-- Raise rate controller -->
+        <node pkg="uav_ftc" name="rate_controller" type="rate_controller" respawn="true" output="screen">
+            <param name="~rate" value="50"/>
+            <remap from="~wp" to="wp"/>
+            <remap from="~wq" to="wq"/>
+            <remap from="~wr" to="wr"/>
+            <remap from="~wda" to="wda"/>
+            <remap from="~wde" to="wde"/>
+            <remap from="~wdr" to="wdr"/>
+            <remap from="~wnp" to="wnp"/>
+            <remap from="~wnq" to="wnq"/>
+            <remap from="~wnr" to="wnr"/>
+        </node>
+
+        <!-- Raise input aggreggator node -->
+        <node pkg="uav_ftc" name="input_aggregator" type="input_aggregator" output="screen">
+            <remap from="~rate" to="/world/simRate"/>
+        </node>
+
+        <!-- Raise reference generator node -->
+        <node pkg="uav_ftc" name="reference_generator" type="reference_generator" output="screen">
+            <remap from="~ctrlMode" to="ctrlMode"/>
+            <remap from="~referenceMin" to="referenceMin"/>
+            <remap from="~referenceMax" to="referenceMax"/>
+            <remap from="refCmds" to="refTrajectory"/>
+        </node>
+
+        <!-- Raise rosflight topic converted node -->
+        <node pkg="uav_ftc" name="rosflight_publisher" type="rosflight_publisher" output="screen"/>
+
+        <!--  -->
+        <!-- Launch logger -->
+        <!--  -->
+        <include if="$(arg log)" file="$(find uav_ftc)/launch/logger.launch" />
+
+    </group>
+
+</launch>
